@@ -1,37 +1,21 @@
 package cz.vut.fit.domainradar;
 
-import com.fasterxml.jackson.core.JsonFactory;
-import com.fasterxml.jackson.core.JsonFactoryBuilder;
-import com.fasterxml.jackson.core.StreamReadFeature;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import cz.vut.fit.domainradar.models.results.ExtendedDNSResult;
+import cz.vut.fit.domainradar.pipeline.collectors.*;
+import cz.vut.fit.domainradar.pipeline.*;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
-import com.fasterxml.jackson.datatype.jsr310.JSR310Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import cz.vut.fit.domainradar.models.dns.DNSData;
-import cz.vut.fit.domainradar.models.ip.GeoIPData;
-import cz.vut.fit.domainradar.models.ip.NERDData;
-import cz.vut.fit.domainradar.models.ip.RDAPAddressData;
-import cz.vut.fit.domainradar.models.ip.RTTData;
-import cz.vut.fit.domainradar.models.results.CommonIPResult;
-import cz.vut.fit.domainradar.models.results.DNSResult;
-import cz.vut.fit.domainradar.models.results.RDAPDomainResult;
-import cz.vut.fit.domainradar.models.results.ZoneResult;
-import cz.vut.fit.domainradar.models.dns.ZoneInfo;
-import cz.vut.fit.domainradar.models.requests.DNSProcessRequest;
-import cz.vut.fit.domainradar.models.requests.ZoneProcessRequest;
-import cz.vut.fit.domainradar.models.tls.TLSData;
-import cz.vut.fit.domainradar.serialization.JsonSerde;
+import org.apache.commons.cli.*;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.*;
-import org.apache.kafka.streams.kstream.Consumed;
-import org.apache.kafka.streams.kstream.Grouped;
-import org.apache.kafka.streams.kstream.Materialized;
-import org.apache.kafka.streams.kstream.Produced;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
@@ -40,31 +24,111 @@ public class Main {
     private static final Logger Logger = LoggerFactory.getLogger(Main.class);
 
     public static void main(String[] args) {
-        Properties ksProperties = new Properties();
-        ksProperties.put(StreamsConfig.APPLICATION_ID_CONFIG, "domainradar-pipeline");
-        ksProperties.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
+        final var options = new Options();
+        options.addOption("a", "all", false, "Use all pipeline components");
+        options.addOption("ac", "all-collectors", false, "Use all collectors");
+
+        options.addOption(null, "col-dns", false, "Use the DNS+TLS collector");
+        options.addOption(null, "col-geoip", false, "Use the GeoIP collector");
+        options.addOption(null, "col-nerd", false, "Use the NERD collector");
+        options.addOption(Option.builder()
+                .longOpt("col-ping")
+                .desc("Use the Ping/RTT collector")
+                .argName("collector ID")
+                .hasArg()
+                .build());
+        options.addOption(null, "col-rdap-dn", false, "Use the RDAP-DN collector");
+        options.addOption(null, "col-rdap-ip", false, "Use the RDAP-IP collector");
+        options.addOption(null, "col-zone", false, "Use the zone collector");
+        options.addOption(null, "merger", false, "Use the DNS/IP merger");
+        options.addOption(Option.builder("threads")
+                .option("t")
+                .longOpt("threads")
+                .desc("Number of threads to use")
+                .argName("num of threads")
+                .hasArg()
+                .type(Integer.class)
+                .build());
+        options.addOption(Option.builder("properties")
+                .longOpt("properties")
+                .option("p")
+                .desc("Path to a file with additional Kafka Streams properties")
+                .argName("path")
+                .hasArg()
+                .build());
+        options.addOption(Option.builder("id")
+                .longOpt("app-id")
+                .desc("Kafka Streams application ID (required)")
+                .argName("id")
+                .hasArg()
+                .required()
+                .build()
+        );
+        options.addOption(Option.builder("s")
+                .longOpt("bootstrap-server")
+                .desc("Kafka bootstrap server IP:port (required)")
+                .argName("ip:port")
+                .hasArg()
+                .required()
+                .build()
+        );
+        options.addOption("h", "help", false, "Print this help message");
+
+        final var parser = new DefaultParser();
+        CommandLine cmd;
+        try {
+            cmd = parser.parse(options, args, true);
+        } catch (ParseException e) {
+            if (Arrays.stream(args).anyMatch(arg -> arg.equals("-h") || arg.equals("--help"))) {
+                printHelpAndExit(options, 0);
+                return;
+            }
+
+            System.err.println(e.getMessage());
+            printHelpAndExit(options, 1);
+            return;
+        }
+
+        if (cmd.hasOption("h")) {
+            printHelpAndExit(options, 0);
+            return;
+        }
+
+        final Properties ksProperties = new Properties();
+        if (cmd.hasOption("properties")) {
+            // Open the file and load the properties
+            var path = cmd.getOptionValue("properties");
+            Logger.info("Loading properties from {}", path);
+            try (var inStream = new FileInputStream(path)) {
+                ksProperties.load(inStream);
+            } catch (IOException e) {
+                System.err.println("Failed to load properties: " + e.getMessage());
+                System.exit(1);
+                return;
+            }
+        }
+
+        int threads = 4;
+        if (cmd.hasOption("threads")) {
+            threads = Integer.parseInt(cmd.getOptionValue("threads"));
+        }
+
+        ksProperties.put(StreamsConfig.APPLICATION_ID_CONFIG, cmd.getOptionValue("id"));
+        ksProperties.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, cmd.getOptionValue("bootstrap-server"));
         ksProperties.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.StringSerde.class);
-        ksProperties.put(StreamsConfig.NUM_STREAM_THREADS_CONFIG, 6);
+        ksProperties.put(StreamsConfig.NUM_STREAM_THREADS_CONFIG, threads);
         ksProperties.put(StreamsConfig.DEFAULT_DESERIALIZATION_EXCEPTION_HANDLER_CLASS_CONFIG,
                 "org.apache.kafka.streams.errors.LogAndContinueExceptionHandler");
 
-
         final StreamsBuilder builder = new StreamsBuilder();
-        final Main main = new Main(builder);
+        final ObjectMapper jsonMapper = JsonMapper.builder()
+                .addModule(new JavaTimeModule())
+                .build();
 
-        main.rdapDnCol();
-        main.zoneCol();
-        main.dnsCol();
-        main.rdapIpCol();
-        main.geoIpCol();
-        main.nerdCol();
-        main.rttCol("A");
-        main.rttCol("B");
-        main.ipDataMerger();
+        populateBuilder(cmd, builder, jsonMapper);
 
         final Topology topology = builder.build(ksProperties);
         Logger.info("Topology: {}", topology.describe());
-        //System.exit(0);
 
         final CountDownLatch latch = new CountDownLatch(1);
         try (KafkaStreams streams = new KafkaStreams(topology, ksProperties)) {
@@ -77,6 +141,7 @@ public class Main {
             try {
                 streams.start();
                 latch.await();
+                System.exit(0);
             } catch (Throwable e) {
                 Logger.error("Unhandled exception", e);
                 System.exit(1);
@@ -84,137 +149,61 @@ public class Main {
         }
     }
 
-    private final StreamsBuilder _builder;
-    private final ObjectMapper _objectMapper;
-
-    public Main(StreamsBuilder builder) {
-        _builder = builder;
-        _objectMapper = JsonMapper.builder()
-                .addModule(new JavaTimeModule())
-                .build();
+    private static void printHelpAndExit(Options options, int exitCode) {
+        final var formatter = new HelpFormatter();
+        formatter.printHelp(119,
+                "domainradar-pipeline -id <Streams app ID> -s <Kafka bootstrap ip:port> [options]",
+                "", options, "");
+        System.exit(exitCode);
     }
 
-    public void rdapDnCol() {
-        _builder.stream("to_process_rdap", Consumed.with(Serdes.String(), Serdes.Void()))
-                .map((domainName, noValue) -> KeyValue.pair(domainName, new RDAPDomainResult(
-                        true, null, Instant.now(),
-                        "test1", "test2")))
-                .to("processed_rdap_dn", Produced.with(Serdes.String(), JsonSerde.of(_objectMapper, RDAPDomainResult.class)));
-    }
+    private static void populateBuilder(CommandLine cmd, StreamsBuilder builder, ObjectMapper jsonMapper) {
+        var useAllCollectors = cmd.hasOption("ac") || cmd.hasOption("a");
+        var useAll = cmd.hasOption("a");
 
-    public void zoneCol() {
-        var stream = _builder.stream("to_process_zone", Consumed.with(Serdes.String(),
-                        JsonSerde.of(_objectMapper, ZoneProcessRequest.class)))
-                .map((domainName, request) -> KeyValue.pair(domainName, new ZoneResult(
-                        true, null, Instant.now(),
-                        new ZoneInfo(new DNSData.SOARecord("test1", "test2", "123", 2, 3, 4, 5),
-                                domainName, Set.of("primary NS ip"), Set.of("sec NS 1", "sec NS 2"), Set.of("sec NS ip")))));
-        stream.to("processed_zone", Produced.with(Serdes.String(), JsonSerde.of(_objectMapper, ZoneResult.class)));
+        if (cmd.hasOption("col-dns") || useAllCollectors) {
+            var dnsCollector = new DNSCollector(jsonMapper);
+            dnsCollector.addTo(builder);
+        }
 
-        stream.filter((domainName, zoneResult) -> zoneResult.zone() != null)
-                .map((domainName, zoneResult) -> {
-                    assert zoneResult.zone() != null;
-                    return KeyValue.pair(domainName, new DNSProcessRequest(List.of("A", "AAAA", "MX"), zoneResult.zone()));
-                })
-                .to("to_process_DNS", Produced.with(Serdes.String(), JsonSerde.of(_objectMapper, DNSProcessRequest.class)));
-    }
+        if (cmd.hasOption("col-geoip") || useAllCollectors) {
+            var geoIpCollector = new GeoIPCollector(jsonMapper);
+            geoIpCollector.addTo(builder);
+        }
 
-    public void dnsCol() {
-        var inStream = _builder.stream("to_process_DNS",
-                        Consumed.with(Serdes.String(), JsonSerde.of(_objectMapper, DNSProcessRequest.class)))
-                .filter((domainName, request) -> request != null && request.zoneInfo() != null);
+        if (cmd.hasOption("col-nerd") || useAllCollectors) {
+            var nerdCollector = new NERDCollector(jsonMapper);
+            nerdCollector.addTo(builder);
+        }
 
-        var resolved = inStream.map((domainName, request) -> {
-            assert request.zoneInfo() != null;
-            return KeyValue.pair(domainName, new DNSResult(true, null, Instant.now(),
-                    new DNSData(Map.of("A", 1000, "AAAA", 3600, "MX", 11820),
-                            new DNSData.SOARecord("test1", "test2", "123", 2, 3, 4, 5),
-                            new DNSData.NSRecord("ns", null),
-                            List.of("1.2.3.4", "192.168.1.1"),
-                            List.of("5a::1"),
-                            null, null, null
-                    ),
-                    new TLSData("blah", "blahblah", 1,
-                            List.of(new TLSData.Certificate("abc", "def", true,
-                                    "blah", 1, Instant.MAX, Instant.MIN, 0, null))),
-                    Set.of("1.2.3.4", "192.168.1.1", "5a::1", "IP_" + domainName)));
-        });
+        if (cmd.hasOption("col-ping") || useAllCollectors) {
+            var pingId = cmd.getOptionValue("col-ping");
+            if (pingId == null) {
+                pingId = "default";
+            }
 
-        resolved.to("processed_DNS", Produced.with(Serdes.String(), JsonSerde.of(_objectMapper, DNSResult.class)));
+            var pingCollector = new PingCollector(jsonMapper, pingId);
+            pingCollector.addTo(builder);
+        }
 
-        resolved.flatMap((domainName, data) -> {
-                    assert data.ips() != null;
-                    return data.ips().stream().map(ip -> KeyValue.pair(ip, (Void) null)).toList();
-                })
-                .to("to_process_IP", Produced.with(Serdes.String(), Serdes.Void()));
-    }
+        if (cmd.hasOption("col-rdap-dn") || useAllCollectors) {
+            var rdapDnCollector = new RDAPDomainCollector(jsonMapper);
+            rdapDnCollector.addTo(builder);
+        }
 
-    public void rdapIpCol() {
-        var resultTypeRef = new TypeReference<CommonIPResult<RDAPAddressData>>() {
-        };
+        if (cmd.hasOption("col-rdap-ip") || useAllCollectors) {
+            var rdapIpCollector = new RDAPInetAddressCollector(jsonMapper);
+            rdapIpCollector.addTo(builder);
+        }
 
-        _builder.stream("to_process_IP", Consumed.with(Serdes.String(), Serdes.Void()))
-                .map((ip, noValue) -> KeyValue.pair(ip, new CommonIPResult<>(true, null, Instant.now(), "rdap_ip",
-                        new RDAPAddressData("foobar"))))
-                .to("collected_IP_data", Produced.with(Serdes.String(), JsonSerde.of(_objectMapper, resultTypeRef)));
-    }
+        if (cmd.hasOption("col-zone") || useAllCollectors) {
+            var zoneCollector = new ZoneCollector(jsonMapper);
+            zoneCollector.addTo(builder);
+        }
 
-    public void geoIpCol() {
-        var resultTypeRef = new TypeReference<CommonIPResult<GeoIPData>>() {
-        };
-
-        _builder.stream("to_process_IP", Consumed.with(Serdes.String(), Serdes.Void()))
-                .map((ip, noValue) -> KeyValue.pair(ip, new CommonIPResult<>(true, null, Instant.now(), "geoip",
-                        new GeoIPData("foobar", "asn"))))
-                .to("collected_IP_data", Produced.with(Serdes.String(), JsonSerde.of(_objectMapper, resultTypeRef)));
-    }
-
-    public void nerdCol() {
-        var resultTypeRef = new TypeReference<CommonIPResult<NERDData>>() {
-        };
-
-        _builder.stream("to_process_IP", Consumed.with(Serdes.String(), Serdes.Void()))
-                .map((ip, noValue) -> KeyValue.pair(ip, new CommonIPResult<>(true, null, Instant.now(), "nerd",
-                        new NERDData(0.91))))
-                .to("collected_IP_data", Produced.with(Serdes.String(), JsonSerde.of(_objectMapper, resultTypeRef)));
-    }
-
-    public void rttCol(String id) {
-        var resultTypeRef = new TypeReference<CommonIPResult<RTTData>>() {
-        };
-
-        _builder.stream("to_process_IP", Consumed.with(Serdes.String(), Serdes.Void()))
-                .map((ip, noValue) -> KeyValue.pair(ip, new CommonIPResult<>(true, null, Instant.now(), "rtt_" + id,
-                        new RTTData(true, 25, 0, id))))
-                .to("collected_IP_data", Produced.with(Serdes.String(), JsonSerde.of(_objectMapper, resultTypeRef)));
-    }
-
-    public void ipDataMerger() {
-        var commonIpResultOfNodeTypeRef = new TypeReference<CommonIPResult<JsonNode>>() {
-        };
-        var resultTypeRef = new TypeReference<HashMap<String, CommonIPResult<JsonNode>>>() {
-        };
-
-        var ipDataKTable =
-                _builder.stream("collected_IP_data", Consumed.with(Serdes.String(), Serdes.String()))
-                        .groupByKey(Grouped.with(Serdes.String(), Serdes.String()))
-                        .aggregate(HashMap::new, (ip, partialData, aggregate) ->
-                        {
-                            try {
-                                var val = _objectMapper.readValue(partialData, commonIpResultOfNodeTypeRef);
-                                if (val.success()) {
-                                    aggregate.put(val.collector(), val);
-                                }
-                            } catch (Throwable e) {
-                                // todo
-                                return aggregate;
-                            }
-
-                            return aggregate;
-                        }, Materialized.with(Serdes.String(), JsonSerde.of(_objectMapper, resultTypeRef)));
-
-        var ipDataStream = ipDataKTable.toStream();
-        ipDataStream.foreach((key, value) -> Logger.warn("IP {} data: {}", key, value));
-        ipDataStream.to("grouped_IP_data");
+        if (cmd.hasOption("merger") || useAll) {
+            var merger = new IPDataMergerComponent(jsonMapper);
+            merger.addTo(builder);
+        }
     }
 }
