@@ -31,4 +31,9 @@ public class NERDCollector implements PipelineComponent {
                         new NERDData(0.91))))
                 .to("collected_IP_data", Produced.with(Serdes.String(), JsonSerde.of(_jsonMapper, _resultTypeRef)));
     }
+
+    @Override
+    public String getName() {
+        return "COL_NERD";
+    }
 }

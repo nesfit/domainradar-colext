@@ -13,6 +13,7 @@ import org.apache.kafka.streams.kstream.Consumed;
 import org.apache.kafka.streams.kstream.Produced;
 
 import java.time.Instant;
+import java.util.Random;
 
 public class PingCollector implements PipelineComponent {
     private final ObjectMapper _jsonMapper;
@@ -27,9 +28,24 @@ public class PingCollector implements PipelineComponent {
 
     @Override
     public void addTo(StreamsBuilder builder) {
+        final var rnd = new Random();
+
         builder.stream("to_process_IP", Consumed.with(Serdes.String(), Serdes.Void()))
-                .map((ip, noValue) -> KeyValue.pair(ip, new CommonIPResult<>(true, null, Instant.now(), "rtt_" + _collectorId,
-                        new RTTData(true, 25, 0, _collectorId))))
+                .map((ip, noValue) -> {
+                    try {
+                        Thread.sleep(rnd.nextInt(2000));
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+
+                    return KeyValue.pair(ip, new CommonIPResult<>(true, null, Instant.now(), "rtt_" + _collectorId,
+                            new RTTData(true, 25, 0, _collectorId)));
+                }, namedOp("resolve"))
                 .to("collected_IP_data", Produced.with(Serdes.String(), JsonSerde.of(_jsonMapper, _resultTypeRef)));
+    }
+
+    @Override
+    public String getName() {
+        return "COL_PING_" + _collectorId;
     }
 }

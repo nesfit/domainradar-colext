@@ -1,6 +1,5 @@
 package cz.vut.fit.domainradar.serialization;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.kafka.common.errors.SerializationException;
 import org.apache.kafka.common.header.Headers;
@@ -11,7 +10,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 
 public class JsonDeserializerTypedByClass<T> implements Deserializer<T> {
-
     private final ObjectMapper _objectMapper;
     private final Class<T> _forType;
 
@@ -20,10 +18,9 @@ public class JsonDeserializerTypedByClass<T> implements Deserializer<T> {
         _forType = forType;
     }
 
-
     @Override
     public T deserialize(String s, byte[] bytes) {
-        if (bytes == null)
+        if (bytes == null || bytes.length == 0)
             return null;
 
         try {
@@ -35,12 +32,12 @@ public class JsonDeserializerTypedByClass<T> implements Deserializer<T> {
 
     @Override
     public T deserialize(String topic, Headers headers, ByteBuffer data) {
-        if (data == null)
+        if (data == null || !data.hasRemaining())
             return null;
 
         try (var is = new ByteBufferInputStream(data)) {
             return _objectMapper.readValue(is, _forType);
-        } catch (IOException e) {
+        } catch (Exception e) {
             throw new SerializationException(e);
         }
     }

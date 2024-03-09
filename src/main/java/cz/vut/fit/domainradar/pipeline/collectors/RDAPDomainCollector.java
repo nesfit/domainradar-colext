@@ -24,7 +24,12 @@ public class RDAPDomainCollector implements PipelineComponent {
         builder.stream("to_process_rdap", Consumed.with(Serdes.String(), Serdes.Void()))
                 .map((domainName, noValue) -> KeyValue.pair(domainName, new RDAPDomainResult(
                         true, null, Instant.now(),
-                        "test1", "test2")))
+                        "test1", "test2")), namedOp("resolve"))
                 .to("processed_rdap_dn", Produced.with(Serdes.String(), JsonSerde.of(_jsonMapper, RDAPDomainResult.class)));
+    }
+
+    @Override
+    public String getName() {
+        return "COL_RDAP_DN";
     }
 }

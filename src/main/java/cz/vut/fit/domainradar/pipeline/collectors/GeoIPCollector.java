@@ -28,7 +28,12 @@ public class GeoIPCollector implements PipelineComponent {
 
         builder.stream("to_process_IP", Consumed.with(Serdes.String(), Serdes.Void()))
                 .map((ip, noValue) -> KeyValue.pair(ip, new CommonIPResult<>(true, null, Instant.now(), "geoip",
-                        new GeoIPData("foobar", "asn"))))
+                        new GeoIPData("foobar", "asn"))), namedOp("resolve"))
                 .to("collected_IP_data", Produced.with(Serdes.String(), JsonSerde.of(_jsonMapper, _resultTypeRef)));
+    }
+
+    @Override
+    public String getName() {
+        return "COL_GEOIP";
     }
 }

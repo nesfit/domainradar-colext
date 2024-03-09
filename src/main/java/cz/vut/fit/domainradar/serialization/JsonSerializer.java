@@ -6,7 +6,6 @@ import org.apache.kafka.common.errors.SerializationException;
 import org.apache.kafka.common.serialization.Serializer;
 
 public class JsonSerializer<T> implements Serializer<T> {
-
     private final ObjectMapper _objectMapper;
 
     public JsonSerializer(ObjectMapper objectMapper) {

@@ -11,7 +11,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 
 public class JsonDeserializerTypedByTypeReference<T> implements Deserializer<T> {
-
     private final ObjectMapper _objectMapper;
     private final TypeReference<T> _typeRef;
 
@@ -20,10 +19,9 @@ public class JsonDeserializerTypedByTypeReference<T> implements Deserializer<T> 
         _typeRef = forType;
     }
 
-
     @Override
     public T deserialize(String s, byte[] bytes) {
-        if (bytes == null)
+        if (bytes == null || bytes.length == 0)
             return null;
 
         try {
@@ -35,12 +33,12 @@ public class JsonDeserializerTypedByTypeReference<T> implements Deserializer<T> 
 
     @Override
     public T deserialize(String topic, Headers headers, ByteBuffer data) {
-        if (data == null)
+        if (data == null || !data.hasRemaining())
             return null;
 
         try (var is = new ByteBufferInputStream(data)) {
             return _objectMapper.readValue(is, _typeRef);
-        } catch (IOException e) {
+        } catch (Exception e) {
             throw new SerializationException(e);
         }
     }

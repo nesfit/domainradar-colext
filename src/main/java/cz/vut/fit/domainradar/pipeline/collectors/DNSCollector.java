@@ -29,7 +29,7 @@ public class DNSCollector implements PipelineComponent {
     public void addTo(StreamsBuilder builder) {
         var inStream = builder.stream("to_process_DNS",
                         Consumed.with(Serdes.String(), JsonSerde.of(_jsonMapper, DNSProcessRequest.class)))
-                .filter((domainName, request) -> request != null && request.zoneInfo() != null);
+                .filter((domainName, request) -> request != null && request.zoneInfo() != null, namedOp("filter_null_requests"));
 
         var resolved = inStream.map((domainName, request) -> {
                     assert request.zoneInfo() != null;
@@ -44,15 +44,19 @@ public class DNSCollector implements PipelineComponent {
                             new TLSData("blah", "blahblah", 1,
                                     List.of(new TLSData.Certificate("abc", "def", true,
                                             "blah", 1, Instant.MAX, Instant.MIN, 0, null))),
-                            Set.of("1.2.3.4", "192.168.1.1", "5a::1", "IP_" + domainName)));
-                }
-        );
+                            Set.of("IP1_" + domainName, "5a::1", "IP2_" + domainName)));
+                }, namedOp("resolve"));
 
         resolved.to("processed_DNS", Produced.with(Serdes.String(), JsonSerde.of(_jsonMapper, DNSResult.class)));
 
         resolved.flatMap((domainName, data) -> {
             assert data.ips() != null;
             return data.ips().stream().map(ip -> KeyValue.pair(ip, (Void) null)).toList();
-        }).to("to_process_IP", Produced.with(Serdes.String(), Serdes.Void()));
+        }, namedOp("process_IPs_from_DNS")).to("to_process_IP", Produced.with(Serdes.String(), Serdes.Void()));
+    }
+
+    @Override
+    public String getName() {
+        return "COL_DNS";
     }
 }

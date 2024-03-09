@@ -1,14 +1,12 @@
 package cz.vut.fit.domainradar.serialization;
 
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonDeserializer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.kafka.common.serialization.Deserializer;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serializer;
 
 public class JsonSerde<T> implements Serde<T> {
-
     private final JsonSerializer<T> _serializer;
     private final Deserializer<T> _deserializer;
 

@@ -32,14 +32,20 @@ public class ZoneCollector implements PipelineComponent {
                 .map((domainName, request) -> KeyValue.pair(domainName, new ZoneResult(
                         true, null, Instant.now(),
                         new ZoneInfo(new DNSData.SOARecord("test1", "test2", "123", 2, 3, 4, 5),
-                                domainName, Set.of("primary NS ip"), Set.of("sec NS 1", "sec NS 2"), Set.of("sec NS ip")))));
+                                domainName, Set.of("primary NS ip"), Set.of("sec NS 1", "sec NS 2"), Set.of("sec NS ip")))),
+                        namedOp("resolve"));
         stream.to("processed_zone", Produced.with(Serdes.String(), JsonSerde.of(_jsonMapper, ZoneResult.class)));
 
         stream.filter((domainName, zoneResult) -> zoneResult.zone() != null)
                 .map((domainName, zoneResult) -> {
                     assert zoneResult.zone() != null;
                     return KeyValue.pair(domainName, new DNSProcessRequest(List.of("A", "AAAA", "MX"), zoneResult.zone()));
-                })
+                }, namedOp("process_DNS_from_zone"))
                 .to("to_process_DNS", Produced.with(Serdes.String(), JsonSerde.of(_jsonMapper, DNSProcessRequest.class)));
+    }
+
+    @Override
+    public String getName() {
+        return "COL_ZONE";
     }
 }
