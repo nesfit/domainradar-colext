@@ -21,11 +21,11 @@ public class RDAPDomainCollector implements PipelineComponent {
 
     @Override
     public void addTo(StreamsBuilder builder) {
-        builder.stream("to_process_rdap", Consumed.with(Serdes.String(), Serdes.Void()))
+        builder.stream("to_process_RDAP_DN", Consumed.with(Serdes.String(), Serdes.Void()))
                 .map((domainName, noValue) -> KeyValue.pair(domainName, new RDAPDomainResult(
                         true, null, Instant.now(),
                         "test1", "test2")), namedOp("resolve"))
-                .to("processed_rdap_dn", Produced.with(Serdes.String(), JsonSerde.of(_jsonMapper, RDAPDomainResult.class)));
+                .to("processed_RDAP_DN", Produced.with(Serdes.String(), JsonSerde.of(_jsonMapper, RDAPDomainResult.class)));
     }
 
     @Override

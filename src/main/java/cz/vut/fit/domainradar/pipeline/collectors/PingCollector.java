@@ -32,14 +32,17 @@ public class PingCollector implements PipelineComponent {
 
         builder.stream("to_process_IP", Consumed.with(Serdes.String(), Serdes.Void()))
                 .map((ip, noValue) -> {
-                    try {
-                        Thread.sleep(rnd.nextInt(2000));
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
+                    if (RANDOM_DELAYS) {
+                        try {
+                            Thread.sleep(rnd.nextInt(3000));
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
                     }
 
+
                     return KeyValue.pair(ip, new CommonIPResult<>(true, null, Instant.now(), "rtt_" + _collectorId,
-                            new RTTData(true, 25, 0, _collectorId)));
+                            new RTTData(true, rnd.nextInt(100), rnd.nextInt(4), _collectorId)));
                 }, namedOp("resolve"))
                 .to("collected_IP_data", Produced.with(Serdes.String(), JsonSerde.of(_jsonMapper, _resultTypeRef)));
     }

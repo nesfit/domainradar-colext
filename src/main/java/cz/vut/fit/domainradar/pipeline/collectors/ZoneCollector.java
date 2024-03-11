@@ -16,6 +16,7 @@ import org.apache.kafka.streams.kstream.Produced;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Random;
 import java.util.Set;
 
 public class ZoneCollector implements PipelineComponent {
@@ -27,12 +28,23 @@ public class ZoneCollector implements PipelineComponent {
 
     @Override
     public void addTo(StreamsBuilder builder) {
+        final var rnd = new Random();
+
         var stream = builder.stream("to_process_zone", Consumed.with(Serdes.String(),
                         JsonSerde.of(_jsonMapper, ZoneProcessRequest.class)))
-                .map((domainName, request) -> KeyValue.pair(domainName, new ZoneResult(
-                        true, null, Instant.now(),
-                        new ZoneInfo(new DNSData.SOARecord("test1", "test2", "123", 2, 3, 4, 5),
-                                domainName, Set.of("primary NS ip"), Set.of("sec NS 1", "sec NS 2"), Set.of("sec NS ip")))),
+                .map((domainName, request) -> {
+                            if (RANDOM_DELAYS) {
+                                try {
+                                    Thread.sleep(rnd.nextInt(1000));
+                                } catch (InterruptedException e) {
+                                    e.printStackTrace();
+                                }
+                            }
+                            return KeyValue.pair(domainName, new ZoneResult(
+                                    true, null, Instant.now(),
+                                    new ZoneInfo(new DNSData.SOARecord("test1", "test2", "123", 2, 3, 4, 5),
+                                            domainName, Set.of("primary NS ip"), Set.of("sec NS 1", "sec NS 2"), Set.of("sec NS ip"))));
+                        },
                         namedOp("resolve"));
         stream.to("processed_zone", Produced.with(Serdes.String(), JsonSerde.of(_jsonMapper, ZoneResult.class)));
 

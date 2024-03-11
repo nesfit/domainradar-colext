@@ -13,6 +13,7 @@ import org.apache.kafka.streams.kstream.Consumed;
 import org.apache.kafka.streams.kstream.Produced;
 
 import java.time.Instant;
+import java.util.Random;
 
 public class GeoIPCollector implements PipelineComponent {
     private final ObjectMapper _jsonMapper;
@@ -25,10 +26,21 @@ public class GeoIPCollector implements PipelineComponent {
 
     @Override
     public void addTo(StreamsBuilder builder) {
+        final var rnd = new Random();
 
         builder.stream("to_process_IP", Consumed.with(Serdes.String(), Serdes.Void()))
-                .map((ip, noValue) -> KeyValue.pair(ip, new CommonIPResult<>(true, null, Instant.now(), "geoip",
-                        new GeoIPData("foobar", "asn"))), namedOp("resolve"))
+                .map((ip, noValue) -> {
+                    if (RANDOM_DELAYS) {
+                        try {
+                            Thread.sleep(rnd.nextInt(500));
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                    }
+
+                    return KeyValue.pair(ip, new CommonIPResult<>(true, null, Instant.now(),
+                            "geoip", new GeoIPData("foobar_" + ip, "AS" + rnd.nextInt())));
+                }, namedOp("resolve"))
                 .to("collected_IP_data", Produced.with(Serdes.String(), JsonSerde.of(_jsonMapper, _resultTypeRef)));
     }
 
