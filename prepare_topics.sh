@@ -24,7 +24,7 @@ echo Creating to process topics
 ./kafka-topics.sh --bootstrap-server "$BOOTSTRAP" --create --topic processed_DNS --partitions $PROCSSED_PARTITIONS
 ./kafka-topics.sh --bootstrap-server "$BOOTSTRAP" --create --topic processed_RDAP_DN --partitions $PROCSSED_PARTITIONS
 ./kafka-topics.sh --bootstrap-server "$BOOTSTRAP" --create --topic collected_IP_data --partitions $PROCSSED_PARTITIONS
-./kafka-topics.sh --bootstrap-server "$BOOTSTRAP" --create --topic merged_IP_data --partitions $PROCSSED_PARTITIONS
+./kafka-topics.sh --bootstrap-server "$BOOTSTRAP" --create --topic merged_DNS_IP --partitions $PROCSSED_PARTITIONS
 echo "-------"
 
 echo Topics after:

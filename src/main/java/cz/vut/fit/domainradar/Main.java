@@ -177,13 +177,16 @@ public class Main {
         }
 
         if (cmd.hasOption("col-ping") || useAllCollectors) {
-            var pingId = cmd.getOptionValue("col-ping");
-            if (pingId == null) {
-                pingId = "default";
+            var pingIds = cmd.getOptionValues("col-ping");
+            if (pingIds == null || pingIds.length == 0) {
+                var pingCollector = new PingCollector(jsonMapper, "default");
+                pingCollector.addTo(builder);
+            } else {
+                for (var id : pingIds) {
+                    var pingCollector = new PingCollector(jsonMapper, id);
+                    pingCollector.addTo(builder);
+                }
             }
-
-            var pingCollector = new PingCollector(jsonMapper, pingId);
-            pingCollector.addTo(builder);
         }
 
         if (cmd.hasOption("col-rdap-dn") || useAllCollectors) {

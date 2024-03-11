@@ -1,12 +1,14 @@
 package cz.vut.fit.domainradar.pipeline.collectors;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import cz.vut.fit.domainradar.models.StringPair;
 import cz.vut.fit.domainradar.models.dns.DNSData;
 import cz.vut.fit.domainradar.models.requests.DNSProcessRequest;
 import cz.vut.fit.domainradar.models.results.DNSResult;
 import cz.vut.fit.domainradar.models.tls.TLSData;
 import cz.vut.fit.domainradar.pipeline.PipelineComponent;
 import cz.vut.fit.domainradar.serialization.JsonSerde;
+import cz.vut.fit.domainradar.serialization.StringPairSerde;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.StreamsBuilder;
@@ -63,8 +65,9 @@ public class DNSCollector implements PipelineComponent {
 
         resolved.flatMap((domainName, data) -> {
             assert data.ips() != null;
-            return data.ips().stream().map(ip -> KeyValue.pair(ip, (Void) null)).toList();
-        }, namedOp("process_IPs_from_DNS")).to("to_process_IP", Produced.with(Serdes.String(), Serdes.Void()));
+            return data.ips().stream().map(ip -> KeyValue.pair(new StringPair(domainName, ip), (Void) null)).toList();
+        }, namedOp("process_IPs_from_DNS"))
+                .to("to_process_IP", Produced.with(StringPairSerde.build(), Serdes.Void()));
     }
 
     @Override

@@ -15,9 +15,9 @@ public record ExtendedDNSResult(boolean success,
                                 Instant lastAttempt,
                                 @Nullable DNSData dnsData,
                                 @Nullable TLSData tlsData,
-                                @Nullable Map<String, List<Map<String, CommonIPResult<JsonNode>>>> ips
+                                @Nullable Map<String, Map<String, CommonIPResult<JsonNode>>> ips
 ) implements Result {
-    public ExtendedDNSResult(DNSResult result, @Nullable Map<String, List<Map<String, CommonIPResult<JsonNode>>>> ips) {
+    public ExtendedDNSResult(DNSResult result, @Nullable Map<String, Map<String, CommonIPResult<JsonNode>>> ips) {
         this(result.success(), result.error(), result.lastAttempt(), result.dnsData(), result.tlsData(), ips);
     }
 }

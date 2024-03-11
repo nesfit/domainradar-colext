@@ -6,6 +6,7 @@ import cz.vut.fit.domainradar.models.ip.RTTData;
 import cz.vut.fit.domainradar.models.results.CommonIPResult;
 import cz.vut.fit.domainradar.pipeline.PipelineComponent;
 import cz.vut.fit.domainradar.serialization.JsonSerde;
+import cz.vut.fit.domainradar.serialization.StringPairSerde;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.StreamsBuilder;
@@ -30,7 +31,7 @@ public class PingCollector implements PipelineComponent {
     public void addTo(StreamsBuilder builder) {
         final var rnd = new Random();
 
-        builder.stream("to_process_IP", Consumed.with(Serdes.String(), Serdes.Void()))
+        builder.stream("to_process_IP", Consumed.with(StringPairSerde.build(), Serdes.Void()))
                 .map((ip, noValue) -> {
                     if (RANDOM_DELAYS) {
                         try {
@@ -44,7 +45,7 @@ public class PingCollector implements PipelineComponent {
                     return KeyValue.pair(ip, new CommonIPResult<>(true, null, Instant.now(), "rtt_" + _collectorId,
                             new RTTData(true, rnd.nextInt(100), rnd.nextInt(4), _collectorId)));
                 }, namedOp("resolve"))
-                .to("collected_IP_data", Produced.with(Serdes.String(), JsonSerde.of(_jsonMapper, _resultTypeRef)));
+                .to("collected_IP_data", Produced.with(StringPairSerde.build(), JsonSerde.of(_jsonMapper, _resultTypeRef)));
     }
 
     @Override
