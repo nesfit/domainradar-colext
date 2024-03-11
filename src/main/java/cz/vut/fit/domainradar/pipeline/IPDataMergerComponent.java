@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class IPDataMergerComponent implements PipelineComponent {
     public record DataForDomainIP(boolean success,
@@ -66,7 +67,7 @@ public class IPDataMergerComponent implements PipelineComponent {
         var commonIpResultOfNodeTypeRef = new TypeReference<CommonIPResult<JsonNode>>() {
         };
         var commonIpResultSerde = JsonSerde.of(_jsonMapper, commonIpResultOfNodeTypeRef);
-        var hashMapWithIpResultsTypeRef = new TypeReference<HashMap<String, CommonIPResult<JsonNode>>>() {
+        var hashMapWithIpResultsTypeRef = new TypeReference<ConcurrentHashMap<String, CommonIPResult<JsonNode>>>() {
         };
         var hashMapWithIpResultsSerde = JsonSerde.of(_jsonMapper, hashMapWithIpResultsTypeRef);
 
@@ -88,7 +89,7 @@ public class IPDataMergerComponent implements PipelineComponent {
                 // Aggregate the results from the collectors to a HashMap keyed by the collector name.
                 // If there are multiple results from the same collector, the last successful one wins.
                 // It doesn't matter that several domains may yield the same IP.
-                .aggregate(HashMap::new, (ip, partialData, aggregate) ->
+                .aggregate(ConcurrentHashMap::new, (ip, partialData, aggregate) ->
                 {
                     var existingRecord = aggregate.get(partialData.collector());
                     if (existingRecord != null) {
@@ -105,34 +106,101 @@ public class IPDataMergerComponent implements PipelineComponent {
                     return aggregate;
                 }, namedOp("aggregate_data_per_IP"), Materialized.with(Serdes.String(), hashMapWithIpResultsSerde));
 
+        // Print, TODO: remove
         aggregatedDataPerIP
                 .toStream()
-                .foreach((k, v) -> Logger.warn("Aggregated data for IP {}:\n\t{}", k, v));
+                .foreach((k, v) -> {
+                    var data = String.join("\n", v.entrySet().stream()
+                            .map(x -> "\t" + x.getValue().collector() + ":" + x.getValue().lastAttempt()).toList());
+                    Logger.warn("Aggregated data for IP {}:\n{}", k, data);
+                });
+
+        // Store
+        aggregatedDataPerIP
+                .toStream()
+                .to("merged_IP_data", Produced.with(Serdes.String(), hashMapWithIpResultsSerde));
+
+        // Interpret as a GlobalKTable
+        var aggregatedDataPerIPGlobalKTable = builder.globalTable("merged_IP_data",
+                Consumed.with(Serdes.String(), hashMapWithIpResultsSerde));
 
         // This sub-topology consumes the processed DNS data and joins it with the aggregated data for each
         // IP discovered in the DNS.
         //noinspection DataFlowIssue : false positives in .stream()
-        var x = builder.stream("processed_DNS", Consumed.with(Serdes.String(), dnsResultSerde))
+        var aggregatedDataPerDomainIP = builder
+                .stream("processed_DNS", Consumed.with(Serdes.String(), dnsResultSerde))
                 // Only take the DNS results that contain IPs (the rest are processed separately below).
                 .filter((domain, dns) -> dns != null && dns.ips() != null && !dns.ips().isEmpty(), namedOp("filter_DNS_with_IPs"))
                 // Transform the DNS result to a series of data records keyed by the IPs, each containing a copy
                 // of the DNS result and a reference to the source domain name and the IP.
-                .flatMap((domain, dns) -> dns.ips().stream().map((ip) ->
-                        new KeyValue<>(ip, new DataForDomainIP(dns, domain, ip))).toList(), namedOp("flat_map_DNS_data_to_IPs"))
+                .flatMap((domain, dns) -> dns.ips().stream().map((ip) -> {
+                    Logger.warn("Flatmapping IP {} from domain {}", ip, domain);
+                    return new KeyValue<>(ip, new DataForDomainIP(dns, domain, ip));
+                }).toList(), namedOp("flat_map_DNS_data_to_IPs"))
+                .join(aggregatedDataPerIPGlobalKTable, (leftKey, leftVal) -> leftKey,
+                        (leftVal, rightVal) -> new DataForDomainIP(leftVal, rightVal))
+                .map((ip, data) -> new KeyValue<>(data.dn(), data));
+
+
                 // Join the per-IP DNS data with the aggregated collected data for the same IP.
-                .join(aggregatedDataPerIP,
+                /*.join(aggregatedDataPerIP,
                         (ip, ipDomainData, aggregatedIpData) -> new DataForDomainIP(ipDomainData, aggregatedIpData),
-                        Joined.with(Serdes.String(), dataForDomainIpSerde, hashMapWithIpResultsSerde));
+                        Joined.with(Serdes.String(), dataForDomainIpSerde, hashMapWithIpResultsSerde))
+                // Re-key the data by the domain name.
+                .map((ip, data) -> new KeyValue<>(data.dn(), data), namedOp("rekey_joined_IP_data_by_domain")); */
 
-        x.foreach((k, v) -> Logger.warn("Joined data for IP {} (of {}): {}", k, v.dn, v));
 
-        // Re-key the data by the domain name.
-        var y = x.map((ip, data) -> new KeyValue<>(data.dn(), data), namedOp("rekey_joined_IP_data_by_domain"))
+        // Print, TODO: remove
+        aggregatedDataPerDomainIP.foreach((k, v) -> Logger.warn("Joined data for IP {} (of {}): {}", v.ip, k, v));
+
+        // addWindowedProcessor(aggregatedDataPerDomainIP, dataForDomainIpSerde);
+        addNonWindowedProcessor(aggregatedDataPerDomainIP, dataForDomainIpSerde, extendedDnsResultSerde);
+
+        // addWithoutIPProcessor(builder, dnsResultSerde, extendedDnsResultSerde);
+    }
+
+    private void addNonWindowedProcessor(KStream<@Nullable String, DataForDomainIP> aggregatedDataPerDomainIP, JsonSerde<DataForDomainIP> dataForDomainIpSerde, JsonSerde<ExtendedDNSResult> extendedDnsResultSerde) {
+        // Now we need to aggregate so that the DNS data is kept and the IP data maps are collected into
+        // a single map of maps keyed by the IP.
+        aggregatedDataPerDomainIP
+                .groupByKey(Grouped.with(Serdes.String(), dataForDomainIpSerde))
+                .aggregate(IPDataForDomainAggregator::new, (domain, data, aggregate) -> {
+                            // The aggregator is a simple structure that contains the DNS data and a map of IP -> IP data.
+                            // We always want to keep the latest DNS data.
+                            if (aggregate.dnsData == null ||
+                                    (data.success && data.lastAttempt.isAfter(aggregate.dnsData.lastAttempt()))) {
+                                aggregate.dnsData = new ExtendedDNSResult(data.success, data.error, data.lastAttempt,
+                                        data.dnsData, data.tlsData, null);
+                            }
+
+                            var existingListForIps = aggregate.ipData.get(data.ip());
+                            //noinspection Java8MapApi
+                            if (existingListForIps == null) {
+                                aggregate.ipData.put(data.ip(), existingListForIps = new ArrayList<>());
+                            }
+
+                            existingListForIps.add(data.ipData);
+                            return aggregate;
+                        }, namedOp("aggregate_collected_IP_data_per_domain_nw"),
+                        Materialized.with(Serdes.String(), JsonSerde.of(_jsonMapper, IPDataForDomainAggregator.class)))
+                .mapValues((v) -> new ExtendedDNSResult(v.dnsData.success(), v.dnsData.error(), v.dnsData.lastAttempt(), v.dnsData.dnsData(),
+                                v.dnsData.tlsData(), v.ipData),
+                        Materialized.with(Serdes.String(), extendedDnsResultSerde))
+                .toStream()
+                .foreach((k, v) -> Logger.warn("Aggregated data for domain {}: {}", k, v));
+
+        //.to("merged_DNS_IP",
+        //       Produced.with(Serdes.String(), extendedDnsResultSerde));
+    }
+
+    private void addWindowedProcessor(KStream<@Nullable String, DataForDomainIP> aggregatedDataPerDomainIP,
+                                      JsonSerde<DataForDomainIP> dataForDomainIpSerde) {
+        var y = aggregatedDataPerDomainIP
                 // At this point, we've got a stream of {Domain Name} -> DNS data + all collected data for a single IP,
                 // there are multiple records for each domain name, one for each IP.
                 // Group all records by the domain name.
                 .groupByKey(Grouped.with(Serdes.String(), dataForDomainIpSerde))
-                .windowedBy(SessionWindows.ofInactivityGapWithNoGrace(Duration.ofSeconds(10)))
+                .windowedBy(SessionWindows.ofInactivityGapWithNoGrace(Duration.ofSeconds(15)))
                 .aggregate(IPDataForDomainAggregator::new, (domain, data, aggregate) -> {
                             if (aggregate.dnsData == null ||
                                     (data.success && data.lastAttempt.isAfter(aggregate.dnsData.lastAttempt()))) {
@@ -162,52 +230,19 @@ public class IPDataMergerComponent implements PipelineComponent {
                                 }
                             });
                             return merged;
-                        }, namedOp("aggregate_collected_IP_data_per_domain"),
+                        }, namedOp("aggregate_collected_IP_data_per_domain_w"),
                         Materialized.with(Serdes.String(), JsonSerde.of(_jsonMapper, IPDataForDomainAggregator.class)))
-                        .suppress(Suppressed.untilWindowCloses(Suppressed.BufferConfig.unbounded()));
+                .suppress(Suppressed.untilWindowCloses(Suppressed.BufferConfig.unbounded()));
 
+        y.toStream().foreach((k, v) -> Logger.warn("Aggregated data for domain {}: {}", k, v));
+    }
 
-                /*
-                // Now we need to aggregate so that the DNS data is kept and the IP data maps are collected into
-                // a single map of maps keyed by the IP.
-                .aggregate(IPDataForDomainAggregator::new, (domain, data, aggregate) -> {
-                            // The aggregator is a simple structure that contains the DNS data and a map of IP -> IP data.
-                            // We always want to keep the latest DNS data.
-                            if (aggregate.dnsData == null ||
-                                    (data.success && data.lastAttempt.isAfter(aggregate.dnsData.lastAttempt()))) {
-                                aggregate.dnsData = new ExtendedDNSResult(data.success, data.error, data.lastAttempt,
-                                        data.dnsData, data.tlsData, null);
-                            }
-
-                            var existingListForIps = aggregate.ipData.get(data.ip());
-                            //noinspection Java8MapApi
-                            if (existingListForIps == null) {
-                                aggregate.ipData.put(data.ip(), existingListForIps = new ArrayList<>());
-                            }
-
-                            existingListForIps.add(data.ipData);
-                            return aggregate;
-                        }, namedOp("aggregate_collected_IP_data_per_domain"),
-                        Materialized.with(Serdes.String(), JsonSerde.of(_jsonMapper, IPDataForDomainAggregator.class)));
-*/
-
-                y.toStream().foreach((k, v) -> Logger.warn("Aggregated data for domain {}: {}", k, v));
-
-                /*
-                y.mapValues((v) -> new ExtendedDNSResult(v.dnsData.success(), v.dnsData.error(), v.dnsData.lastAttempt(), v.dnsData.dnsData(),
-                                v.dnsData.tlsData(), v.ipData),
-                        Materialized.with(Serdes.String(), extendedDnsResultSerde))
-                .toStream()
-                .to("merged_DNS_IP",
-                        Produced.with(Serdes.String(), extendedDnsResultSerde));*/
-
-
-        /*
+    private static void addWithoutIPProcessor(StreamsBuilder builder, JsonSerde<DNSResult> dnsResultSerde, JsonSerde<ExtendedDNSResult> extendedDnsResultSerde) {
         // Also output the records with no IPs.
         builder.stream("processed_DNS", Consumed.with(Serdes.String(), dnsResultSerde))
                 .filter((domain, dns) -> dns == null || dns.ips() == null || dns.ips().isEmpty())
                 .mapValues((v) -> new ExtendedDNSResult(v, null))
-                .to("merged_DNS_IP", Produced.with(Serdes.String(), extendedDnsResultSerde));*/
+                .to("merged_DNS_IP", Produced.with(Serdes.String(), extendedDnsResultSerde));
     }
 
     @Override
