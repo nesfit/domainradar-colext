@@ -110,8 +110,10 @@ public class IPDataMergerComponent implements PipelineComponent {
         // The second topology materializes the "processed DNS" stream as a KTable - this is fine, we only care about
         // the last observed DNS data. Then it joins with the IP data per domain generated above to output a single
         // merged DNS/IP data object.
-        builder
-                .table("processed_DNS", Consumed.with(Serdes.String(), dnsResultSerde))
+        var processedDnsTable = builder.table("processed_DNS",
+                Consumed.with(Serdes.String(), dnsResultSerde));
+
+        processedDnsTable
                 .filter((domain, dns) -> dns != null && dns.ips() != null && !dns.ips().isEmpty(),
                         namedOp("filter_out_DNS_records_without_IPs"))
                 .join(allIPDataForDomain, ExtendedDNSResult::new,
@@ -121,10 +123,10 @@ public class IPDataMergerComponent implements PipelineComponent {
                 .to("merged_DNS_IP", Produced.with(Serdes.String(), extendedDnsResultSerde));
 
         // This topology ensures that DNS records with no IPs are also present in the final collection.
-        builder
-                .stream("processed_DNS", Consumed.with(Serdes.String(), dnsResultSerde))
+        processedDnsTable
                 .filter((domain, dns) -> dns == null || dns.ips() == null || dns.ips().isEmpty())
                 .mapValues((v) -> new ExtendedDNSResult(v, null))
+                .toStream(namedOp("DNS_with_no_IPs_to_merged"))
                 .to("merged_DNS_IP", Produced.with(Serdes.String(), extendedDnsResultSerde));
     }
 
