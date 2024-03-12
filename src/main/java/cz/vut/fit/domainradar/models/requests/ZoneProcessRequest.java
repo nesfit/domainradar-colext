@@ -6,7 +6,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.List;
 
 public record ZoneProcessRequest(
-        @JsonProperty(value = "collect_dns", required = false)
+        @JsonProperty
         @Nullable
         List<String> toCollect) {
 

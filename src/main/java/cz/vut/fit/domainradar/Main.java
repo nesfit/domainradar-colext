@@ -1,7 +1,5 @@
 package cz.vut.fit.domainradar;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import cz.vut.fit.domainradar.models.results.ExtendedDNSResult;
 import cz.vut.fit.domainradar.pipeline.collectors.*;
 import cz.vut.fit.domainradar.pipeline.*;
 
@@ -13,10 +11,10 @@ import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import py4j.GatewayServer;
 
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
 
@@ -24,6 +22,11 @@ public class Main {
     private static final Logger Logger = LoggerFactory.getLogger(Main.class);
 
     public static void main(String[] args) {
+        final var pythonGateway = new GatewayServer(null);
+        pythonGateway.start();
+        final var pythonEntryPoint = (PythonEntryPoint) pythonGateway.getPythonServerEntryPoint(
+                new Class[]{PythonEntryPoint.class});
+
         final var options = new Options();
         options.addOption("a", "all", false, "Use all pipeline components");
         options.addOption("ac", "all-collectors", false, "Use all collectors");
@@ -125,7 +128,7 @@ public class Main {
                 .addModule(new JavaTimeModule())
                 .build();
 
-        populateBuilder(cmd, builder, jsonMapper);
+        populateBuilder(cmd, builder, jsonMapper, pythonEntryPoint);
 
         final Topology topology = builder.build(ksProperties);
         Logger.info("Topology: {}", topology.describe());
@@ -141,6 +144,7 @@ public class Main {
             try {
                 streams.start();
                 latch.await();
+                pythonGateway.shutdown();
                 System.exit(0);
             } catch (Throwable e) {
                 Logger.error("Unhandled exception", e);
@@ -157,7 +161,8 @@ public class Main {
         System.exit(exitCode);
     }
 
-    private static void populateBuilder(CommandLine cmd, StreamsBuilder builder, ObjectMapper jsonMapper) {
+    private static void populateBuilder(CommandLine cmd, StreamsBuilder builder,
+                                        ObjectMapper jsonMapper, PythonEntryPoint pythonEntryPoint) {
         var useAllCollectors = cmd.hasOption("ac") || cmd.hasOption("a");
         var useAll = cmd.hasOption("a");
 
@@ -200,7 +205,7 @@ public class Main {
         }
 
         if (cmd.hasOption("col-zone") || useAllCollectors) {
-            var zoneCollector = new ZoneCollector(jsonMapper);
+            var zoneCollector = new ZoneCollector(jsonMapper, pythonEntryPoint);
             zoneCollector.addTo(builder);
         }
 

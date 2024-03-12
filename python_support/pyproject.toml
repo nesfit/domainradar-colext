@@ -1,0 +1,32 @@
+[tool.poetry]
+name = "domainradar-colext"
+version = "0.1.0"
+description = "The DomainRadar collector & feature extractor pipeline"
+authors = ["Ondřej Ondryáš <xondry02@stud.fit.vut.cz>"]
+license = "MIT"
+repository = "https://github.com/nesfit/domainradar-colext"
+packages = [
+    { include = "drce_collectors", from = "src" },
+    { include = "drce_extractors", from = "src" }
+]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+tldextract = "^5.1.1"
+geoip2 = "^4.8.0"
+icmplib = "^3.0.4"
+whoisit = "^2.7.3"
+whoisdomain = "^1.20240129.1"
+dnspython = "^2.6.1"
+py4j = "^0.10.9.7"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0.0"
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+testpaths = [ "tests" ]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

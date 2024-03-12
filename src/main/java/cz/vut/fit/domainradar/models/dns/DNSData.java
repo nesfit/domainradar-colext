@@ -28,6 +28,6 @@ public record DNSData(@NotNull Map<String, Integer> ttlValues,
     }
 
     public record SOARecord(@NotNull String primaryNs, @NotNull String respMailboxDname, @NotNull String serial,
-                            int refresh, int retry, int expire, int minTtl) {
+                            int refresh, int retry, int expire, int minTTL) {
     }
 }
