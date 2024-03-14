@@ -40,19 +40,19 @@ public class IPDataMergerComponent implements PipelineComponent {
 
     @Override
     public void addTo(StreamsBuilder builder) {
-        var commonIpResultOfNodeTypeRef = new TypeReference<CommonIPResult<JsonNode>>() {
+        final var commonIpResultOfNodeTypeRef = new TypeReference<CommonIPResult<JsonNode>>() {
         };
-        var commonIpResultSerde = JsonSerde.of(_jsonMapper, commonIpResultOfNodeTypeRef);
-        var hashMapWithIpResultsTypeRef = new TypeReference<ConcurrentHashMap<String, CommonIPResult<JsonNode>>>() {
+        final var commonIpResultSerde = JsonSerde.of(_jsonMapper, commonIpResultOfNodeTypeRef);
+        final var hashMapWithIpResultsTypeRef = new TypeReference<ConcurrentHashMap<String, CommonIPResult<JsonNode>>>() {
         };
-        var hashMapWithIpResultsSerde = JsonSerde.of(_jsonMapper, hashMapWithIpResultsTypeRef);
-        var hashMapWithAllIpResultsTypeRef = new TypeReference<Map<String, Map<String, CommonIPResult<JsonNode>>>>() {
+        final var hashMapWithIpResultsSerde = JsonSerde.of(_jsonMapper, hashMapWithIpResultsTypeRef);
+        final var hashMapWithAllIpResultsTypeRef = new TypeReference<Map<String, Map<String, CommonIPResult<JsonNode>>>>() {
         };
-        var hashMapWithAllIpResultsSerde = JsonSerde.of(_jsonMapper, hashMapWithAllIpResultsTypeRef);
+        final var hashMapWithAllIpResultsSerde = JsonSerde.of(_jsonMapper, hashMapWithAllIpResultsTypeRef);
 
-        var ipDataPairSerde = JsonSerde.of(_jsonMapper, IPDataPair.class);
-        var dnsResultSerde = JsonSerde.of(_jsonMapper, DNSResult.class);
-        var extendedDnsResultSerde = JsonSerde.of(_jsonMapper, ExtendedDNSResult.class);
+        final var ipDataPairSerde = JsonSerde.of(_jsonMapper, IPDataPair.class);
+        final var dnsResultSerde = JsonSerde.of(_jsonMapper, DNSResult.class);
+        final var extendedDnsResultSerde = JsonSerde.of(_jsonMapper, ExtendedDNSResult.class);
 
         // These two sub-topologies combines the results from the IP collectors per a domain name.
 
@@ -132,6 +132,6 @@ public class IPDataMergerComponent implements PipelineComponent {
 
     @Override
     public String getName() {
-        return "COL_DNS_IP_MERGER";
+        return "DNS_IP_MERGER";
     }
 }

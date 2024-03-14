@@ -15,16 +15,18 @@ echo Topics before:
 echo "-------"
 
 echo Creating to process topics
-./kafka-topics.sh --bootstrap-server "$BOOTSTRAP" --create --topic to_process_zone --partitions $TO_PROCESS_PARTITIONS
-./kafka-topics.sh --bootstrap-server "$BOOTSTRAP" --create --topic to_process_DNS --partitions $TO_PROCESS_PARTITIONS
+./kafka-topics.sh --bootstrap-server "$BOOTSTRAP" --create --topic to_process_zone    --partitions $TO_PROCESS_PARTITIONS
+./kafka-topics.sh --bootstrap-server "$BOOTSTRAP" --create --topic to_process_DNS     --partitions $TO_PROCESS_PARTITIONS
 ./kafka-topics.sh --bootstrap-server "$BOOTSTRAP" --create --topic to_process_RDAP_DN --partitions $TO_PROCESS_PARTITIONS
-./kafka-topics.sh --bootstrap-server "$BOOTSTRAP" --create --topic to_process_IP --partitions $TO_PROCESS_PARTITIONS
+./kafka-topics.sh --bootstrap-server "$BOOTSTRAP" --create --topic to_process_IP      --partitions $TO_PROCESS_PARTITIONS
 
-./kafka-topics.sh --bootstrap-server "$BOOTSTRAP" --create --topic processed_zone --partitions $PROCSSED_PARTITIONS
-./kafka-topics.sh --bootstrap-server "$BOOTSTRAP" --create --topic processed_DNS --partitions $PROCSSED_PARTITIONS
-./kafka-topics.sh --bootstrap-server "$BOOTSTRAP" --create --topic processed_RDAP_DN --partitions $PROCSSED_PARTITIONS
-./kafka-topics.sh --bootstrap-server "$BOOTSTRAP" --create --topic collected_IP_data --partitions $PROCSSED_PARTITIONS
-./kafka-topics.sh --bootstrap-server "$BOOTSTRAP" --create --topic merged_DNS_IP --partitions $PROCSSED_PARTITIONS
+./kafka-topics.sh --bootstrap-server "$BOOTSTRAP" --create --topic processed_zone     --partitions $PROCSSED_PARTITIONS
+./kafka-topics.sh --bootstrap-server "$BOOTSTRAP" --create --topic processed_DNS      --partitions $PROCSSED_PARTITIONS
+./kafka-topics.sh --bootstrap-server "$BOOTSTRAP" --create --topic processed_RDAP_DN  --partitions $PROCSSED_PARTITIONS
+./kafka-topics.sh --bootstrap-server "$BOOTSTRAP" --create --topic collected_IP_data  --partitions $PROCSSED_PARTITIONS
+./kafka-topics.sh --bootstrap-server "$BOOTSTRAP" --create --topic merged_DNS_IP      --partitions $PROCSSED_PARTITIONS
+
+./kafka-topics.sh --bootstrap-server "$BOOTSTRAP" --create --topic all_collected_data --partitions $PROCSSED_PARTITIONS
 echo "-------"
 
 echo Topics after:

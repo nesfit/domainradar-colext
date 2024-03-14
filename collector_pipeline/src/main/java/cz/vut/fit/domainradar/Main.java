@@ -43,7 +43,8 @@ public class Main {
         options.addOption(null, "col-rdap-dn", false, "Use the RDAP-DN collector");
         options.addOption(null, "col-rdap-ip", false, "Use the RDAP-IP collector");
         options.addOption(null, "col-zone", false, "Use the zone collector");
-        options.addOption(null, "merger", false, "Use the DNS/IP merger");
+        options.addOption(null, "ip-merger", false, "Use the DNS/IP merger");
+        options.addOption(null, "domain-merger", false, "Use the all domain data merger");
         options.addOption(Option.builder("threads")
                 .option("t")
                 .longOpt("threads")
@@ -209,8 +210,13 @@ public class Main {
             zoneCollector.addTo(builder);
         }
 
-        if (cmd.hasOption("merger") || useAll) {
+        if (cmd.hasOption("ip-merger") || useAll) {
             var merger = new IPDataMergerComponent(jsonMapper);
+            merger.addTo(builder);
+        }
+
+        if (cmd.hasOption("domain-merger") || useAll) {
+            var merger = new AllDataMergerComponent(jsonMapper);
             merger.addTo(builder);
         }
     }
