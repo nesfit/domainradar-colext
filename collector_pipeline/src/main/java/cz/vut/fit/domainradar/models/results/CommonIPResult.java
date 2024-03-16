@@ -10,4 +10,7 @@ public record CommonIPResult<TData>(boolean success,
                                     String collector,
                                     @Nullable TData data
 ) implements Result {
+    public static <TData> CommonIPResult<TData> ofError(String collector, Exception e) {
+        return new CommonIPResult<>(false, e.getMessage(), Instant.now(), collector, null);
+    }
 }
