@@ -20,6 +20,7 @@ import java.util.concurrent.CountDownLatch;
 
 public class Main {
     private static final Logger Logger = LoggerFactory.getLogger(Main.class);
+    private static Properties Properties;
 
     public static void main(String[] args) {
         final var pythonGateway = new GatewayServer(null);
@@ -98,16 +99,18 @@ public class Main {
             return;
         }
 
-        final Properties ksProperties = new Properties();
+        final Properties props = new Properties();
+        Properties = props;
+
         if (cmd.hasOption("properties")) {
             // Open the file and load the properties
             var path = cmd.getOptionValue("properties");
             Logger.info("Loading properties from {}", path);
             try (var inStream = new FileInputStream(path)) {
-                ksProperties.load(inStream);
+                props.load(inStream);
             } catch (IOException e) {
                 System.err.println("Failed to load properties: " + e.getMessage());
-                System.exit(1);
+                System.exit(2);
                 return;
             }
         }
@@ -117,25 +120,34 @@ public class Main {
             threads = Integer.parseInt(cmd.getOptionValue("threads"));
         }
 
-        ksProperties.put(StreamsConfig.APPLICATION_ID_CONFIG, cmd.getOptionValue("id"));
-        ksProperties.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, cmd.getOptionValue("bootstrap-server"));
-        ksProperties.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.StringSerde.class);
-        ksProperties.put(StreamsConfig.NUM_STREAM_THREADS_CONFIG, threads);
-        ksProperties.put(StreamsConfig.DEFAULT_DESERIALIZATION_EXCEPTION_HANDLER_CLASS_CONFIG,
+        props.put(StreamsConfig.APPLICATION_ID_CONFIG, cmd.getOptionValue("id"));
+        props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, cmd.getOptionValue("bootstrap-server"));
+        props.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.StringSerde.class);
+        props.put(StreamsConfig.NUM_STREAM_THREADS_CONFIG, threads);
+        props.put(StreamsConfig.DEFAULT_DESERIALIZATION_EXCEPTION_HANDLER_CLASS_CONFIG,
                 "org.apache.kafka.streams.errors.LogAndContinueExceptionHandler");
+
+        // TODO: remove me
+        props.put(CollectorConfig.GEOIP_DIRECTORY_CONFIG, "/home/ondryaso/Projects/domrad-collector-pipeline/data/");
+
 
         final StreamsBuilder builder = new StreamsBuilder();
         final ObjectMapper jsonMapper = JsonMapper.builder()
                 .addModule(new JavaTimeModule())
                 .build();
 
-        populateBuilder(cmd, builder, jsonMapper, pythonEntryPoint);
-
-        final Topology topology = builder.build(ksProperties);
+        try {
+            populateBuilder(cmd, builder, jsonMapper, pythonEntryPoint);
+        } catch (Exception e) {
+            Logger.error("Failed to initialize some of the pipeline components", e);
+            System.exit(1);
+            return;
+        }
+        final Topology topology = builder.build(props);
         Logger.info("Topology: {}", topology.describe());
 
         final CountDownLatch latch = new CountDownLatch(1);
-        try (KafkaStreams streams = new KafkaStreams(topology, ksProperties)) {
+        try (KafkaStreams streams = new KafkaStreams(topology, props)) {
             // attach shutdown handler to catch control-c
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 streams.close();
@@ -163,7 +175,7 @@ public class Main {
     }
 
     private static void populateBuilder(CommandLine cmd, StreamsBuilder builder,
-                                        ObjectMapper jsonMapper, PythonEntryPoint pythonEntryPoint) {
+                                        ObjectMapper jsonMapper, PythonEntryPoint pythonEntryPoint) throws Exception {
         var useAllCollectors = cmd.hasOption("ac") || cmd.hasOption("a");
         var useAll = cmd.hasOption("a");
 
@@ -173,7 +185,7 @@ public class Main {
         }
 
         if (cmd.hasOption("col-geoip") || useAllCollectors) {
-            var geoIpCollector = new GeoIPCollector(jsonMapper);
+            var geoIpCollector = new GeoIPCollector(jsonMapper, Properties);
             geoIpCollector.addTo(builder);
         }
 
