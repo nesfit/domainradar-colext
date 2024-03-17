@@ -29,14 +29,14 @@ public class DNSCollector implements PipelineComponent {
     }
 
     @Override
-    public void addTo(StreamsBuilder builder) {
+    public void use(StreamsBuilder builder) {
         final var rnd = new Random();
 
         var inStream = builder.stream("to_process_DNS",
                         Consumed.with(Serdes.String(), JsonSerde.of(_jsonMapper, DNSProcessRequest.class)))
                 .filter((domainName, request) -> request != null && request.zoneInfo() != null, namedOp("filter_null_requests"));
 
-        var resolved = inStream.map((domainName, request) -> {
+        var resolved = inStream.mapValues((domainName, request) -> {
             assert request.zoneInfo() != null;
 
             if (RANDOM_DELAYS) {
@@ -47,7 +47,7 @@ public class DNSCollector implements PipelineComponent {
                 }
             }
 
-            return KeyValue.pair(domainName, new DNSResult(true, null, Instant.now(),
+            return new DNSResult(true, null, Instant.now(),
                     new DNSData(Map.of("A", 1000, "AAAA", 3600, "MX", 11820),
                             new DNSData.SOARecord("test1", "test2", "123", 2, 3, 4, 5),
                             new DNSData.NSRecord("ns", null),
@@ -58,15 +58,15 @@ public class DNSCollector implements PipelineComponent {
                     new TLSData("blah", "blahblah", 1,
                             List.of(new TLSData.Certificate("abc", "def", true,
                                     "blah", 1, Instant.MAX, Instant.MIN, 0, null))),
-                    Set.of("IP1_" + domainName, "5a::1", "IP2_" + domainName)));
+                    Set.of("IP1_" + domainName, "5a::1", "IP2_" + domainName));
         }, namedOp("resolve"));
 
         resolved.to("processed_DNS", Produced.with(Serdes.String(), JsonSerde.of(_jsonMapper, DNSResult.class)));
 
         resolved.flatMap((domainName, data) -> {
-            assert data.ips() != null;
-            return data.ips().stream().map(ip -> KeyValue.pair(new StringPair(domainName, ip), (Void) null)).toList();
-        }, namedOp("process_IPs_from_DNS"))
+                    assert data.ips() != null;
+                    return data.ips().stream().map(ip -> KeyValue.pair(new StringPair(domainName, ip), (Void) null)).toList();
+                }, namedOp("process_IPs_from_DNS"))
                 .to("to_process_IP", Produced.with(StringPairSerde.build(), Serdes.Void()));
     }
 

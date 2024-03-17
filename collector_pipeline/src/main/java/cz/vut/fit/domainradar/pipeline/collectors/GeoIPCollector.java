@@ -10,6 +10,7 @@ import com.maxmind.geoip2.record.*;
 import cz.vut.fit.domainradar.CollectorConfig;
 import cz.vut.fit.domainradar.models.ip.GeoIPData;
 import cz.vut.fit.domainradar.models.results.CommonIPResult;
+import cz.vut.fit.domainradar.pipeline.CommonResultIPCollector;
 import cz.vut.fit.domainradar.pipeline.IPCollector;
 import cz.vut.fit.domainradar.serialization.JsonSerde;
 import cz.vut.fit.domainradar.serialization.StringPairSerde;
@@ -25,7 +26,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Properties;
 
-public class GeoIPCollector implements IPCollector<CommonIPResult<GeoIPData>> {
+public class GeoIPCollector implements CommonResultIPCollector<GeoIPData> {
     private final ObjectMapper _jsonMapper;
     private final TypeReference<CommonIPResult<GeoIPData>> _resultTypeRef = new TypeReference<>() {
     };
@@ -50,7 +51,7 @@ public class GeoIPCollector implements IPCollector<CommonIPResult<GeoIPData>> {
     }
 
     @Override
-    public void addTo(StreamsBuilder builder) {
+    public void use(StreamsBuilder builder) {
         builder.stream("to_process_IP", Consumed.with(StringPairSerde.build(), Serdes.Void()))
                 .mapValues((ip, noValue) -> {
                     try {
@@ -81,10 +82,10 @@ public class GeoIPCollector implements IPCollector<CommonIPResult<GeoIPData>> {
                                 network == null ? null : network.getPrefixLength()
                         );
 
-                        return new CommonIPResult<>(true, null, Instant.now(), getCollectorName(), record);
+                        return successResult(record);
                     } catch (Exception e) {
                         // TODO
-                        return errorResult(e, CommonIPResult.class);
+                        return errorResult(e);
                     }
 
                 }, namedOp("resolve"))

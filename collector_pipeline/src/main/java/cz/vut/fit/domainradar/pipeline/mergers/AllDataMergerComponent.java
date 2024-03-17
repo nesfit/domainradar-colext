@@ -1,9 +1,10 @@
-package cz.vut.fit.domainradar.pipeline;
+package cz.vut.fit.domainradar.pipeline.mergers;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import cz.vut.fit.domainradar.models.results.ExtendedDNSResult;
 import cz.vut.fit.domainradar.models.results.FinalResult;
 import cz.vut.fit.domainradar.models.results.RDAPDomainResult;
+import cz.vut.fit.domainradar.pipeline.PipelineComponent;
 import cz.vut.fit.domainradar.serialization.JsonSerde;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.StreamsBuilder;
@@ -20,7 +21,7 @@ public class AllDataMergerComponent implements PipelineComponent {
     }
 
     @Override
-    public void addTo(StreamsBuilder builder) {
+    public void use(StreamsBuilder builder) {
         final var extendedDnsResultSerde = JsonSerde.of(_jsonMapper, ExtendedDNSResult.class);
         final var rdapDnSerde = JsonSerde.of(_jsonMapper, RDAPDomainResult.class);
         final var finalResultSerde = JsonSerde.of(_jsonMapper, FinalResult.class);

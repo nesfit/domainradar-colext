@@ -33,7 +33,7 @@ public class ZoneCollector implements PipelineComponent {
     }
 
     @Override
-    public void addTo(StreamsBuilder builder) {
+    public void use(StreamsBuilder builder) {
         var stream = builder
                 .stream("to_process_zone",
                         Consumed.with(Serdes.String(), JsonSerde.of(_jsonMapper, ZoneProcessRequest.class)))

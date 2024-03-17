@@ -28,7 +28,7 @@ public class PingCollector implements PipelineComponent {
     }
 
     @Override
-    public void addTo(StreamsBuilder builder) {
+    public void use(StreamsBuilder builder) {
         final var rnd = new Random();
 
         builder.stream("to_process_IP", Consumed.with(StringPairSerde.build(), Serdes.Void()))

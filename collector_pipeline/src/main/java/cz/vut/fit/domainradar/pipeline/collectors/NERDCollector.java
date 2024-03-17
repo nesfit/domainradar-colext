@@ -5,70 +5,69 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import cz.vut.fit.domainradar.models.StringPair;
 import cz.vut.fit.domainradar.models.ip.NERDData;
 import cz.vut.fit.domainradar.models.results.CommonIPResult;
-import cz.vut.fit.domainradar.pipeline.IPCollector;
-import cz.vut.fit.domainradar.pipeline.PipelineComponent;
-import cz.vut.fit.domainradar.serialization.JsonSerde;
+import cz.vut.fit.domainradar.pipeline.CommonResultIPCollector;
 import cz.vut.fit.domainradar.serialization.JsonSerializer;
 import cz.vut.fit.domainradar.serialization.StringPairSerde;
-import io.confluent.parallelconsumer.vertx.JStreamVertxParallelStreamProcessor;
-import io.confluent.parallelconsumer.vertx.VertxParallelEoSStreamProcessor;
 import io.confluent.parallelconsumer.vertx.VertxParallelStreamProcessor;
 import io.vertx.core.http.HttpMethod;
 import io.vertx.core.http.RequestOptions;
 import org.apache.kafka.clients.consumer.Consumer;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
+import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.Serdes;
-import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.StreamsBuilder;
-import org.apache.kafka.streams.kstream.Consumed;
-import org.apache.kafka.streams.kstream.Produced;
 import io.confluent.parallelconsumer.ParallelConsumerOptions;
-import io.confluent.parallelconsumer.ParallelStreamProcessor;
+import org.apache.kafka.streams.StreamsConfig;
 import pl.tlinkowski.unij.api.UniLists;
 
-import java.time.Instant;
-import java.util.Map;
 import java.util.Properties;
-import java.util.Random;
 
-public class NERDCollector implements IPCollector<CommonIPResult<NERDData>> {
+public class NERDCollector implements CommonResultIPCollector<NERDData> {
     private final ObjectMapper _jsonMapper;
-    private final TypeReference<CommonIPResult<NERDData>> _resultTypeRef = new TypeReference<>() {
-    };
+    private final Properties _properties;
 
-    public NERDCollector(ObjectMapper jsonMapper) {
+    private Consumer<StringPair, String> _kafkaConsumer;
+    private Producer<StringPair, CommonIPResult<NERDData>> _kafkaProducer;
+
+    public NERDCollector(ObjectMapper jsonMapper, Properties properties) {
         _jsonMapper = jsonMapper;
+
+        var appId = properties.getProperty(StreamsConfig.APPLICATION_ID_CONFIG);
+        var groupId = appId + "-" + getName() + "-parallel-consumer-group";
+
+        _properties = new Properties();
+        _properties.putAll(properties);
+        _properties.setProperty(ConsumerConfig.GROUP_ID_CONFIG, groupId);
+        _properties.setProperty(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
     }
 
-    private void setupParallelConsumer(Properties properties) {
+    private void setupParallelConsumer() {
         var stringPairSerde = StringPairSerde.build();
 
-        Consumer<StringPair, String> kafkaConsumer =
-                new KafkaConsumer<>(properties, stringPairSerde.deserializer(), Serdes.String().deserializer());
-        Producer<StringPair, CommonIPResult<NERDData>> kafkaProducer =
-                new KafkaProducer<>(properties, stringPairSerde.serializer(), new JsonSerializer<>(_jsonMapper));
+        _kafkaConsumer =
+                new KafkaConsumer<>(_properties, stringPairSerde.deserializer(), Serdes.String().deserializer());
+        _kafkaProducer =
+                new KafkaProducer<>(_properties, stringPairSerde.serializer(), new JsonSerializer<>(_jsonMapper));
 
         var options = ParallelConsumerOptions.<StringPair, String>builder()
                 .ordering(ParallelConsumerOptions.ProcessingOrder.KEY)
-                .consumer(kafkaConsumer)
+                .consumer(_kafkaConsumer)
                 .maxConcurrency(64)
-                //.batchSize(5)
                 .build();
 
 
         final var parallelSp = VertxParallelStreamProcessor.<StringPair, String>createEosStreamProcessor(options);
         parallelSp.subscribe(UniLists.of("to_process_IP"));
         parallelSp.vertxHttpRequest((client, ctx) -> {
-            // var ri = new VertxParallelEoSStreamProcessor.RequestInfo("nerd.cesnet.cz", 443,
-            // "/nerd/api/v1/ip/" + ctx.getSingleConsumerRecord().key().ip(), Map.of());
             var url = "https://nerd.cesnet.cz/nerd/api/v1/ip/" + ctx.getSingleConsumerRecord().key().ip();
             return client.request(HttpMethod.GET, new RequestOptions()
                     .putHeader("Authorization", "token TOKENHERE")
-                    .setURI(url));
-        }, (x) -> {
+                    .setAbsoluteURI(url));
+        }, (unused) -> {
         }, (x) -> {
             CommonIPResult<NERDData> result;
             if (x.succeeded()) {
@@ -79,30 +78,21 @@ public class NERDCollector implements IPCollector<CommonIPResult<NERDData>> {
                     var fmpObj = resultData.getJsonObject("fmp");
                     var fmp = fmpObj == null ? -1.0 : fmpObj.getDouble("general", -1.0);
                     var data = new NERDData(rep, fmp);
-                    result = new CommonIPResult<>(true, null, Instant.now(), getCollectorName(),
-                            data);
+                    result = successResult(data);
                 } else {
-                    result = errorResult(httpResult.statusMessage(), CommonIPResult.class);
+                    result = errorResult(httpResult.statusMessage());
                 }
             } else {
-                result = errorResult(x.cause(), CommonIPResult.class);
+                result = errorResult(x.cause());
             }
 
-            kafkaProducer.send(new ProducerRecord<>("collected_IP_data", result));
+            _kafkaProducer.send(new ProducerRecord<>("collected_IP_data", result));
         });
     }
 
     @Override
-    public void addTo(StreamsBuilder builder) {
-        /*
-        builder.stream("to_process_IP", Consumed.with(StringPairSerde.build(), Serdes.Void()))
-                .map((ip, noValue) -> {
-
-                    return KeyValue.pair(ip, new CommonIPResult<>(true, null, Instant.now(),
-                            "nerd", new NERDData(rnd.nextDouble())));
-                })
-                .to("collected_IP_data", Produced.with(StringPairSerde.build(), JsonSerde.of(_jsonMapper, _resultTypeRef)));
-        */
+    public void use(StreamsBuilder builder) {
+        setupParallelConsumer();
     }
 
     @Override

@@ -20,7 +20,7 @@ public class RDAPDomainCollector implements PipelineComponent {
     }
 
     @Override
-    public void addTo(StreamsBuilder builder) {
+    public void use(StreamsBuilder builder) {
         builder.stream("to_process_RDAP_DN", Consumed.with(Serdes.String(), Serdes.Void()))
                 .map((domainName, noValue) -> KeyValue.pair(domainName, new RDAPDomainResult(
                         true, null, Instant.now(),

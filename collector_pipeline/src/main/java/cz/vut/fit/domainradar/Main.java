@@ -1,14 +1,16 @@
 package cz.vut.fit.domainradar;
 
 import cz.vut.fit.domainradar.pipeline.collectors.*;
-import cz.vut.fit.domainradar.pipeline.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import cz.vut.fit.domainradar.pipeline.mergers.AllDataMergerComponent;
+import cz.vut.fit.domainradar.pipeline.mergers.IPDataMergerComponent;
 import org.apache.commons.cli.*;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.*;
+import org.apache.kafka.streams.errors.TopologyException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import py4j.GatewayServer;
@@ -143,6 +145,8 @@ public class Main {
             System.exit(1);
             return;
         }
+
+
         final Topology topology = builder.build(props);
         Logger.info("Topology: {}", topology.describe());
 
@@ -163,6 +167,8 @@ public class Main {
                 Logger.error("Unhandled exception", e);
                 System.exit(1);
             }
+        } catch (TopologyException topologyException) {
+            Logger.error(topologyException.getMessage());
         }
     }
 
@@ -181,55 +187,55 @@ public class Main {
 
         if (cmd.hasOption("col-dns") || useAllCollectors) {
             var dnsCollector = new DNSCollector(jsonMapper);
-            dnsCollector.addTo(builder);
+            dnsCollector.use(builder);
         }
 
         if (cmd.hasOption("col-geoip") || useAllCollectors) {
             var geoIpCollector = new GeoIPCollector(jsonMapper, Properties);
-            geoIpCollector.addTo(builder);
+            geoIpCollector.use(builder);
         }
 
         if (cmd.hasOption("col-nerd") || useAllCollectors) {
-            var nerdCollector = new NERDCollector(jsonMapper);
-            nerdCollector.addTo(builder);
+            var nerdCollector = new NERDCollector(jsonMapper, Properties);
+            nerdCollector.use(builder);
         }
 
         if (cmd.hasOption("col-ping") || useAllCollectors) {
             var pingIds = cmd.getOptionValues("col-ping");
             if (pingIds == null || pingIds.length == 0) {
                 var pingCollector = new PingCollector(jsonMapper, "default");
-                pingCollector.addTo(builder);
+                pingCollector.use(builder);
             } else {
                 for (var id : pingIds) {
                     var pingCollector = new PingCollector(jsonMapper, id);
-                    pingCollector.addTo(builder);
+                    pingCollector.use(builder);
                 }
             }
         }
 
         if (cmd.hasOption("col-rdap-dn") || useAllCollectors) {
             var rdapDnCollector = new RDAPDomainCollector(jsonMapper);
-            rdapDnCollector.addTo(builder);
+            rdapDnCollector.use(builder);
         }
 
         if (cmd.hasOption("col-rdap-ip") || useAllCollectors) {
             var rdapIpCollector = new RDAPInetAddressCollector(jsonMapper);
-            rdapIpCollector.addTo(builder);
+            rdapIpCollector.use(builder);
         }
 
         if (cmd.hasOption("col-zone") || useAllCollectors) {
             var zoneCollector = new ZoneCollector(jsonMapper, pythonEntryPoint);
-            zoneCollector.addTo(builder);
+            zoneCollector.use(builder);
         }
 
         if (cmd.hasOption("ip-merger") || useAll) {
             var merger = new IPDataMergerComponent(jsonMapper);
-            merger.addTo(builder);
+            merger.use(builder);
         }
 
         if (cmd.hasOption("domain-merger") || useAll) {
             var merger = new AllDataMergerComponent(jsonMapper);
-            merger.addTo(builder);
+            merger.use(builder);
         }
     }
 }

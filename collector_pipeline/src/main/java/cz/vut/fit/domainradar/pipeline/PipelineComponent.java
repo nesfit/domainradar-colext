@@ -6,7 +6,7 @@ import org.apache.kafka.streams.kstream.Named;
 public interface PipelineComponent {
     boolean RANDOM_DELAYS = true;
 
-    void addTo(StreamsBuilder builder);
+    void use(StreamsBuilder builder);
 
     String getName();
 

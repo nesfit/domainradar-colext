@@ -25,7 +25,7 @@ public class RDAPInetAddressCollector implements PipelineComponent {
     }
 
     @Override
-    public void addTo(StreamsBuilder builder) {
+    public void use(StreamsBuilder builder) {
         builder.stream("to_process_IP", Consumed.with(StringPairSerde.build(), Serdes.Void()))
                 .map((ip, noValue) -> KeyValue.pair(ip, new CommonIPResult<>(true, null, Instant.now(), "rdap_ip",
                         new RDAPAddressData("foobar"))), namedOp("resolve"))
