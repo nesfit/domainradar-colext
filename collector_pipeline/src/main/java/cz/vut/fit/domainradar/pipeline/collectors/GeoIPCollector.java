@@ -10,7 +10,7 @@ import com.maxmind.geoip2.record.*;
 import cz.vut.fit.domainradar.CollectorConfig;
 import cz.vut.fit.domainradar.models.ip.GeoIPData;
 import cz.vut.fit.domainradar.models.results.CommonIPResult;
-import cz.vut.fit.domainradar.pipeline.PipelineCollector;
+import cz.vut.fit.domainradar.pipeline.IPCollector;
 import cz.vut.fit.domainradar.serialization.JsonSerde;
 import cz.vut.fit.domainradar.serialization.StringPairSerde;
 import org.apache.kafka.common.serialization.Serdes;
@@ -25,7 +25,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Properties;
 
-public class GeoIPCollector implements PipelineCollector {
+public class GeoIPCollector implements IPCollector<CommonIPResult<GeoIPData>> {
     private final ObjectMapper _jsonMapper;
     private final TypeReference<CommonIPResult<GeoIPData>> _resultTypeRef = new TypeReference<>() {
     };
@@ -84,7 +84,7 @@ public class GeoIPCollector implements PipelineCollector {
                         return new CommonIPResult<>(true, null, Instant.now(), getCollectorName(), record);
                     } catch (Exception e) {
                         // TODO
-                        return CommonIPResult.<GeoIPData>ofError(getCollectorName(), e);
+                        return errorResult(e, CommonIPResult.class);
                     }
 
                 }, namedOp("resolve"))
