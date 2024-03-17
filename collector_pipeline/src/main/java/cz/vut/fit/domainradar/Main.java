@@ -128,7 +128,7 @@ public class Main {
                 "org.apache.kafka.streams.errors.LogAndContinueExceptionHandler");
 
         // TODO: remove me
-        props.put(CollectorConfig.GEOIP_DIRECTORY_CONFIG, "/home/ondryaso/Projects/domrad-collector-pipeline/data/");
+        props.put(CollectorConfig.GEOIP_DIRECTORY_CONFIG, "../data/");
 
 
         final StreamsBuilder builder = new StreamsBuilder();

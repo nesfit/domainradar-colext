@@ -18,6 +18,7 @@
         <kafka.version>3.7.0</kafka.version>
         <slf4j.version>2.0.12</slf4j.version>
         <jackson.version>2.16.0</jackson.version>
+        <parallelconsumer.version>0.5.2.8</parallelconsumer.version>
     </properties>
 
     <repositories>
@@ -64,6 +65,17 @@
             <groupId>org.apache.kafka</groupId>
             <artifactId>kafka-clients</artifactId>
             <version>${kafka.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>io.confluent.parallelconsumer</groupId>
+            <artifactId>parallel-consumer-core</artifactId>
+            <version>${parallelconsumer.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.confluent.parallelconsumer</groupId>
+            <artifactId>parallel-consumer-vertx</artifactId>
+            <version>${parallelconsumer.version}</version>
         </dependency>
         <!-- JSON -->
         <dependency>
