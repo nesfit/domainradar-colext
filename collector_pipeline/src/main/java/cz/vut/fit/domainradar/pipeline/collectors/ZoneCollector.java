@@ -7,6 +7,7 @@ import cz.vut.fit.domainradar.models.dns.ZoneInfo;
 import cz.vut.fit.domainradar.models.requests.DNSProcessRequest;
 import cz.vut.fit.domainradar.models.requests.ZoneProcessRequest;
 import cz.vut.fit.domainradar.models.results.ZoneResult;
+import cz.vut.fit.domainradar.pipeline.ErrorCodes;
 import cz.vut.fit.domainradar.pipeline.PipelineComponent;
 import cz.vut.fit.domainradar.PythonEntryPoint;
 import cz.vut.fit.domainradar.serialization.JsonSerde;
@@ -25,11 +26,9 @@ import java.util.Set;
 
 public class ZoneCollector implements PipelineComponent {
     private final ObjectMapper _jsonMapper;
-    private final PythonEntryPoint _pythonEntryPoint;
 
-    public ZoneCollector(ObjectMapper jsonMapper, PythonEntryPoint pythonEntryPoint) {
+    public ZoneCollector(ObjectMapper jsonMapper) {
         _jsonMapper = jsonMapper;
-        _pythonEntryPoint = pythonEntryPoint;
     }
 
     @Override
@@ -40,15 +39,11 @@ public class ZoneCollector implements PipelineComponent {
                 .mapValues((domainName, request) -> {
 
                     try {
-                        var resultJson = _pythonEntryPoint.getZoneInfo(domainName);
-                        if (resultJson == null)
-                            return new ZoneResult(false, "Not found", Instant.now(), null);
-
-                        var result = _jsonMapper.readValue(resultJson, ZoneInfo.class);
-                        return new ZoneResult(true, null, Instant.now(), result);
+                        // TODO
+                        return new ZoneResult(0, null, Instant.now(), null);
                     } catch (Exception e) {
                         // TODO
-                        return new ZoneResult(false, e.getMessage(), Instant.now(), null);
+                        return new ZoneResult(ErrorCodes.OTHER_ERROR, e.getMessage(), Instant.now(), null);
                     }
                 }, namedOp("resolve"));
 

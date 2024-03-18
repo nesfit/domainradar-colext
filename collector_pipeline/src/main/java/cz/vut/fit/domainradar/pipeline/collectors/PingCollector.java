@@ -42,7 +42,7 @@ public class PingCollector implements PipelineComponent {
                     }
 
 
-                    return KeyValue.pair(ip, new CommonIPResult<>(true, null, Instant.now(), "rtt_" + _collectorId,
+                    return KeyValue.pair(ip, new CommonIPResult<>(0, null, Instant.now(), "rtt_" + _collectorId,
                             new RTTData(true, rnd.nextInt(100), rnd.nextInt(4), _collectorId)));
                 }, namedOp("resolve"))
                 .to("collected_IP_data", Produced.with(StringPairSerde.build(), JsonSerde.of(_jsonMapper, _resultTypeRef)));

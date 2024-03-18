@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import cz.vut.fit.domainradar.models.results.CommonIPResult;
 import cz.vut.fit.domainradar.models.results.DNSResult;
 import cz.vut.fit.domainradar.models.results.ExtendedDNSResult;
+import cz.vut.fit.domainradar.pipeline.ErrorCodes;
 import cz.vut.fit.domainradar.pipeline.PipelineComponent;
 import cz.vut.fit.domainradar.serialization.JsonSerde;
 import cz.vut.fit.domainradar.serialization.StringPairSerde;
@@ -64,7 +65,7 @@ public class IPDataMergerComponent implements PipelineComponent {
                             var existingRecord = aggregate.get(partialData.collector());
                             if (existingRecord != null) {
                                 // Store the latest successful result.
-                                if (partialData.success()
+                                if (partialData.statusCode() == ErrorCodes.OK
                                         && (existingRecord.lastAttempt().isBefore(partialData.lastAttempt()))) {
                                     aggregate.put(partialData.collector(), partialData);
                                 }

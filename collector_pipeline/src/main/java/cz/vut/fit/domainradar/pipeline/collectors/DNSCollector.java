@@ -47,7 +47,7 @@ public class DNSCollector implements PipelineComponent {
                 }
             }
 
-            return new DNSResult(true, null, Instant.now(),
+            return new DNSResult(0, null, Instant.now(),
                     new DNSData(Map.of("A", 1000, "AAAA", 3600, "MX", 11820),
                             new DNSData.SOARecord("test1", "test2", "123", 2, 3, 4, 5),
                             new DNSData.NSRecord("ns", null),

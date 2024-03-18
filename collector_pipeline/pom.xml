@@ -15,7 +15,7 @@
         <maven.compiler.target>21</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
-        <kafka.version>3.7.0</kafka.version>
+        <kafka.version>3.6.0</kafka.version>
         <slf4j.version>2.0.12</slf4j.version>
         <jackson.version>2.16.0</jackson.version>
         <parallelconsumer.version>0.5.2.8</parallelconsumer.version>
@@ -115,12 +115,6 @@
             <groupId>com.maxmind.geoip2</groupId>
             <artifactId>geoip2</artifactId>
             <version>4.2.0</version>
-        </dependency>
-
-        <dependency>
-            <groupId>net.sf.py4j</groupId>
-            <artifactId>py4j</artifactId>
-            <version>0.10.9.7</version> <!-- Check for the latest version -->
         </dependency>
     </dependencies>
 </project>

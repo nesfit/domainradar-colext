@@ -1,5 +1,6 @@
 package cz.vut.fit.domainradar;
 
+import cz.vut.fit.domainradar.pipeline.PipelineComponent;
 import cz.vut.fit.domainradar.pipeline.collectors.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -11,9 +12,9 @@ import org.apache.commons.cli.*;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.*;
 import org.apache.kafka.streams.errors.TopologyException;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import py4j.GatewayServer;
 
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -25,62 +26,7 @@ public class Main {
     private static Properties Properties;
 
     public static void main(String[] args) {
-        final var pythonGateway = new GatewayServer(null);
-        pythonGateway.start();
-        final var pythonEntryPoint = (PythonEntryPoint) pythonGateway.getPythonServerEntryPoint(
-                new Class[]{PythonEntryPoint.class});
-
-        final var options = new Options();
-        options.addOption("a", "all", false, "Use all pipeline components");
-        options.addOption("ac", "all-collectors", false, "Use all collectors");
-
-        options.addOption(null, "col-dns", false, "Use the DNS+TLS collector");
-        options.addOption(null, "col-geoip", false, "Use the GeoIP collector");
-        options.addOption(null, "col-nerd", false, "Use the NERD collector");
-        options.addOption(Option.builder()
-                .longOpt("col-ping")
-                .desc("Use the Ping/RTT collector")
-                .argName("collector ID")
-                .hasArg()
-                .build());
-        options.addOption(null, "col-rdap-dn", false, "Use the RDAP-DN collector");
-        options.addOption(null, "col-rdap-ip", false, "Use the RDAP-IP collector");
-        options.addOption(null, "col-zone", false, "Use the zone collector");
-        options.addOption(null, "ip-merger", false, "Use the DNS/IP merger");
-        options.addOption(null, "domain-merger", false, "Use the all domain data merger");
-        options.addOption(Option.builder("threads")
-                .option("t")
-                .longOpt("threads")
-                .desc("Number of threads to use")
-                .argName("num of threads")
-                .hasArg()
-                .type(Integer.class)
-                .build());
-        options.addOption(Option.builder("properties")
-                .longOpt("properties")
-                .option("p")
-                .desc("Path to a file with additional Kafka Streams properties")
-                .argName("path")
-                .hasArg()
-                .build());
-        options.addOption(Option.builder("id")
-                .longOpt("app-id")
-                .desc("Kafka Streams application ID (required)")
-                .argName("id")
-                .hasArg()
-                .required()
-                .build()
-        );
-        options.addOption(Option.builder("s")
-                .longOpt("bootstrap-server")
-                .desc("Kafka bootstrap server IP:port (required)")
-                .argName("ip:port")
-                .hasArg()
-                .required()
-                .build()
-        );
-        options.addOption("h", "help", false, "Print this help message");
-
+        final var options = makeOptions();
         final var parser = new DefaultParser();
         CommandLine cmd;
         try {
@@ -137,21 +83,49 @@ public class Main {
         final ObjectMapper jsonMapper = JsonMapper.builder()
                 .addModule(new JavaTimeModule())
                 .build();
+        List<PipelineComponent> components;
 
         try {
-            populateBuilder(cmd, builder, jsonMapper, pythonEntryPoint);
+            components = populateBuilder(cmd, builder, jsonMapper);
+            logComponents(components);
         } catch (Exception e) {
             Logger.error("Failed to initialize some of the pipeline components", e);
             System.exit(1);
             return;
         }
 
+        if (components.stream().noneMatch(PipelineComponent::createsStreamTopology)) {
+            runComponentsOnly(components);
+        } else {
+            runStreams(builder, components);
+        }
+    }
 
-        final Topology topology = builder.build(props);
-        Logger.info("Topology: {}", topology.describe());
+    private static void runComponentsOnly(List<PipelineComponent> components) {
+        Logger.info("Running in components-only mode");
 
         final CountDownLatch latch = new CountDownLatch(1);
-        try (KafkaStreams streams = new KafkaStreams(topology, props)) {
+        Runtime.getRuntime().addShutdownHook(new Thread(latch::countDown, "components-shutdown-hook"));
+
+        try {
+            latch.await();
+            closeComponents(components);
+            System.exit(0);
+        } catch (InterruptedException e) {
+            Logger.error("Unhandled exception", e);
+            System.exit(1);
+        }
+    }
+
+    private static void runStreams(StreamsBuilder builder, List<PipelineComponent> components) {
+        Logger.info("Running in Kafka Streams mode");
+
+        final CountDownLatch latch = new CountDownLatch(1);
+
+        final Topology topology = builder.build(Properties);
+        Logger.info("Topology: {}", topology.describe());
+
+        try (KafkaStreams streams = new KafkaStreams(topology, Properties)) {
             // attach shutdown handler to catch control-c
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 streams.close();
@@ -161,7 +135,7 @@ public class Main {
             try {
                 streams.start();
                 latch.await();
-                pythonGateway.shutdown();
+                closeComponents(components);
                 System.exit(0);
             } catch (Throwable e) {
                 Logger.error("Unhandled exception", e);
@@ -172,6 +146,78 @@ public class Main {
         }
     }
 
+    private static List<PipelineComponent> populateBuilder(CommandLine cmd, StreamsBuilder builder,
+                                                           ObjectMapper jsonMapper) throws Exception {
+        var useAllCollectors = cmd.hasOption("ac") || cmd.hasOption("a");
+        var useAll = cmd.hasOption("a");
+        var components = new ArrayList<PipelineComponent>();
+
+        if (cmd.hasOption("col-dns") || useAllCollectors) {
+            var dnsCollector = new DNSCollector(jsonMapper);
+            dnsCollector.use(builder);
+            components.add(dnsCollector);
+        }
+
+        if (cmd.hasOption("col-geoip") || useAllCollectors) {
+            var geoIpCollector = new GeoIPCollector(jsonMapper, Properties);
+            geoIpCollector.use(builder);
+            components.add(geoIpCollector);
+        }
+
+        if (cmd.hasOption("col-nerd") || useAllCollectors) {
+            var nerdCollector = new NERDCollector(jsonMapper, Properties);
+            nerdCollector.use(builder);
+            components.add(nerdCollector);
+        }
+
+        if (cmd.hasOption("col-ping") || useAllCollectors) {
+            var pingIds = cmd.getOptionValues("col-ping");
+            if (pingIds == null || pingIds.length == 0) {
+                var pingCollector = new PingCollector(jsonMapper, "default");
+                pingCollector.use(builder);
+                components.add(pingCollector);
+            } else {
+                for (var id : pingIds) {
+                    var pingCollector = new PingCollector(jsonMapper, id);
+                    pingCollector.use(builder);
+                    components.add(pingCollector);
+                }
+            }
+        }
+
+        if (cmd.hasOption("col-rdap-dn") || useAllCollectors) {
+            var rdapDnCollector = new RDAPDomainCollector(jsonMapper);
+            rdapDnCollector.use(builder);
+            components.add(rdapDnCollector);
+        }
+
+        if (cmd.hasOption("col-rdap-ip") || useAllCollectors) {
+            var rdapIpCollector = new RDAPInetAddressCollector(jsonMapper);
+            rdapIpCollector.use(builder);
+            components.add(rdapIpCollector);
+        }
+
+        if (cmd.hasOption("col-zone") || useAllCollectors) {
+            var zoneCollector = new ZoneCollector(jsonMapper);
+            zoneCollector.use(builder);
+            components.add(zoneCollector);
+        }
+
+        if (cmd.hasOption("ip-merger") || useAll) {
+            var merger = new IPDataMergerComponent(jsonMapper);
+            merger.use(builder);
+            components.add(merger);
+        }
+
+        if (cmd.hasOption("domain-merger") || useAll) {
+            var merger = new AllDataMergerComponent(jsonMapper);
+            merger.use(builder);
+            components.add(merger);
+        }
+
+        return components;
+    }
+
     private static void printHelpAndExit(Options options, int exitCode) {
         final var formatter = new HelpFormatter();
         formatter.printHelp(119,
@@ -180,62 +226,74 @@ public class Main {
         System.exit(exitCode);
     }
 
-    private static void populateBuilder(CommandLine cmd, StreamsBuilder builder,
-                                        ObjectMapper jsonMapper, PythonEntryPoint pythonEntryPoint) throws Exception {
-        var useAllCollectors = cmd.hasOption("ac") || cmd.hasOption("a");
-        var useAll = cmd.hasOption("a");
-
-        if (cmd.hasOption("col-dns") || useAllCollectors) {
-            var dnsCollector = new DNSCollector(jsonMapper);
-            dnsCollector.use(builder);
+    private static void logComponents(List<PipelineComponent> components) {
+        for (var component : components) {
+            Logger.info("Using component: {} ({})", component.getName(), Integer.toHexString(component.hashCode()));
         }
+    }
 
-        if (cmd.hasOption("col-geoip") || useAllCollectors) {
-            var geoIpCollector = new GeoIPCollector(jsonMapper, Properties);
-            geoIpCollector.use(builder);
-        }
-
-        if (cmd.hasOption("col-nerd") || useAllCollectors) {
-            var nerdCollector = new NERDCollector(jsonMapper, Properties);
-            nerdCollector.use(builder);
-        }
-
-        if (cmd.hasOption("col-ping") || useAllCollectors) {
-            var pingIds = cmd.getOptionValues("col-ping");
-            if (pingIds == null || pingIds.length == 0) {
-                var pingCollector = new PingCollector(jsonMapper, "default");
-                pingCollector.use(builder);
-            } else {
-                for (var id : pingIds) {
-                    var pingCollector = new PingCollector(jsonMapper, id);
-                    pingCollector.use(builder);
-                }
+    private static void closeComponents(List<PipelineComponent> components) {
+        for (var component : components) {
+            try {
+                component.close();
+            } catch (IOException e) {
+                Logger.error("Error closing pipeline component {}", component.getName(), e);
             }
         }
+    }
 
-        if (cmd.hasOption("col-rdap-dn") || useAllCollectors) {
-            var rdapDnCollector = new RDAPDomainCollector(jsonMapper);
-            rdapDnCollector.use(builder);
-        }
+    @NotNull
+    private static Options makeOptions() {
+        final var options = new Options();
+        options.addOption("a", "all", false, "Use all pipeline components");
+        options.addOption("ac", "all-collectors", false, "Use all collectors");
 
-        if (cmd.hasOption("col-rdap-ip") || useAllCollectors) {
-            var rdapIpCollector = new RDAPInetAddressCollector(jsonMapper);
-            rdapIpCollector.use(builder);
-        }
-
-        if (cmd.hasOption("col-zone") || useAllCollectors) {
-            var zoneCollector = new ZoneCollector(jsonMapper, pythonEntryPoint);
-            zoneCollector.use(builder);
-        }
-
-        if (cmd.hasOption("ip-merger") || useAll) {
-            var merger = new IPDataMergerComponent(jsonMapper);
-            merger.use(builder);
-        }
-
-        if (cmd.hasOption("domain-merger") || useAll) {
-            var merger = new AllDataMergerComponent(jsonMapper);
-            merger.use(builder);
-        }
+        options.addOption(null, "col-dns", false, "Use the DNS+TLS collector");
+        options.addOption(null, "col-geoip", false, "Use the GeoIP collector");
+        options.addOption(null, "col-nerd", false, "Use the NERD collector");
+        options.addOption(Option.builder()
+                .longOpt("col-ping")
+                .desc("Use the Ping/RTT collector")
+                .argName("collector ID")
+                .hasArg()
+                .build());
+        options.addOption(null, "col-rdap-dn", false, "Use the RDAP-DN collector");
+        options.addOption(null, "col-rdap-ip", false, "Use the RDAP-IP collector");
+        options.addOption(null, "col-zone", false, "Use the zone collector");
+        options.addOption(null, "ip-merger", false, "Use the DNS/IP merger");
+        options.addOption(null, "domain-merger", false, "Use the all domain data merger");
+        options.addOption(Option.builder("threads")
+                .option("t")
+                .longOpt("threads")
+                .desc("Number of threads to use")
+                .argName("num of threads")
+                .hasArg()
+                .type(Integer.class)
+                .build());
+        options.addOption(Option.builder("properties")
+                .longOpt("properties")
+                .option("p")
+                .desc("Path to a file with additional Kafka Streams properties")
+                .argName("path")
+                .hasArg()
+                .build());
+        options.addOption(Option.builder("id")
+                .longOpt("app-id")
+                .desc("Kafka Streams application ID (required)")
+                .argName("id")
+                .hasArg()
+                .required()
+                .build()
+        );
+        options.addOption(Option.builder("s")
+                .longOpt("bootstrap-server")
+                .desc("Kafka bootstrap server IP:port (required)")
+                .argName("ip:port")
+                .hasArg()
+                .required()
+                .build()
+        );
+        options.addOption("h", "help", false, "Print this help message");
+        return options;
     }
 }

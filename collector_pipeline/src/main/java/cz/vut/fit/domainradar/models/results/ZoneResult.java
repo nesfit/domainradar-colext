@@ -6,8 +6,8 @@ import org.jetbrains.annotations.Nullable;
 
 import java.time.Instant;
 
-public record ZoneResult(boolean success,
-                         String error,
-                         Instant lastAttempt,
+public record ZoneResult(int statusCode,
+                         @Nullable String error,
+                         @NotNull Instant lastAttempt,
                          @Nullable ZoneInfo zone) implements Result {
 }

@@ -7,18 +7,14 @@ import java.time.Instant;
 public interface IPCollector<TResult extends Result>
         extends PipelineCollector<TResult> {
 
-    @Override
-    default TResult errorResult(Throwable e, Class<?> clz) {
-        return this.errorResult(e.getMessage(), clz);
-    }
 
     @Override
-    default TResult errorResult(String message, Class<?> clz) {
+    default TResult errorResult(String message, int code, Class<?> clz) {
         try {
             final var constructor = clz.getDeclaredConstructors()[0];
             Object[] parValues = new Object[constructor.getParameterCount()];
 
-            parValues[0] = false;
+            parValues[0] = code;
             parValues[1] = message;
             parValues[2] = Instant.now();
             parValues[3] = getCollectorName();

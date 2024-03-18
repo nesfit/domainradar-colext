@@ -11,6 +11,7 @@ import cz.vut.fit.domainradar.CollectorConfig;
 import cz.vut.fit.domainradar.models.ip.GeoIPData;
 import cz.vut.fit.domainradar.models.results.CommonIPResult;
 import cz.vut.fit.domainradar.pipeline.CommonResultIPCollector;
+import cz.vut.fit.domainradar.pipeline.ErrorCodes;
 import cz.vut.fit.domainradar.pipeline.IPCollector;
 import cz.vut.fit.domainradar.serialization.JsonSerde;
 import cz.vut.fit.domainradar.serialization.StringPairSerde;
@@ -85,7 +86,7 @@ public class GeoIPCollector implements CommonResultIPCollector<GeoIPData> {
                         return successResult(record);
                     } catch (Exception e) {
                         // TODO
-                        return errorResult(e);
+                        return errorResult(e.getMessage(), ErrorCodes.OTHER_ERROR);
                     }
 
                 }, namedOp("resolve"))

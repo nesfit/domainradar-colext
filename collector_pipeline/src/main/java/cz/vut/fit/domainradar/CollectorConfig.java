@@ -12,4 +12,8 @@ public class CollectorConfig {
     public static final String GEOIP_ASN_DB_NAME_CONFIG = "collectors.geoip.asndb";
     public static final String GEOIP_ASN_DB_NAME_DOC = "The name of the GeoIP ASN database.";
     public static final String GEOIP_ASN_DB_NAME_DEFAULT = "GeoLite2-ASN.mmdb";
+
+    public static final String NERD_HTTP_TIMEOUT_CONFIG = "collectors.nerd.timeout";
+    public static final String NERD_HTTP_TIMEOUT_DOC = "The request timeout to use in the NERD collector (seconds).";
+    public static final String NERD_HTTP_TIMEOUT_DEFAULT = "3";
 }
