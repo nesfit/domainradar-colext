@@ -1,10 +1,10 @@
-package cz.vut.fit.domainradar.pipeline.collectors;
+package cz.vut.fit.domainradar.streams.collectors;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import cz.vut.fit.domainradar.models.ip.RTTData;
 import cz.vut.fit.domainradar.models.results.CommonIPResult;
-import cz.vut.fit.domainradar.pipeline.PipelineComponent;
+import cz.vut.fit.domainradar.streams.PipelineComponent;
 import cz.vut.fit.domainradar.serialization.JsonSerde;
 import cz.vut.fit.domainradar.serialization.StringPairSerde;
 import org.apache.kafka.common.serialization.Serdes;

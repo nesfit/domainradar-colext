@@ -1,4 +1,4 @@
-package cz.vut.fit.domainradar.pipeline.collectors;
+package cz.vut.fit.domainradar.streams.collectors;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -10,9 +10,8 @@ import com.maxmind.geoip2.record.*;
 import cz.vut.fit.domainradar.CollectorConfig;
 import cz.vut.fit.domainradar.models.ip.GeoIPData;
 import cz.vut.fit.domainradar.models.results.CommonIPResult;
-import cz.vut.fit.domainradar.pipeline.CommonResultIPCollector;
-import cz.vut.fit.domainradar.pipeline.ErrorCodes;
-import cz.vut.fit.domainradar.pipeline.IPCollector;
+import cz.vut.fit.domainradar.streams.CommonResultIPCollector;
+import cz.vut.fit.domainradar.models.ResultCodes;
 import cz.vut.fit.domainradar.serialization.JsonSerde;
 import cz.vut.fit.domainradar.serialization.StringPairSerde;
 import org.apache.kafka.common.serialization.Serdes;
@@ -23,7 +22,6 @@ import org.apache.kafka.streams.kstream.Produced;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Properties;
 
@@ -86,7 +84,7 @@ public class GeoIPCollector implements CommonResultIPCollector<GeoIPData> {
                         return successResult(record);
                     } catch (Exception e) {
                         // TODO
-                        return errorResult(e.getMessage(), ErrorCodes.OTHER_ERROR);
+                        return errorResult(e.getMessage(), ResultCodes.OTHER_ERROR);
                     }
 
                 }, namedOp("resolve"))

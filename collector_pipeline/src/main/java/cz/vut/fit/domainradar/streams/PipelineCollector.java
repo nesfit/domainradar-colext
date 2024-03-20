@@ -1,4 +1,4 @@
-package cz.vut.fit.domainradar.pipeline;
+package cz.vut.fit.domainradar.streams;
 
 
 import cz.vut.fit.domainradar.models.results.Result;

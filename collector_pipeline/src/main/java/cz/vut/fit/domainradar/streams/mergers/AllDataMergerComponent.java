@@ -1,10 +1,10 @@
-package cz.vut.fit.domainradar.pipeline.mergers;
+package cz.vut.fit.domainradar.streams.mergers;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import cz.vut.fit.domainradar.models.results.ExtendedDNSResult;
 import cz.vut.fit.domainradar.models.results.FinalResult;
 import cz.vut.fit.domainradar.models.results.RDAPDomainResult;
-import cz.vut.fit.domainradar.pipeline.PipelineComponent;
+import cz.vut.fit.domainradar.streams.PipelineComponent;
 import cz.vut.fit.domainradar.serialization.JsonSerde;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.StreamsBuilder;

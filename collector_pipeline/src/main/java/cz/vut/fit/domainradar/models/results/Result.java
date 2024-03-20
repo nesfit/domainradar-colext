@@ -1,6 +1,6 @@
 package cz.vut.fit.domainradar.models.results;
 
-import cz.vut.fit.domainradar.pipeline.ErrorCodes;
+import cz.vut.fit.domainradar.models.ResultCodes;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -14,6 +14,6 @@ public interface Result {
     Instant lastAttempt();
 
     default boolean success() {
-        return this.statusCode() == ErrorCodes.OK;
+        return this.statusCode() == ResultCodes.OK;
     }
 }

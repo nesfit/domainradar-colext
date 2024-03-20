@@ -16,4 +16,17 @@ public class CollectorConfig {
     public static final String NERD_HTTP_TIMEOUT_CONFIG = "collectors.nerd.timeout";
     public static final String NERD_HTTP_TIMEOUT_DOC = "The request timeout to use in the NERD collector (seconds).";
     public static final String NERD_HTTP_TIMEOUT_DEFAULT = "3";
+
+    public static final String CLOSE_TIMEOUT_SEC_CONFIG = "collectors.kafka.close.timeout";
+    public static final String CLOSE_TIMEOUT_SEC_DOC = "The time to wait for a standalone collector producer/consumer to close (seconds).";
+    public static final String CLOSE_TIMEOUT_SEC_DEFAULT = "5";
+
+    public static final String MAX_CONCURRENCY_CONFIG = "collectors.parallel.consumer.max.concurrency";
+    public static final String MAX_CONCURRENCY_DOC = "The maximum number of concurrent requests to make.";
+    public static final String MAX_CONCURRENCY_DEFAULT = "4";
+
+    public static final String COMMIT_INTERVAL_MS_CONFIG = "collectors.parallel.consumer.commit.interval";
+    public static final String COMMIT_INTERVAL_MS_DOC = "The interval at which to commit the offsets.";
+    public static final String COMMIT_INTERVAL_MS_DEFAULT = "1000";
+
 }

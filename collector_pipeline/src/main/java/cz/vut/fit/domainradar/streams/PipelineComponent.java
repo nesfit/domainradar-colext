@@ -1,4 +1,4 @@
-package cz.vut.fit.domainradar.pipeline;
+package cz.vut.fit.domainradar.streams;
 
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.kstream.Named;
@@ -15,10 +15,6 @@ public interface PipelineComponent extends Closeable {
 
     default Named namedOp(String name) {
         return Named.as(getName() + "_" + name);
-    }
-
-    default boolean createsStreamTopology() {
-        return true;
     }
 
     @Override

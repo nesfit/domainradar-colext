@@ -1,13 +1,14 @@
-package cz.vut.fit.domainradar;
+package cz.vut.fit.domainradar.streams;
 
-import cz.vut.fit.domainradar.pipeline.PipelineComponent;
-import cz.vut.fit.domainradar.pipeline.collectors.*;
+import cz.vut.fit.domainradar.CollectorConfig;
+import cz.vut.fit.domainradar.standalone.collectors.NERDCollector;
+import cz.vut.fit.domainradar.streams.collectors.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import cz.vut.fit.domainradar.pipeline.mergers.AllDataMergerComponent;
-import cz.vut.fit.domainradar.pipeline.mergers.IPDataMergerComponent;
+import cz.vut.fit.domainradar.streams.mergers.AllDataMergerComponent;
+import cz.vut.fit.domainradar.streams.mergers.IPDataMergerComponent;
 import org.apache.commons.cli.*;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.*;
@@ -21,8 +22,8 @@ import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
 
-public class Main {
-    private static final Logger Logger = LoggerFactory.getLogger(Main.class);
+public class StreamsPipelineRunner {
+    private static final Logger Logger = LoggerFactory.getLogger(StreamsPipelineRunner.class);
     private static Properties Properties;
 
     public static void main(String[] args) {
@@ -75,9 +76,8 @@ public class Main {
         props.put(StreamsConfig.DEFAULT_DESERIALIZATION_EXCEPTION_HANDLER_CLASS_CONFIG,
                 "org.apache.kafka.streams.errors.LogAndContinueExceptionHandler");
 
-        // TODO: remove me
+        // TODO: remove me?
         props.put(CollectorConfig.GEOIP_DIRECTORY_CONFIG, "../data/");
-
 
         final StreamsBuilder builder = new StreamsBuilder();
         final ObjectMapper jsonMapper = JsonMapper.builder()
@@ -94,27 +94,7 @@ public class Main {
             return;
         }
 
-        if (components.stream().noneMatch(PipelineComponent::createsStreamTopology)) {
-            runComponentsOnly(components);
-        } else {
-            runStreams(builder, components);
-        }
-    }
-
-    private static void runComponentsOnly(List<PipelineComponent> components) {
-        Logger.info("Running in components-only mode");
-
-        final CountDownLatch latch = new CountDownLatch(1);
-        Runtime.getRuntime().addShutdownHook(new Thread(latch::countDown, "components-shutdown-hook"));
-
-        try {
-            latch.await();
-            closeComponents(components);
-            System.exit(0);
-        } catch (InterruptedException e) {
-            Logger.error("Unhandled exception", e);
-            System.exit(1);
-        }
+        runStreams(builder, components);
     }
 
     private static void runStreams(StreamsBuilder builder, List<PipelineComponent> components) {
@@ -152,55 +132,10 @@ public class Main {
         var useAll = cmd.hasOption("a");
         var components = new ArrayList<PipelineComponent>();
 
-        if (cmd.hasOption("col-dns") || useAllCollectors) {
-            var dnsCollector = new DNSCollector(jsonMapper);
-            dnsCollector.use(builder);
-            components.add(dnsCollector);
-        }
-
         if (cmd.hasOption("col-geoip") || useAllCollectors) {
             var geoIpCollector = new GeoIPCollector(jsonMapper, Properties);
             geoIpCollector.use(builder);
             components.add(geoIpCollector);
-        }
-
-        if (cmd.hasOption("col-nerd") || useAllCollectors) {
-            var nerdCollector = new NERDCollector(jsonMapper, Properties);
-            nerdCollector.use(builder);
-            components.add(nerdCollector);
-        }
-
-        if (cmd.hasOption("col-ping") || useAllCollectors) {
-            var pingIds = cmd.getOptionValues("col-ping");
-            if (pingIds == null || pingIds.length == 0) {
-                var pingCollector = new PingCollector(jsonMapper, "default");
-                pingCollector.use(builder);
-                components.add(pingCollector);
-            } else {
-                for (var id : pingIds) {
-                    var pingCollector = new PingCollector(jsonMapper, id);
-                    pingCollector.use(builder);
-                    components.add(pingCollector);
-                }
-            }
-        }
-
-        if (cmd.hasOption("col-rdap-dn") || useAllCollectors) {
-            var rdapDnCollector = new RDAPDomainCollector(jsonMapper);
-            rdapDnCollector.use(builder);
-            components.add(rdapDnCollector);
-        }
-
-        if (cmd.hasOption("col-rdap-ip") || useAllCollectors) {
-            var rdapIpCollector = new RDAPInetAddressCollector(jsonMapper);
-            rdapIpCollector.use(builder);
-            components.add(rdapIpCollector);
-        }
-
-        if (cmd.hasOption("col-zone") || useAllCollectors) {
-            var zoneCollector = new ZoneCollector(jsonMapper);
-            zoneCollector.use(builder);
-            components.add(zoneCollector);
         }
 
         if (cmd.hasOption("ip-merger") || useAll) {
@@ -248,18 +183,7 @@ public class Main {
         options.addOption("a", "all", false, "Use all pipeline components");
         options.addOption("ac", "all-collectors", false, "Use all collectors");
 
-        options.addOption(null, "col-dns", false, "Use the DNS+TLS collector");
         options.addOption(null, "col-geoip", false, "Use the GeoIP collector");
-        options.addOption(null, "col-nerd", false, "Use the NERD collector");
-        options.addOption(Option.builder()
-                .longOpt("col-ping")
-                .desc("Use the Ping/RTT collector")
-                .argName("collector ID")
-                .hasArg()
-                .build());
-        options.addOption(null, "col-rdap-dn", false, "Use the RDAP-DN collector");
-        options.addOption(null, "col-rdap-ip", false, "Use the RDAP-IP collector");
-        options.addOption(null, "col-zone", false, "Use the zone collector");
         options.addOption(null, "ip-merger", false, "Use the DNS/IP merger");
         options.addOption(null, "domain-merger", false, "Use the all domain data merger");
         options.addOption(Option.builder("threads")
@@ -273,7 +197,7 @@ public class Main {
         options.addOption(Option.builder("properties")
                 .longOpt("properties")
                 .option("p")
-                .desc("Path to a file with additional Kafka Streams properties")
+                .desc("Path to a file with additional properties")
                 .argName("path")
                 .hasArg()
                 .build());

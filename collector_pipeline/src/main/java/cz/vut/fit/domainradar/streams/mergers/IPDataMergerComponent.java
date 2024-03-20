@@ -1,4 +1,4 @@
-package cz.vut.fit.domainradar.pipeline.mergers;
+package cz.vut.fit.domainradar.streams.mergers;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -6,8 +6,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import cz.vut.fit.domainradar.models.results.CommonIPResult;
 import cz.vut.fit.domainradar.models.results.DNSResult;
 import cz.vut.fit.domainradar.models.results.ExtendedDNSResult;
-import cz.vut.fit.domainradar.pipeline.ErrorCodes;
-import cz.vut.fit.domainradar.pipeline.PipelineComponent;
+import cz.vut.fit.domainradar.models.ResultCodes;
+import cz.vut.fit.domainradar.streams.PipelineComponent;
 import cz.vut.fit.domainradar.serialization.JsonSerde;
 import cz.vut.fit.domainradar.serialization.StringPairSerde;
 import org.apache.kafka.common.serialization.Serdes;
@@ -65,7 +65,7 @@ public class IPDataMergerComponent implements PipelineComponent {
                             var existingRecord = aggregate.get(partialData.collector());
                             if (existingRecord != null) {
                                 // Store the latest successful result.
-                                if (partialData.statusCode() == ErrorCodes.OK
+                                if (partialData.statusCode() == ResultCodes.OK
                                         && (existingRecord.lastAttempt().isBefore(partialData.lastAttempt()))) {
                                     aggregate.put(partialData.collector(), partialData);
                                 }

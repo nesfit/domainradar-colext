@@ -1,26 +1,19 @@
-package cz.vut.fit.domainradar.pipeline.collectors;
+package cz.vut.fit.domainradar.standalone.collectors;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import cz.vut.fit.domainradar.CollectorConfig;
+import cz.vut.fit.domainradar.models.ResultCodes;
 import cz.vut.fit.domainradar.models.StringPair;
 import cz.vut.fit.domainradar.models.ip.NERDData;
 import cz.vut.fit.domainradar.models.results.CommonIPResult;
-import cz.vut.fit.domainradar.pipeline.CommonResultIPCollector;
-import cz.vut.fit.domainradar.pipeline.ErrorCodes;
-import cz.vut.fit.domainradar.serialization.JsonSerializer;
-import cz.vut.fit.domainradar.serialization.StringPairSerde;
+import cz.vut.fit.domainradar.standalone.IPStandaloneCollector;
 import io.confluent.parallelconsumer.ParallelConsumerOptions;
 import io.confluent.parallelconsumer.ParallelStreamProcessor;
-import org.apache.kafka.clients.consumer.Consumer;
+import org.apache.commons.cli.CommandLine;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.apache.kafka.clients.consumer.KafkaConsumer;
-import org.apache.kafka.clients.producer.KafkaProducer;
-import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
-import org.apache.kafka.common.serialization.VoidDeserializer;
-import org.apache.kafka.streams.StreamsBuilder;
-import org.apache.kafka.streams.StreamsConfig;
+import org.jetbrains.annotations.NotNull;
 import pl.tlinkowski.unij.api.UniLists;
 
 import java.net.Inet4Address;
@@ -38,56 +31,27 @@ import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-public class NERDCollector implements CommonResultIPCollector<NERDData> {
-    public static final int CLOSE_TIMEOUT_S = 5;
+public class NERDCollector extends IPStandaloneCollector<NERDData> {
     private static final String NERD_BASE = "https://nerd.cesnet.cz/nerd/api/v1/";
     private static final String RESULT_TOPIC = "collected_IP_data";
 
-    private final ObjectMapper _jsonMapper;
-    private final Properties _properties;
     private final Duration _httpTimeout;
-
-    private Consumer<StringPair, Void> _kafkaConsumer;
-    private Producer<StringPair, CommonIPResult<NERDData>> _kafkaProducer;
-    private ParallelStreamProcessor<StringPair, Void> _parallelStreamProcessor;
 
     private HttpClient _client;
     private ExecutorService _executor;
 
-    public NERDCollector(ObjectMapper jsonMapper, Properties properties) {
-        _jsonMapper = jsonMapper;
+    public NERDCollector(ObjectMapper jsonMapper, String appName, Properties properties) {
+        super(jsonMapper, appName, properties);
 
-        var appId = properties.getProperty(StreamsConfig.APPLICATION_ID_CONFIG);
-        var groupId = appId + "-" + getName() + "-parallel-consumer-group";
-
-        _properties = new Properties();
-        _properties.putAll(properties);
-        _properties.setProperty(ConsumerConfig.GROUP_ID_CONFIG, groupId);
         _properties.setProperty(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
-
         _httpTimeout = Duration.ofSeconds(Integer.parseInt(
                 properties.getProperty(CollectorConfig.NERD_HTTP_TIMEOUT_CONFIG,
                         CollectorConfig.NERD_HTTP_TIMEOUT_DEFAULT)));
     }
 
-    private void setupParallelConsumer() {
-        var stringPairSerde = StringPairSerde.build();
-
-        _kafkaConsumer =
-                new KafkaConsumer<>(_properties, stringPairSerde.deserializer(), new VoidDeserializer());
-        _kafkaProducer =
-                new KafkaProducer<>(_properties, stringPairSerde.serializer(), new JsonSerializer<>(_jsonMapper));
-
-        var options = ParallelConsumerOptions.<StringPair, Void>builder()
-                .ordering(ParallelConsumerOptions.ProcessingOrder.KEY)
-                .consumer(_kafkaConsumer)
-                .maxConcurrency(32)
-                .batchSize(30)
-                .commitInterval(Duration.ofMillis(100))
-                .build();
-
-        final var parallelSp = _parallelStreamProcessor
-                = ParallelStreamProcessor.createEosStreamProcessor(options);
+    @Override
+    public void run(CommandLine cmd) {
+        buildProcessor(30);
 
         final var executor = _executor = Executors.newVirtualThreadPerTaskExecutor();
         _client = HttpClient.newBuilder()
@@ -97,8 +61,8 @@ public class NERDCollector implements CommonResultIPCollector<NERDData> {
                 .executor(executor)
                 .build();
 
-        parallelSp.subscribe(UniLists.of("to_process_IP"));
-        parallelSp.poll(ctx -> {
+        _parallelProcessor.subscribe(UniLists.of("to_process_IP"));
+        _parallelProcessor.poll(ctx -> {
             var entries = ctx.streamConsumerRecords().map(ConsumerRecord::key).toList();
             this.processIps(entries);
         });
@@ -135,8 +99,7 @@ public class NERDCollector implements CommonResultIPCollector<NERDData> {
                     if (response.statusCode() == 200) {
                         var resultData = response.body();
                         if (resultData.length % 8 != 0 || resultData.length / 8 != ips.size()) {
-                            sendAboutAll(entries, errorResult("Invalid NERD response (content length mismatch)",
-                                    ErrorCodes.INVALID_FORMAT));
+                            sendAboutAll(entries, errorResult(ResultCodes.INVALID_FORMAT, "Invalid NERD response (content length mismatch)"));
                             return;
                         }
 
@@ -146,55 +109,34 @@ public class NERDCollector implements CommonResultIPCollector<NERDData> {
 
                         for (var i = 0; i < ips.size(); i++) {
                             var value = resultDataBuffer.getDouble(i);
-                            _kafkaProducer.send(new ProducerRecord<>(RESULT_TOPIC, entries.get(i),
+                            _producer.send(new ProducerRecord<>(RESULT_TOPIC, entries.get(i),
                                     successResult(new NERDData(value))));
                         }
                     } else {
-                        sendAboutAll(entries, errorResult("NERD response " + response.statusCode(),
-                                ErrorCodes.CANNOT_FETCH));
+                        sendAboutAll(entries, errorResult(ResultCodes.CANNOT_FETCH, "NERD response " + response.statusCode()));
 
                     }
                 })
                 .exceptionally(e -> {
-                    sendAboutAll(entries, errorResult("Cannot fetch NERD data: " + e.getMessage(),
-                            ErrorCodes.CANNOT_FETCH));
+                    sendAboutAll(entries, errorResult(ResultCodes.CANNOT_FETCH, "Cannot fetch NERD data: " + e.getMessage()));
                     return null;
                 });
     }
 
     private void sendAboutAll(List<StringPair> entries, CommonIPResult<NERDData> result) {
-        for (var entry : entries) {
-            _kafkaProducer.send(new ProducerRecord<>(RESULT_TOPIC, entry, result));
-        }
+        this.sendAboutAll(RESULT_TOPIC, entries, result);
     }
 
     @Override
-    public void use(StreamsBuilder builder) {
-        setupParallelConsumer();
-    }
-
-    @Override
-    public String getName() {
-        return "COL_NERD";
-    }
-
-    @Override
-    public String getCollectorName() {
+    public @NotNull String getName() {
         return "nerd";
     }
 
     @Override
-    public boolean createsStreamTopology() {
-        return false;
-    }
-
-    @Override
     public void close() {
-        if (_parallelStreamProcessor != null) {
-            _parallelStreamProcessor.closeDrainFirst(Duration.ofSeconds(CLOSE_TIMEOUT_S));
-            _kafkaProducer.close(Duration.ofSeconds(CLOSE_TIMEOUT_S));
-            _kafkaConsumer.close(Duration.ofSeconds(CLOSE_TIMEOUT_S));
+        super.close();
 
+        if (_parallelProcessor != null) {
             _client.close();
             _executor.close();
         }

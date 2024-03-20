@@ -1,4 +1,4 @@
-package cz.vut.fit.domainradar.pipeline.collectors;
+package cz.vut.fit.domainradar.streams.collectors;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import cz.vut.fit.domainradar.models.StringPair;
@@ -6,7 +6,7 @@ import cz.vut.fit.domainradar.models.dns.DNSData;
 import cz.vut.fit.domainradar.models.requests.DNSProcessRequest;
 import cz.vut.fit.domainradar.models.results.DNSResult;
 import cz.vut.fit.domainradar.models.tls.TLSData;
-import cz.vut.fit.domainradar.pipeline.PipelineComponent;
+import cz.vut.fit.domainradar.streams.PipelineComponent;
 import cz.vut.fit.domainradar.serialization.JsonSerde;
 import cz.vut.fit.domainradar.serialization.StringPairSerde;
 import org.apache.kafka.common.serialization.Serdes;

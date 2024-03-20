@@ -1,28 +1,19 @@
-package cz.vut.fit.domainradar.pipeline.collectors;
+package cz.vut.fit.domainradar.streams.collectors;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import cz.vut.fit.domainradar.models.dns.DNSData;
-import cz.vut.fit.domainradar.models.dns.ZoneInfo;
 import cz.vut.fit.domainradar.models.requests.DNSProcessRequest;
 import cz.vut.fit.domainradar.models.requests.ZoneProcessRequest;
 import cz.vut.fit.domainradar.models.results.ZoneResult;
-import cz.vut.fit.domainradar.pipeline.ErrorCodes;
-import cz.vut.fit.domainradar.pipeline.PipelineComponent;
-import cz.vut.fit.domainradar.PythonEntryPoint;
+import cz.vut.fit.domainradar.models.ResultCodes;
+import cz.vut.fit.domainradar.streams.PipelineComponent;
 import cz.vut.fit.domainradar.serialization.JsonSerde;
 import org.apache.kafka.common.serialization.Serdes;
-import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.StreamsBuilder;
-import org.apache.kafka.streams.errors.StreamsException;
 import org.apache.kafka.streams.kstream.Consumed;
 import org.apache.kafka.streams.kstream.Produced;
-import py4j.Py4JException;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Random;
-import java.util.Set;
 
 public class ZoneCollector implements PipelineComponent {
     private final ObjectMapper _jsonMapper;
@@ -43,7 +34,7 @@ public class ZoneCollector implements PipelineComponent {
                         return new ZoneResult(0, null, Instant.now(), null);
                     } catch (Exception e) {
                         // TODO
-                        return new ZoneResult(ErrorCodes.OTHER_ERROR, e.getMessage(), Instant.now(), null);
+                        return new ZoneResult(ResultCodes.OTHER_ERROR, e.getMessage(), Instant.now(), null);
                     }
                 }, namedOp("resolve"));
 
