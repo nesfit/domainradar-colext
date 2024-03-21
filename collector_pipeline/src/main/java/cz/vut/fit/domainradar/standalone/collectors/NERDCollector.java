@@ -124,7 +124,7 @@ public class NERDCollector extends IPStandaloneCollector<NERDData> {
     }
 
     private void sendAboutAll(List<StringPair> entries, CommonIPResult<NERDData> result) {
-        this.sendAboutAll(RESULT_TOPIC, entries, result);
+        sendAboutAll(RESULT_TOPIC, entries, result);
     }
 
     @Override

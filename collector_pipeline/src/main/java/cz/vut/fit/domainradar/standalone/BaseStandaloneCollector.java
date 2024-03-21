@@ -78,15 +78,16 @@ public abstract class BaseStandaloneCollector<KIn, VIn, KOut, VOut extends Resul
     }
 
     protected void buildProcessor(int batchSize) {
-        var options = ParallelConsumerOptions.<KIn, VIn>builder()
+        var optionsBuilder = ParallelConsumerOptions.<KIn, VIn>builder()
                 .ordering(ParallelConsumerOptions.ProcessingOrder.KEY)
                 .consumer(_consumer)
                 .maxConcurrency(_maxConcurrency)
-                .batchSize(batchSize)
-                .commitInterval(_commitInterval)
-                .build();
+                .commitInterval(_commitInterval);
 
-        _parallelProcessor = ParallelStreamProcessor.createEosStreamProcessor(options);
+        if (batchSize > 0)
+            optionsBuilder = optionsBuilder.batchSize(batchSize);
+
+        _parallelProcessor = ParallelStreamProcessor.createEosStreamProcessor(optionsBuilder.build());
     }
 
     protected @NotNull KafkaConsumer<KIn, VIn> createConsumer(@NotNull Deserializer<KIn> keyDeserializer,

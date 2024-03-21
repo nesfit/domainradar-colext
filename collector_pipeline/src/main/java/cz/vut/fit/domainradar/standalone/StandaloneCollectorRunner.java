@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import cz.vut.fit.domainradar.CollectorConfig;
+import cz.vut.fit.domainradar.models.results.Result;
 import cz.vut.fit.domainradar.standalone.collectors.DNSCollector;
 import cz.vut.fit.domainradar.standalone.collectors.NERDCollector;
 import cz.vut.fit.domainradar.standalone.collectors.ZoneCollector;
@@ -65,7 +66,7 @@ public class StandaloneCollectorRunner {
             for (var component : toRun) {
                 try {
                     component.close();
-                } catch(Exception e) {
+                } catch (Exception e) {
                     Logger.warn("Failed to close component {}", component.getName(), e);
                 }
             }
@@ -82,16 +83,21 @@ public class StandaloneCollectorRunner {
         var useAll = cmd.hasOption("a");
         var components = new ArrayList<BaseStandaloneCollector<?, ?, ?, ?>>();
 
-        if (useAll || cmd.hasOption("col-dns")) {
-            components.add(new DNSCollector(mapper, appId, properties));
-        }
+        try {
+            if (useAll || cmd.hasOption("col-dns")) {
+                components.add(new DNSCollector(mapper, appId, properties));
+            }
 
-        if (useAll || cmd.hasOption("col-zone")) {
-            components.add(new ZoneCollector(mapper, appId, properties));
-        }
+            if (useAll || cmd.hasOption("col-zone")) {
+                components.add(new ZoneCollector(mapper, appId, properties));
+            }
 
-        if (useAll || cmd.hasOption("col-nerd")) {
-            components.add(new NERDCollector(mapper, appId, properties));
+            if (useAll || cmd.hasOption("col-nerd")) {
+                components.add(new NERDCollector(mapper, appId, properties));
+            }
+        } catch (Exception e) {
+            Logger.error("Failed to initialize a collector", e);
+            System.exit(4);
         }
 
         return components;
@@ -178,7 +184,7 @@ public class StandaloneCollectorRunner {
             }
         }
 
-        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, cmd.getOptionValue("bootstrap-server"));
+        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, cmd.getOptionValue("bootstrap-servers"));
         return props;
     }
 
