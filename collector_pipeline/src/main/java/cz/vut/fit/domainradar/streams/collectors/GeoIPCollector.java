@@ -84,7 +84,7 @@ public class GeoIPCollector implements CommonResultIPCollector<GeoIPData> {
                         return successResult(record);
                     } catch (Exception e) {
                         // TODO
-                        return errorResult(e.getMessage(), ResultCodes.OTHER_ERROR);
+                        return errorResult(e.getMessage(), ResultCodes.OTHER_EXTERNAL_ERROR);
                     }
 
                 }, namedOp("resolve"))

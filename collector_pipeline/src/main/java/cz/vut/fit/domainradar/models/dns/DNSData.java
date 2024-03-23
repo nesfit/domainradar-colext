@@ -3,6 +3,7 @@ package cz.vut.fit.domainradar.models.dns;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.UnknownNullability;
+import org.xbill.DNS.SOARecord;
 
 import java.util.List;
 import java.util.Map;
@@ -29,5 +30,14 @@ public record DNSData(@NotNull Map<String, Integer> ttlValues,
 
     public record SOARecord(@NotNull String primaryNs, @NotNull String respMailboxDname, @NotNull String serial,
                             long refresh, long retry, long expire, long minTTL) {
+        public SOARecord(org.xbill.DNS.SOARecord xbillDnsRecord) {
+            this(xbillDnsRecord.getHost().toString(true),
+                    xbillDnsRecord.getAdmin().toString(true),
+                    Long.toString(xbillDnsRecord.getSerial()),
+                    xbillDnsRecord.getRefresh(),
+                    xbillDnsRecord.getRetry(),
+                    xbillDnsRecord.getExpire(),
+                    xbillDnsRecord.getMinimum());
+        }
     }
 }

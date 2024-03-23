@@ -6,8 +6,10 @@ import org.jetbrains.annotations.Nullable;
 import java.util.Set;
 
 public record ZoneInfo(
-        @NotNull DNSData.SOARecord soa,
         @NotNull String zone,
+        @NotNull DNSData.SOARecord soa,
+        @NotNull String publicSuffix,
+        @NotNull String registrySuffix,
         @Nullable Set<String> primaryNameserverIps,
         @Nullable Set<String> secondaryNameservers,
         @Nullable Set<String> secondaryNameserverIps

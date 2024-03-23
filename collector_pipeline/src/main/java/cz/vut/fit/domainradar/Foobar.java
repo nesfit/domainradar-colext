@@ -1,10 +1,24 @@
 package cz.vut.fit.domainradar;
 
 import com.google.common.net.InternetDomainName;
+import cz.vut.fit.domainradar.standalone.collectors.InternalDNSResolver;
+import org.xbill.DNS.SimpleResolver;
+
+import java.net.UnknownHostException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 public class Foobar {
-    public static void main(String[] args) {
+    public static void main(String[] args) throws InterruptedException {
         var names = new InternetDomainName[]{
+                InternetDomainName.from("email.seznam.cz"),
+                InternetDomainName.from("www.merlin.fit.vut.cz"),
+                InternetDomainName.from("www.fit.vut.cz"),
+                InternetDomainName.from("fit.vut.cz"),
+                InternetDomainName.from("vut.cz"),
+                InternetDomainName.from("cz"),
+                /*
                 InternetDomainName.from("jp"),
                 InternetDomainName.from("hokkaido.jp"),
                 InternetDomainName.from("hakodate.hokkaido.jp"),
@@ -17,7 +31,10 @@ public class Foobar {
                 InternetDomainName.from("blogspot.com"),
                 InternetDomainName.from("adobeaemcloud.com"),
                 InternetDomainName.from("sadasd.asdasd.adobeaemcloud.com"),
-                InternetDomainName.from("asd-ewqe.dev.adobeaemcloud.com")
+                InternetDomainName.from("asd-ewqe.dev.adobeaemcloud.com"),
+                InternetDomainName.from("invalid"),
+                InternetDomainName.from("something.invalid"),
+                 */
         };
 
         for (var name : names) {
@@ -47,5 +64,26 @@ public class Foobar {
 
             System.out.println();
         }
+
+        var ex = Executors.newVirtualThreadPerTaskExecutor();
+        try {
+            var resolver = new SimpleResolver("1.1.1.1");
+            var dns = new InternalDNSResolver(resolver, ex);
+
+            for (var name : names) {
+                dns.getZoneInfo(name.toString())
+                        .thenAcceptAsync(x -> {
+                            synchronized (ex) {
+                                System.out.print(name + ": ");
+                                System.out.println(x);
+                            }
+                        }, ex).toCompletableFuture().join();
+
+            }
+        } catch (UnknownHostException e) {
+            throw new RuntimeException(e);
+        }
+
+        //ex.awaitTermination(20000, TimeUnit.MILLISECONDS);
     }
 }

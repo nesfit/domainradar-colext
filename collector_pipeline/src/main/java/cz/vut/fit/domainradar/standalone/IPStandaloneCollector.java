@@ -16,6 +16,9 @@ import java.util.Properties;
 
 public abstract class IPStandaloneCollector<TData> extends BaseStandaloneCollector<StringPair, Void,
         StringPair, CommonIPResult<TData>> {
+    public static final String IN_TOPIC = "to_process_IP";
+    public static final String OUT_TOPIC = "collected_IP_data";
+
     public IPStandaloneCollector(@NotNull ObjectMapper jsonMapper,
                                  @NotNull String appName,
                                  @Nullable Properties properties) {

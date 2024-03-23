@@ -34,7 +34,7 @@ public class ZoneCollector implements PipelineComponent {
                         return new ZoneResult(0, null, Instant.now(), null);
                     } catch (Exception e) {
                         // TODO
-                        return new ZoneResult(ResultCodes.OTHER_ERROR, e.getMessage(), Instant.now(), null);
+                        return new ZoneResult(ResultCodes.OTHER_EXTERNAL_ERROR, e.getMessage(), Instant.now(), null);
                     }
                 }, namedOp("resolve"));
 

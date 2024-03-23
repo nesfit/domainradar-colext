@@ -23,7 +23,7 @@ public class CollectorConfig {
 
     public static final String MAX_CONCURRENCY_CONFIG = "collectors.parallel.consumer.max.concurrency";
     public static final String MAX_CONCURRENCY_DOC = "The maximum number of concurrent requests to make.";
-    public static final String MAX_CONCURRENCY_DEFAULT = "4";
+    public static final String MAX_CONCURRENCY_DEFAULT = "2";
 
     public static final String COMMIT_INTERVAL_MS_CONFIG = "collectors.parallel.consumer.commit.interval";
     public static final String COMMIT_INTERVAL_MS_DOC = "The interval at which to commit the offsets.";
