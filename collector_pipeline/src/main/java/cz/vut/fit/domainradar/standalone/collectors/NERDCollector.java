@@ -2,6 +2,7 @@ package cz.vut.fit.domainradar.standalone.collectors;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import cz.vut.fit.domainradar.CollectorConfig;
+import cz.vut.fit.domainradar.Topics;
 import cz.vut.fit.domainradar.models.ResultCodes;
 import cz.vut.fit.domainradar.models.StringPair;
 import cz.vut.fit.domainradar.models.ip.NERDData;
@@ -33,7 +34,6 @@ import java.util.concurrent.Executors;
 
 public class NERDCollector extends IPStandaloneCollector<NERDData> {
     private static final String NERD_BASE = "https://nerd.cesnet.cz/nerd/api/v1/";
-    private static final String RESULT_TOPIC = "collected_IP_data";
 
     private final Duration _httpTimeout;
 
@@ -61,7 +61,7 @@ public class NERDCollector extends IPStandaloneCollector<NERDData> {
                 .executor(executor)
                 .build();
 
-        _parallelProcessor.subscribe(UniLists.of("to_process_IP"));
+        _parallelProcessor.subscribe(UniLists.of(Topics.IN_IP));
         _parallelProcessor.poll(ctx -> {
             var entries = ctx.streamConsumerRecords().map(ConsumerRecord::key).toList();
             this.processIps(entries);
@@ -109,7 +109,7 @@ public class NERDCollector extends IPStandaloneCollector<NERDData> {
 
                         for (var i = 0; i < ips.size(); i++) {
                             var value = resultDataBuffer.getDouble(i);
-                            _producer.send(new ProducerRecord<>(RESULT_TOPIC, entries.get(i),
+                            _producer.send(new ProducerRecord<>(Topics.OUT_IP, entries.get(i),
                                     successResult(new NERDData(value))));
                         }
                     } else {
@@ -124,7 +124,7 @@ public class NERDCollector extends IPStandaloneCollector<NERDData> {
     }
 
     private void sendAboutAll(List<StringPair> entries, CommonIPResult<NERDData> result) {
-        sendAboutAll(RESULT_TOPIC, entries, result);
+        sendAboutAll(Topics.OUT_IP, entries, result);
     }
 
     @Override

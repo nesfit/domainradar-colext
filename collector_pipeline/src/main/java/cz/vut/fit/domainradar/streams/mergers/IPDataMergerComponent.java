@@ -3,6 +3,7 @@ package cz.vut.fit.domainradar.streams.mergers;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import cz.vut.fit.domainradar.Topics;
 import cz.vut.fit.domainradar.models.results.CommonIPResult;
 import cz.vut.fit.domainradar.models.results.DNSResult;
 import cz.vut.fit.domainradar.models.results.ExtendedDNSResult;
@@ -53,7 +54,7 @@ public class IPDataMergerComponent implements PipelineComponent {
                 // Input: collected_IP_data: a stream of CommonIPResult objects with various kinds of data.
                 // At this point, we don't care what the data is, so we work with it as with an opaque JSON object.
                 // The input records are keyed by (Domain Name;IP) pairs.
-                .stream("collected_IP_data",
+                .stream(Topics.OUT_IP,
                         Consumed.with(StringPairSerde.build(), commonIpResultSerde))
                 // Group by the (DN;IP) pairs - the grouping contains results from several collectors for the same DN-IP.
                 .groupByKey(Grouped.with(StringPairSerde.build(), commonIpResultSerde))
@@ -102,7 +103,7 @@ public class IPDataMergerComponent implements PipelineComponent {
         // The second topology materializes the "processed DNS" stream as a KTable - this is fine, we only care about
         // the last observed DNS data. Then it joins with the IP data per domain generated above to output a single
         // merged DNS/IP data object.
-        var processedDnsTable = builder.table("processed_DNS",
+        var processedDnsTable = builder.table(Topics.OUT_DNS,
                 Consumed.with(Serdes.String(), dnsResultSerde));
 
         processedDnsTable
@@ -119,7 +120,7 @@ public class IPDataMergerComponent implements PipelineComponent {
                 .filter((domain, dns) -> dns == null || dns.ips() == null || dns.ips().isEmpty())
                 .mapValues((v) -> new ExtendedDNSResult(v, null))
                 .toStream(namedOp("DNS_with_no_IPs_to_merged"))
-                .to("merged_DNS_IP", Produced.with(Serdes.String(), extendedDnsResultSerde));
+                .to(Topics.OUT_MERGE_DNS_IP, Produced.with(Serdes.String(), extendedDnsResultSerde));
     }
 
     @Override

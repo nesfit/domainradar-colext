@@ -1,6 +1,7 @@
 package cz.vut.fit.domainradar.standalone.collectors;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import cz.vut.fit.domainradar.Topics;
 import cz.vut.fit.domainradar.models.ResultCodes;
 import cz.vut.fit.domainradar.models.results.ZoneResult;
 import cz.vut.fit.domainradar.serialization.JsonSerde;
@@ -28,8 +29,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class ZoneCollector extends BaseStandaloneCollector<String, Void, String, ZoneResult> {
-    public static final String IN_TOPIC = "to_process_zone";
-    public static final String OUT_TOPIC = "processed_zone";
     private final ExecutorService _executor;
     private final InternalDNSResolver _dns;
 
@@ -55,7 +54,7 @@ public class ZoneCollector extends BaseStandaloneCollector<String, Void, String,
     public void run(CommandLine cmd) {
         buildProcessor(0);
 
-        _parallelProcessor.subscribe(UniLists.of(IN_TOPIC));
+        _parallelProcessor.subscribe(UniLists.of(Topics.IN_ZONE));
         _parallelProcessor.poll(ctx -> {
             var dn = ctx.key();
             _dns.getZoneInfo(dn)
@@ -69,7 +68,8 @@ public class ZoneCollector extends BaseStandaloneCollector<String, Void, String,
                                     "Result null", Instant.now(), null);
 
                         System.err.println("producing result: " + result.toString());
-                        _producer.send(new ProducerRecord<>(OUT_TOPIC, dn, result));
+                        _producer.send(new ProducerRecord<>(Topics.OUT_ZONE, dn, result));
+                        // TODO: produce to IN_DNS
                     }, _executor);
         });
     }

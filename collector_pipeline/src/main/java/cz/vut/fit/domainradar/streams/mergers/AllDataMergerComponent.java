@@ -1,6 +1,7 @@
 package cz.vut.fit.domainradar.streams.mergers;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import cz.vut.fit.domainradar.Topics;
 import cz.vut.fit.domainradar.models.results.ExtendedDNSResult;
 import cz.vut.fit.domainradar.models.results.FinalResult;
 import cz.vut.fit.domainradar.models.results.RDAPDomainResult;
@@ -27,10 +28,10 @@ public class AllDataMergerComponent implements PipelineComponent {
         final var finalResultSerde = JsonSerde.of(_jsonMapper, FinalResult.class);
 
         var mergedDnsIpTable = builder
-                .table("merged_DNS_IP",
+                .table(Topics.OUT_MERGE_DNS_IP,
                         Consumed.with(Serdes.String(), extendedDnsResultSerde));
         var rdapDnTable = builder
-                .table("processed_RDAP_DN",
+                .table(Topics.OUT_RDAP_DN,
                         Consumed.with(Serdes.String(), rdapDnSerde));
 
         // We suppose that without DNS(+IP) data, the domain is not interesting at all, hence the left join.
@@ -39,7 +40,7 @@ public class AllDataMergerComponent implements PipelineComponent {
                         namedOp("join_DNS_IP_RDAP"),
                         Materialized.with(Serdes.String(), finalResultSerde))
                 .toStream(namedOp("result_to_stream"))
-                .to("all_collected_data",
+                .to(Topics.OUT_MERGE_ALL,
                         Produced.with(Serdes.String(), finalResultSerde));
     }
 
