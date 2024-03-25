@@ -30,7 +30,7 @@ import java.util.Properties;
 public abstract class BaseStandaloneCollector<KIn, VIn, KOut, VOut extends Result> implements Closeable {
 
     protected final Properties _properties;
-    private final Duration _closeTimeout;
+    protected final Duration _closeTimeout;
     private final Duration _commitInterval;
     private final int _maxConcurrency;
 
@@ -77,6 +77,10 @@ public abstract class BaseStandaloneCollector<KIn, VIn, KOut, VOut extends Resul
         }
     }
 
+    protected void send(@NotNull String topic, KOut key, VOut value) {
+        _producer.send(new ProducerRecord<>(topic, key, value));
+    }
+
     protected void buildProcessor(int batchSize) {
         var optionsBuilder = ParallelConsumerOptions.<KIn, VIn>builder()
                 .ordering(ParallelConsumerOptions.ProcessingOrder.KEY)
@@ -113,7 +117,7 @@ public abstract class BaseStandaloneCollector<KIn, VIn, KOut, VOut extends Resul
         _producer.close(_closeTimeout);
     }
 
-    VOut errorResult(int code, @NotNull String message, @NotNull Class<?> clz, Object[]... args) {
+    protected VOut errorResult(int code, @NotNull String message, @NotNull Class<?> clz, Object[]... args) {
         try {
             final var constructor = clz.getDeclaredConstructors()[0];
             Object[] parValues = new Object[constructor.getParameterCount()];

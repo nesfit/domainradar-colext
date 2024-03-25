@@ -17,6 +17,14 @@ public class CollectorConfig {
     public static final String NERD_HTTP_TIMEOUT_DOC = "The request timeout to use in the NERD collector (seconds).";
     public static final String NERD_HTTP_TIMEOUT_DEFAULT = "3";
 
+    public static final String DNS_DEFAULT_RECORD_TYPES_TO_COLLECT_CONFIG = "collectors.dns.record.types.to.scan";
+    public static final String DNS_DEFAULT_RECORD_TYPES_TO_COLLECT_DOC = "The DNS record types to scan if none are specified in the request (comma-separated).";
+    public static final String DNS_DEFAULT_RECORD_TYPES_TO_COLLECT_DEFAULT = "A,AAAA,CNAME,NS,MX,TXT";
+
+    public static final String DNS_DEFAULT_TYPES_TO_COLLECT_IPS_FROM_CONFIG = "collectors.dns.record.types.to.collect.ips.from";
+    public static final String DNS_DEFAULT_TYPES_TO_COLLECT_IPS_FROM_DOC = "The DNS record types to collect additional IP data for if none are specified in the request (comma-separated).";
+    public static final String DNS_DEFAULT_TYPES_TO_COLLECT_IPS_FROM_DEFAULT = "A,AAAA,CNAME,MX";
+
     public static final String CLOSE_TIMEOUT_SEC_CONFIG = "collectors.kafka.close.timeout";
     public static final String CLOSE_TIMEOUT_SEC_DOC = "The time to wait for a standalone collector producer/consumer to close (seconds).";
     public static final String CLOSE_TIMEOUT_SEC_DEFAULT = "5";

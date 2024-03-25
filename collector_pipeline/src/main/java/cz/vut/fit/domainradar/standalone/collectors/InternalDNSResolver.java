@@ -21,6 +21,7 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -53,13 +54,22 @@ public class InternalDNSResolver {
             _zoneInfo = Objects.requireNonNull(zoneInfo);
         }
 
-        public CompletionStage<DNSData> scan() {
-            var a = resolveA().toCompletableFuture();
-            var aaaa = resolveAAAA().toCompletableFuture();
-            var cname = resolveCNAME().toCompletableFuture();
-            var mx = resolveMX().toCompletableFuture();
-            var ns = resolveNS().toCompletableFuture();
-            var txt = resolveTXT().toCompletableFuture();
+        private static <T> CompletableFuture<TTLTuple<T>> resolveIfWanted(List<String> toCollect, String record,
+                                                                          Supplier<CompletionStage<TTLTuple<T>>> supplier) {
+            if (toCollect == null || toCollect.contains(record)) {
+                return supplier.get().toCompletableFuture();
+            } else {
+                return CompletableFuture.completedFuture(TTLTuple.ofNull());
+            }
+        }
+
+        public CompletionStage<DNSData> scan(List<String> toCollect) {
+            var a = resolveIfWanted(toCollect, "A", this::resolveA);
+            var aaaa = resolveIfWanted(toCollect, "AAAA", this::resolveAAAA);
+            var cname = resolveIfWanted(toCollect, "CNAME", this::resolveCNAME);
+            var mx = resolveIfWanted(toCollect, "MX", this::resolveMX);
+            var ns = resolveIfWanted(toCollect, "NS", this::resolveNS);
+            var txt = resolveIfWanted(toCollect, "TXT", this::resolveTXT);
 
             return CompletableFuture.allOf(a, aaaa, cname, mx, ns, txt)
                     .thenApply(unused -> {
@@ -506,21 +516,6 @@ public class InternalDNSResolver {
                 });
     }
 
-    private LookupSession getLookupSession() {
-        return LookupSession.builder()
-                .resolver(_mainResolver)
-                .executor(_executor)
-                .build();
-    }
-
-    private static CompletionStage<ZoneResult> errorResultStage(int code, String message) {
-        return CompletableFuture.completedFuture(new ZoneResult(code, message, Instant.now(), null));
-    }
-
-    private static ZoneResult successResult(ZoneInfo zoneInfo) {
-        return new ZoneResult(ResultCodes.OK, null, Instant.now(), zoneInfo);
-    }
-
     public CompletionStage<Set<Name>> findNameserversAsync(String domainName) {
         try {
             return findNameserversAsync(Name.fromString(domainName));
@@ -572,5 +567,20 @@ public class InternalDNSResolver {
 
         return aSession.thenCombine(aaaaSession, Stream::concat)
                 .thenApply(x -> x.collect(Collectors.toSet()));
+    }
+
+    private LookupSession getLookupSession() {
+        return LookupSession.builder()
+                .resolver(_mainResolver)
+                .executor(_executor)
+                .build();
+    }
+
+    private static CompletionStage<ZoneResult> errorResultStage(int code, String message) {
+        return CompletableFuture.completedFuture(new ZoneResult(code, message, Instant.now(), null));
+    }
+
+    private static ZoneResult successResult(ZoneInfo zoneInfo) {
+        return new ZoneResult(ResultCodes.OK, null, Instant.now(), zoneInfo);
     }
 }

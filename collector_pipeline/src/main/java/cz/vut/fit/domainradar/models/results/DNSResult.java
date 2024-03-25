@@ -13,6 +13,8 @@ public record DNSResult(int statusCode,
                         @NotNull Instant lastAttempt,
                         @Nullable DNSData dnsData,
                         @Nullable TLSData tlsData,
-                        @Nullable Set<String> ips
+                        @Nullable Set<IPFromRecord> ips
 ) implements Result {
+    public record IPFromRecord(@NotNull String ip, @NotNull String type) {
+    }
 }

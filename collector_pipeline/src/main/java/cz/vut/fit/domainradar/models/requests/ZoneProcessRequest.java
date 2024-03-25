@@ -1,16 +1,16 @@
 package cz.vut.fit.domainradar.models.requests;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 
 public record ZoneProcessRequest(
-        @JsonProperty
         @Nullable
-        List<String> toCollect) {
+        List<String> toCollect,
+        @Nullable
+        List<String> typesToProcessIPsFrom) {
 
     public ZoneProcessRequest() {
-        this(null);
+        this(null, null);
     }
 }

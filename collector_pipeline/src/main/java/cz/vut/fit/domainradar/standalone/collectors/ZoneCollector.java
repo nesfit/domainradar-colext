@@ -3,9 +3,12 @@ package cz.vut.fit.domainradar.standalone.collectors;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import cz.vut.fit.domainradar.Topics;
 import cz.vut.fit.domainradar.models.ResultCodes;
+import cz.vut.fit.domainradar.models.requests.DNSProcessRequest;
+import cz.vut.fit.domainradar.models.requests.ZoneProcessRequest;
 import cz.vut.fit.domainradar.models.results.ZoneResult;
 import cz.vut.fit.domainradar.serialization.JsonSerde;
 import cz.vut.fit.domainradar.standalone.BaseStandaloneCollector;
+import cz.vut.fit.domainradar.standalone.BiProducerStandaloneCollector;
 import cz.vut.fit.domainradar.standalone.IPStandaloneCollector;
 import org.apache.commons.cli.CommandLine;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -28,15 +31,18 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-public class ZoneCollector extends BaseStandaloneCollector<String, Void, String, ZoneResult> {
+public class ZoneCollector extends BiProducerStandaloneCollector<String, ZoneProcessRequest, String, ZoneResult,
+        String, DNSProcessRequest> {
     private final ExecutorService _executor;
     private final InternalDNSResolver _dns;
 
     public ZoneCollector(@NotNull ObjectMapper jsonMapper,
                          @NotNull String appName,
                          @Nullable Properties properties) throws UnknownHostException {
-        super(jsonMapper, appName, properties, Serdes.String(), Serdes.String(), Serdes.Void(),
-                JsonSerde.of(jsonMapper, ZoneResult.class));
+        super(jsonMapper, appName, properties, Serdes.String(), Serdes.String(), Serdes.String(),
+                JsonSerde.of(jsonMapper, ZoneProcessRequest.class),
+                JsonSerde.of(jsonMapper, ZoneResult.class),
+                JsonSerde.of(jsonMapper, DNSProcessRequest.class));
 
         // TODO: Configuration
         var dnsServers = new String[]{"195.113.144.194", "193.17.47.1", "195.113.144.233", "185.43.135.1"};
@@ -61,7 +67,7 @@ public class ZoneCollector extends BaseStandaloneCollector<String, Void, String,
                     .exceptionally(e -> {
                         // Shouldn't happen (error ought to be handled in the InternalDNSResolver)
                         return new ZoneResult(ResultCodes.OTHER_DNS_ERROR, e.getMessage(), Instant.now(), null);
-                    }).thenAcceptAsync(result -> {
+                    }).thenAccept(result -> {
                         if (result == null)
                             // Shouldn't happen
                             result = new ZoneResult(ResultCodes.OTHER_DNS_ERROR,
@@ -69,8 +75,16 @@ public class ZoneCollector extends BaseStandaloneCollector<String, Void, String,
 
                         System.err.println("producing result: " + result.toString());
                         _producer.send(new ProducerRecord<>(Topics.OUT_ZONE, dn, result));
-                        // TODO: produce to IN_DNS
-                    }, _executor);
+
+                        if (result.zone() != null) {
+                            var reqValue = ctx.value();
+                            var toCollect = reqValue == null ? null : reqValue.toCollect();
+                            var toProcessIPsFrom = reqValue == null ? null : reqValue.typesToProcessIPsFrom();
+
+                            _producer2.send(new ProducerRecord<>(Topics.IN_DNS, dn, new DNSProcessRequest(
+                                    toCollect, toProcessIPsFrom, result.zone())));
+                        }
+                    });
         });
     }
 

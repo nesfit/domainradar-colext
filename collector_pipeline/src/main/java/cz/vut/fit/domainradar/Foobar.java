@@ -82,7 +82,7 @@ public class Foobar {
                     continue;
                 }
                 var scanner = dns.makeScanner(name.toString(), zoneInfo.zone());
-                var data = scanner.scan().toCompletableFuture().join();
+                var data = scanner.scan(null).toCompletableFuture().join();
                 System.out.println(data);
                 System.out.println();
             }
