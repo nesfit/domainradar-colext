@@ -7,7 +7,6 @@ import org.apache.kafka.common.header.Headers;
 import org.apache.kafka.common.serialization.Deserializer;
 import org.apache.kafka.common.utils.ByteBufferInputStream;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 
 public class JsonDeserializerTypedByTypeReference<T> implements Deserializer<T> {

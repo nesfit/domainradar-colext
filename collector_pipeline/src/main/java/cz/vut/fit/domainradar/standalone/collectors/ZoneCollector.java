@@ -7,27 +7,19 @@ import cz.vut.fit.domainradar.models.requests.DNSProcessRequest;
 import cz.vut.fit.domainradar.models.requests.ZoneProcessRequest;
 import cz.vut.fit.domainradar.models.results.ZoneResult;
 import cz.vut.fit.domainradar.serialization.JsonSerde;
-import cz.vut.fit.domainradar.standalone.BaseStandaloneCollector;
 import cz.vut.fit.domainradar.standalone.BiProducerStandaloneCollector;
-import cz.vut.fit.domainradar.standalone.IPStandaloneCollector;
 import org.apache.commons.cli.CommandLine;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.Serdes;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.slf4j.Logger;
 import org.xbill.DNS.ExtendedResolver;
-import org.xbill.DNS.Name;
-import org.xbill.DNS.TextParseException;
-import org.xbill.DNS.Type;
-import org.xbill.DNS.lookup.LookupSession;
 import pl.tlinkowski.unij.api.UniLists;
 
 import java.net.UnknownHostException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Properties;
-import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 

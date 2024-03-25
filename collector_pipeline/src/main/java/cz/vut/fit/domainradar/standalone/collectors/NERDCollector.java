@@ -8,8 +8,6 @@ import cz.vut.fit.domainradar.models.StringPair;
 import cz.vut.fit.domainradar.models.ip.NERDData;
 import cz.vut.fit.domainradar.models.results.CommonIPResult;
 import cz.vut.fit.domainradar.standalone.IPStandaloneCollector;
-import io.confluent.parallelconsumer.ParallelConsumerOptions;
-import io.confluent.parallelconsumer.ParallelStreamProcessor;
 import org.apache.commons.cli.CommandLine;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;

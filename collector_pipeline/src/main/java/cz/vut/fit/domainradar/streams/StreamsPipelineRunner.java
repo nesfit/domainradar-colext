@@ -1,17 +1,18 @@
 package cz.vut.fit.domainradar.streams;
 
-import cz.vut.fit.domainradar.CollectorConfig;
-import cz.vut.fit.domainradar.standalone.collectors.NERDCollector;
-import cz.vut.fit.domainradar.streams.collectors.*;
-
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import cz.vut.fit.domainradar.CollectorConfig;
+import cz.vut.fit.domainradar.streams.collectors.GeoIPCollector;
 import cz.vut.fit.domainradar.streams.mergers.AllDataMergerComponent;
 import cz.vut.fit.domainradar.streams.mergers.IPDataMergerComponent;
 import org.apache.commons.cli.*;
 import org.apache.kafka.common.serialization.Serdes;
-import org.apache.kafka.streams.*;
+import org.apache.kafka.streams.KafkaStreams;
+import org.apache.kafka.streams.StreamsBuilder;
+import org.apache.kafka.streams.StreamsConfig;
+import org.apache.kafka.streams.Topology;
 import org.apache.kafka.streams.errors.TopologyException;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -19,7 +20,10 @@ import org.slf4j.LoggerFactory;
 
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
 
 public class StreamsPipelineRunner {

@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import cz.vut.fit.domainradar.CollectorConfig;
-import cz.vut.fit.domainradar.models.results.Result;
 import cz.vut.fit.domainradar.standalone.collectors.DNSCollector;
 import cz.vut.fit.domainradar.standalone.collectors.NERDCollector;
 import cz.vut.fit.domainradar.standalone.collectors.ZoneCollector;
