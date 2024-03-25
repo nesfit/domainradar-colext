@@ -1,2 +1,5 @@
 **/.idea/
 data/*.mmdb
+**/__pycache__
+*.iml
+
