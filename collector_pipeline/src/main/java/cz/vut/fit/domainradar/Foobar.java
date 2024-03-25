@@ -3,38 +3,37 @@ package cz.vut.fit.domainradar;
 import com.google.common.net.InternetDomainName;
 import cz.vut.fit.domainradar.standalone.collectors.InternalDNSResolver;
 import org.xbill.DNS.SimpleResolver;
+import org.xbill.DNS.TextParseException;
 
 import java.net.UnknownHostException;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 
 public class Foobar {
     public static void main(String[] args) throws InterruptedException {
         var names = new InternetDomainName[]{
-                InternetDomainName.from("email.seznam.cz"),
-                InternetDomainName.from("www.merlin.fit.vut.cz"),
-                InternetDomainName.from("www.fit.vut.cz"),
-                InternetDomainName.from("fit.vut.cz"),
-                InternetDomainName.from("vut.cz"),
-                InternetDomainName.from("cz"),
-                /*
-                InternetDomainName.from("jp"),
-                InternetDomainName.from("hokkaido.jp"),
-                InternetDomainName.from("hakodate.hokkaido.jp"),
-                InternetDomainName.from("co.uk"),
-                InternetDomainName.from("cz"),
-                InternetDomainName.from("cesnet.cz"),
-                InternetDomainName.from("fit.vut.cz"),
-                InternetDomainName.from("xyz.co.uk"),
-                InternetDomainName.from("www.blogspot.com"),
-                InternetDomainName.from("blogspot.com"),
-                InternetDomainName.from("adobeaemcloud.com"),
-                InternetDomainName.from("sadasd.asdasd.adobeaemcloud.com"),
-                InternetDomainName.from("asd-ewqe.dev.adobeaemcloud.com"),
-                InternetDomainName.from("invalid"),
-                InternetDomainName.from("something.invalid"),
-                 */
+//                InternetDomainName.from("email.seznam.cz"),
+//                InternetDomainName.from("www.merlin.fit.vutbr.cz"),
+//                InternetDomainName.from("merlin.fit.vutbr.cz"),
+//                InternetDomainName.from("www.fit.vut.cz"),
+//                InternetDomainName.from("fit.vut.cz"),
+//                InternetDomainName.from("vut.cz"),
+//                InternetDomainName.from("cz"),
+//                InternetDomainName.from("ondryaso.eu"),
+//                InternetDomainName.from("www.ondryaso.eu"),
+//                InternetDomainName.from("jp"),
+//                InternetDomainName.from("hokkaido.jp"),
+//                InternetDomainName.from("hakodate.hokkaido.jp"),
+//                InternetDomainName.from("co.uk"),
+//                InternetDomainName.from("cz"),
+//                InternetDomainName.from("cesnet.cz"),
+//                InternetDomainName.from("xyz.co.uk"),
+               InternetDomainName.from("www.blogspot.com"),
+//                InternetDomainName.from("blogspot.com"),
+//                InternetDomainName.from("adobeaemcloud.com"),
+//                InternetDomainName.from("sadasd.asdasd.adobeaemcloud.com"),
+//                InternetDomainName.from("asd-ewqe.dev.adobeaemcloud.com"),
+//                InternetDomainName.from("invalid"),
+//                InternetDomainName.from("something.invalid")
         };
 
         for (var name : names) {
@@ -71,16 +70,23 @@ public class Foobar {
             var dns = new InternalDNSResolver(resolver, ex);
 
             for (var name : names) {
-                dns.getZoneInfo(name.toString())
-                        .thenAcceptAsync(x -> {
-                            synchronized (ex) {
-                                System.out.print(name + ": ");
-                                System.out.println(x);
-                            }
-                        }, ex).toCompletableFuture().join();
+                var zoneInfo = dns.getZoneInfo(name.toString())
+                        .toCompletableFuture().join();
 
+                System.out.println(name);
+                System.out.println(zoneInfo);
+
+                if (zoneInfo.zone() == null) {
+                    System.out.println("No zone");
+                    System.out.println();
+                    continue;
+                }
+                var scanner = dns.makeScanner(name.toString(), zoneInfo.zone());
+                var data = scanner.scan().toCompletableFuture().join();
+                System.out.println(data);
+                System.out.println();
             }
-        } catch (UnknownHostException e) {
+        } catch (UnknownHostException | TextParseException e) {
             throw new RuntimeException(e);
         }
 

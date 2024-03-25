@@ -7,12 +7,17 @@ import cz.vut.fit.domainradar.models.dns.ZoneInfo;
 import cz.vut.fit.domainradar.models.results.ZoneResult;
 import org.slf4j.LoggerFactory;
 import org.xbill.DNS.*;
+import org.xbill.DNS.lookup.LookupResult;
 import org.xbill.DNS.lookup.LookupSession;
 
+import java.io.IOException;
 import java.net.InetAddress;
+import java.net.UnknownHostException;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Function;
@@ -28,12 +33,263 @@ public class InternalDNSResolver {
         }
     }
 
+    public record TTLTuple<T>(long ttl, T value) {
+        public static <T> TTLTuple<T> of(LookupResult result, T value) {
+            return new TTLTuple<>(result.getRecords().getFirst().getTTL(), value);
+        }
+
+        public static <T> TTLTuple<T> ofNull() {
+            return new TTLTuple<>(-1, null);
+        }
+    }
+
+    public class DNSScanner {
+        private final Name _name;
+        private final ZoneInfo _zoneInfo;
+        private LookupSession _primaryLookupSession, _fallbackLookupSession;
+
+        private DNSScanner(Name name, ZoneInfo zoneInfo) {
+            _name = Objects.requireNonNull(name);
+            _zoneInfo = Objects.requireNonNull(zoneInfo);
+        }
+
+        public CompletionStage<DNSData> scan() {
+            var a = resolveA().toCompletableFuture();
+            var aaaa = resolveAAAA().toCompletableFuture();
+            var cname = resolveCNAME().toCompletableFuture();
+            var mx = resolveMX().toCompletableFuture();
+            var ns = resolveNS().toCompletableFuture();
+            var txt = resolveTXT().toCompletableFuture();
+
+            return CompletableFuture.allOf(a, aaaa, cname, mx, ns, txt)
+                    .thenApply(unused -> {
+                        var aRes = a.join();
+                        var aaaaRes = aaaa.join();
+                        var cnameRes = cname.join();
+                        var mxRes = mx.join();
+                        var nsRes = ns.join();
+                        var txtRes = txt.join();
+
+                        return new DNSData(
+                                Map.of(
+                                        "A", aRes.ttl(),
+                                        "AAAA", aaaaRes.ttl(),
+                                        "CNAME", cnameRes.ttl(),
+                                        "MX", mxRes.ttl(),
+                                        "NS", nsRes.ttl(),
+                                        "TXT", txtRes.ttl()
+                                ),
+                                aRes.value(),
+                                aaaaRes.value(),
+                                cnameRes.value(),
+                                mxRes.value(),
+                                nsRes.value(),
+                                txtRes.value()
+                        );
+                    });
+        }
+
+        public CompletionStage<TTLTuple<Set<String>>> resolveA() {
+            return this.resolve(Type.A)
+                    .thenApply(result -> {
+                        if (result == null) {
+                            return TTLTuple.ofNull();
+                        }
+
+                        return TTLTuple.of(result,
+                                result.getRecords().stream()
+                                        .map(record -> ((ARecord) record))
+                                        .filter(record -> record.getName() == _name)
+                                        .map(record -> record.getAddress().getHostAddress())
+                                        .collect(Collectors.toSet()));
+                    });
+
+        }
+
+        public CompletionStage<TTLTuple<Set<String>>> resolveAAAA() {
+            return this.resolve(Type.AAAA)
+                    .thenApply(result -> {
+                        if (result == null) {
+                            return TTLTuple.ofNull();
+                        }
+
+                        return TTLTuple.of(result, result.getRecords().stream()
+                                .map(record -> ((AAAARecord) record).getAddress().getHostAddress())
+                                .collect(Collectors.toSet()));
+                    });
+        }
+
+        public CompletionStage<TTLTuple<DNSData.CNAMERecord>> resolveCNAME() {
+            return this.resolve(Type.CNAME)
+                    .thenCompose(result -> {
+                        if (result == null) {
+                            return CompletableFuture.completedFuture(TTLTuple.ofNull());
+                        }
+
+                        var record = (CNAMERecord) result.getRecords().getFirst();
+                        var resolveIpsStage = InternalDNSResolver.this.resolveIpsAsync(record.getTarget());
+
+                        return resolveIpsStage.thenApply(ips -> TTLTuple.of(result, new DNSData.CNAMERecord(
+                                record.getTarget().toString(true),
+                                ips.stream().map(InetAddress::getHostAddress).collect(Collectors.toList())
+                        )));
+                    });
+        }
+
+        public CompletionStage<TTLTuple<List<DNSData.MXRecord>>> resolveMX() {
+            return this.resolve(Type.MX)
+                    .thenCompose(result -> {
+                        if (result == null) {
+                            return CompletableFuture.completedFuture(TTLTuple.ofNull());
+                        }
+
+                        var records = result.getRecords().stream()
+                                .map(record -> (MXRecord) record)
+                                .toList();
+
+                        var stages = records.stream()
+                                .map(MXRecord::getTarget)
+                                .map(InternalDNSResolver.this::resolveIpsAsync)
+                                .map(CompletionStage::toCompletableFuture)
+                                .toArray(CompletableFuture[]::new);
+
+                        return CompletableFuture.allOf(stages)
+                                .thenApply(unused -> {
+                                    var returnRecords = new ArrayList<DNSData.MXRecord>();
+                                    for (var i = 0; i < records.size(); i++) {
+                                        final var inRecord = records.get(i);
+                                        //noinspection unchecked
+                                        returnRecords.add(new DNSData.MXRecord(
+                                                inRecord.getTarget().toString(true),
+                                                inRecord.getPriority(),
+                                                ((CompletableFuture<Set<InetAddress>>) stages[i]).join().stream()
+                                                        .map(InetAddress::getHostAddress)
+                                                        .collect(Collectors.toList())));
+                                    }
+                                    return TTLTuple.of(result, returnRecords);
+                                });
+                    });
+        }
+
+        public CompletionStage<TTLTuple<List<DNSData.NSRecord>>> resolveNS() {
+            return this.resolve(Type.NS)
+                    .thenCompose(result -> {
+                        if (result == null) {
+                            return CompletableFuture.completedFuture(TTLTuple.ofNull());
+                        }
+
+                        var records = result.getRecords().stream()
+                                .map(record -> (NSRecord) record)
+                                .toList();
+
+                        var stages = records.stream()
+                                .map(NSRecord::getTarget)
+                                .map(InternalDNSResolver.this::resolveIpsAsync)
+                                .map(CompletionStage::toCompletableFuture)
+                                .toArray(CompletableFuture[]::new);
+
+                        return CompletableFuture.allOf(stages)
+                                .thenApply(unused -> {
+                                    var returnRecords = new ArrayList<DNSData.NSRecord>();
+                                    for (var i = 0; i < records.size(); i++) {
+                                        //noinspection unchecked
+                                        returnRecords.add(new DNSData.NSRecord(
+                                                records.get(i).getTarget().toString(true),
+                                                ((CompletableFuture<Set<InetAddress>>) stages[i]).join().stream()
+                                                        .map(InetAddress::getHostAddress)
+                                                        .collect(Collectors.toList())));
+                                    }
+                                    return TTLTuple.of(result, returnRecords);
+                                });
+                    });
+        }
+
+        public CompletionStage<TTLTuple<List<String>>> resolveTXT() {
+            return this.resolve(Type.TXT)
+                    .thenApply(result -> {
+                        if (result == null) {
+                            return TTLTuple.ofNull();
+                        }
+
+                        return TTLTuple.of(result, result.getRecords().stream()
+                                .flatMap(record -> ((TXTRecord) record).getStrings().stream())
+                                .collect(Collectors.toList()));
+                    });
+        }
+
+        private CompletionStage<LookupResult> resolve(int type) {
+            // TODO: log stuff
+            return getPrimaryLookupSession().lookupAsync(_name, type)
+                    .thenApply(result -> {
+                        if (result.getRecords().isEmpty()) {
+                            return null;
+                        } else {
+                            return result;
+                        }
+                    })
+                    .exceptionallyCompose(e -> {
+                        if (e instanceof CompletionException) {
+                            e = e.getCause();
+                        }
+
+                        if (e instanceof IOException) {
+                            return getSecondaryLookupSession().lookupAsync(_name, type)
+                                    .exceptionallyCompose(e2 -> CompletableFuture.completedFuture(null));
+                        } else {
+                            return CompletableFuture.completedFuture(null);
+                        }
+                    });
+        }
+
+
+        private LookupSession getPrimaryLookupSession() {
+            if (_primaryLookupSession != null) {
+                return _primaryLookupSession;
+            }
+
+            return _primaryLookupSession = getLookupSessionForNameservers(_zoneInfo.primaryNameserverIps());
+        }
+
+        private LookupSession getSecondaryLookupSession() {
+            if (_fallbackLookupSession != null) {
+                return _fallbackLookupSession;
+            }
+
+            return _fallbackLookupSession = getLookupSessionForNameservers(_zoneInfo.secondaryNameserverIps());
+        }
+
+        private LookupSession getLookupSessionForNameservers(Set<String> nameservers) {
+            if (nameservers == null || nameservers.isEmpty()) {
+                return null;
+            }
+
+            try {
+                var resolver = new ExtendedResolver(nameservers.toArray(String[]::new));
+                resolver.setRetries(2);
+                resolver.setTimeout(Duration.ofSeconds(10)); // TODO
+                resolver.setLoadBalance(true);
+                resolver.setTCP(false);
+
+                return LookupSession.builder()
+                        .executor(_executor)
+                        .resolver(resolver)
+                        .build();
+            } catch (UnknownHostException e) {
+                return null;
+            }
+        }
+    }
+
     private final Resolver _mainResolver;
     private final ExecutorService _executor;
 
     public InternalDNSResolver(Resolver resolver, ExecutorService executor) {
         _mainResolver = resolver;
         _executor = executor;
+    }
+
+    public DNSScanner makeScanner(String name, ZoneInfo zoneInfo) throws TextParseException {
+        return new DNSScanner(Name.fromString(name), zoneInfo);
     }
 
     public CompletionStage<ZoneResult> getZoneInfo(String domainName) {
