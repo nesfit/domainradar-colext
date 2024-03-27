@@ -49,7 +49,7 @@ public class NERDCollector extends IPStandaloneCollector<NERDData> {
 
     @Override
     public void run(CommandLine cmd) {
-        buildProcessor(30);
+        buildProcessor(20);
 
         final var executor = _executor = Executors.newVirtualThreadPerTaskExecutor();
         _client = HttpClient.newBuilder()

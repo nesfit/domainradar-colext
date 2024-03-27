@@ -35,6 +35,6 @@ public class CollectorConfig {
 
     public static final String COMMIT_INTERVAL_MS_CONFIG = "collectors.parallel.consumer.commit.interval";
     public static final String COMMIT_INTERVAL_MS_DOC = "The interval at which to commit the offsets.";
-    public static final String COMMIT_INTERVAL_MS_DEFAULT = "1000";
+    public static final String COMMIT_INTERVAL_MS_DEFAULT = "100";
 
 }

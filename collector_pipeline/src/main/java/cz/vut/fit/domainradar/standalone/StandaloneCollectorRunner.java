@@ -1,5 +1,6 @@
 package cz.vut.fit.domainradar.standalone;
 
+import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -33,6 +34,7 @@ public class StandaloneCollectorRunner {
 
         final ObjectMapper jsonMapper = JsonMapper.builder()
                 .addModule(new JavaTimeModule())
+                .configure(JsonParser.Feature.INCLUDE_SOURCE_IN_LOCATION, true)
                 .build();
         final Properties properties = initProperties(cmd);
 

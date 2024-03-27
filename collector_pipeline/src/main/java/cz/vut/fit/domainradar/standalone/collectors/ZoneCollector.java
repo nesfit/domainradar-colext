@@ -65,7 +65,6 @@ public class ZoneCollector extends BiProducerStandaloneCollector<String, ZonePro
                             result = new ZoneResult(ResultCodes.OTHER_DNS_ERROR,
                                     "Result null", Instant.now(), null);
 
-                        System.err.println("producing result: " + result.toString());
                         _producer.send(new ProducerRecord<>(Topics.OUT_ZONE, dn, result));
 
                         if (result.zone() != null) {

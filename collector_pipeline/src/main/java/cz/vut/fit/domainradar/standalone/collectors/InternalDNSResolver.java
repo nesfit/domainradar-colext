@@ -39,6 +39,13 @@ public class InternalDNSResolver {
             return new TTLTuple<>(result.getRecords().getFirst().getTTL(), value);
         }
 
+        public static <T extends Collection<?>> TTLTuple<T> of(LookupResult result, T value) {
+            if (value.isEmpty())
+                return TTLTuple.ofNull();
+
+            return new TTLTuple<>(result.getRecords().getFirst().getTTL(), value);
+        }
+
         public static <T> TTLTuple<T> ofNull() {
             return new TTLTuple<>(-1, null);
         }
@@ -50,8 +57,15 @@ public class InternalDNSResolver {
         private LookupSession _primaryLookupSession, _fallbackLookupSession;
 
         private DNSScanner(Name name, ZoneInfo zoneInfo) {
-            _name = Objects.requireNonNull(name);
+            var nameNotNull = Objects.requireNonNull(name);
             _zoneInfo = Objects.requireNonNull(zoneInfo);
+
+            try {
+                _name = Name.concatenate(nameNotNull, Name.root);
+            } catch (NameTooLongException e) {
+                // Shouldn't happen
+                throw new RuntimeException(e);
+            }
         }
 
         private static <T> CompletableFuture<TTLTuple<T>> resolveIfWanted(List<String> toCollect, String record,
@@ -109,7 +123,7 @@ public class InternalDNSResolver {
                         return TTLTuple.of(result,
                                 result.getRecords().stream()
                                         .map(record -> ((ARecord) record))
-                                        .filter(record -> record.getName() == _name)
+                                        .filter(record -> record.getName().equals(_name))
                                         .map(record -> record.getAddress().getHostAddress())
                                         .collect(Collectors.toSet()));
                     });
@@ -124,7 +138,9 @@ public class InternalDNSResolver {
                         }
 
                         return TTLTuple.of(result, result.getRecords().stream()
-                                .map(record -> ((AAAARecord) record).getAddress().getHostAddress())
+                                .map(record -> (AAAARecord) record)
+                                .filter(record -> record.getName().equals(_name))
+                                .map(record -> record.getAddress().getHostAddress())
                                 .collect(Collectors.toSet()));
                     });
         }

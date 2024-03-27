@@ -4,11 +4,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import cz.vut.fit.domainradar.CollectorConfig;
 import cz.vut.fit.domainradar.Topics;
 import cz.vut.fit.domainradar.models.ResultCodes;
+import cz.vut.fit.domainradar.models.StringPair;
 import cz.vut.fit.domainradar.models.dns.DNSData;
 import cz.vut.fit.domainradar.models.requests.DNSProcessRequest;
 import cz.vut.fit.domainradar.models.results.DNSResult;
 import cz.vut.fit.domainradar.models.tls.TLSData;
 import cz.vut.fit.domainradar.serialization.JsonSerde;
+import cz.vut.fit.domainradar.serialization.StringPairSerde;
 import cz.vut.fit.domainradar.standalone.BiProducerStandaloneCollector;
 import org.apache.commons.cli.CommandLine;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -32,7 +34,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class DNSCollector extends BiProducerStandaloneCollector<String, DNSProcessRequest, String, DNSResult,
-        String, Void> {
+        StringPair, Void> {
     private static final org.slf4j.Logger Logger = LoggerFactory.getLogger(DNSCollector.class);
 
     private final ExecutorService _executor;
@@ -46,7 +48,7 @@ public class DNSCollector extends BiProducerStandaloneCollector<String, DNSProce
         super(jsonMapper, appName, properties,
                 Serdes.String(),
                 Serdes.String(),
-                Serdes.String(),
+                StringPairSerde.build(),
                 JsonSerde.of(jsonMapper, DNSProcessRequest.class),
                 JsonSerde.of(jsonMapper, DNSResult.class),
                 Serdes.Void());
@@ -114,7 +116,8 @@ public class DNSCollector extends BiProducerStandaloneCollector<String, DNSProce
                                     .collect(Collectors.toSet());
 
                             for (var ip : unique) {
-                                _producer2.send(new ProducerRecord<>(Topics.IN_IP, ip, null));
+                                _producer2.send(new ProducerRecord<>(Topics.IN_IP,
+                                        new StringPair(dn, ip), null));
                             }
                         }
                     });
@@ -123,6 +126,7 @@ public class DNSCollector extends BiProducerStandaloneCollector<String, DNSProce
 
     private CompletableFuture<DNSResult> runTlsResolve(DNSData dnsData) {
         String targetIp = null;
+        // TODO: handle empty sets
         if (dnsData.CNAME() != null && dnsData.CNAME().relatedIps() != null && !dnsData.CNAME().relatedIps().isEmpty()) {
             targetIp = dnsData.CNAME().relatedIps().getFirst();
         } else if (dnsData.A() != null) {

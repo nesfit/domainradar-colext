@@ -52,6 +52,7 @@ public abstract class BaseStandaloneCollector<KIn, VIn, KOut, VOut extends Resul
             _properties.putAll(properties);
         _properties.setProperty(ConsumerConfig.GROUP_ID_CONFIG, groupId);
         _properties.setProperty(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
+        _properties.setProperty(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, "60000");
 
         _maxConcurrency = Integer.parseInt(_properties.getProperty(
                 CollectorConfig.MAX_CONCURRENCY_CONFIG, CollectorConfig.MAX_CONCURRENCY_DEFAULT));
