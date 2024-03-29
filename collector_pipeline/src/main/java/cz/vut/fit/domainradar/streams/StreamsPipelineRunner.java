@@ -1,9 +1,13 @@
 package cz.vut.fit.domainradar.streams;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import cz.vut.fit.domainradar.CollectorConfig;
+import cz.vut.fit.domainradar.models.results.DNSResult;
 import cz.vut.fit.domainradar.streams.collectors.GeoIPCollector;
 import cz.vut.fit.domainradar.streams.mergers.AllDataMergerComponent;
 import cz.vut.fit.domainradar.streams.mergers.IPDataMergerComponent;
@@ -86,7 +90,18 @@ public class StreamsPipelineRunner {
         final StreamsBuilder builder = new StreamsBuilder();
         final ObjectMapper jsonMapper = JsonMapper.builder()
                 .addModule(new JavaTimeModule())
+                .configure(SerializationFeature.WRITE_DATE_TIMESTAMPS_AS_NANOSECONDS, false)
+                .configure(DeserializationFeature.READ_DATE_TIMESTAMPS_AS_NANOSECONDS, false)
                 .build();
+
+        try {
+            System.err.println(jsonMapper.writeValueAsString(new DNSResult(2,
+                    "", java.time.Instant.now(), null, null, null)));
+            System.exit(0);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
+
         List<PipelineComponent> components;
 
         try {

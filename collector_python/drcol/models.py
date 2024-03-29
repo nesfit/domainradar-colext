@@ -5,9 +5,9 @@ from faust.models.fields import FieldDescriptor, FloatField, IntegerField, Strin
 
 
 class Result(Record, abstract=True, coerce=True):
-    success: bool = BooleanField(required=True)
+    statusCode: int = IntegerField(required=True)
     error: Optional[str] = StringField(required=False)
-    last_attempt: float = FloatField(input_name="lastAttempt")
+    last_attempt: int = IntegerField(input_name="lastAttempt")
 
 
 class RDAPResult(Result):
@@ -18,3 +18,9 @@ class RDAPResult(Result):
 class RDAPDomainResult(RDAPResult):
     raw_whois_data: Optional[str] = StringField(input_name="rawWHOISData", required=False)
     parsed_whois_data: Optional[dict] = FieldDescriptor[dict](input_name="parsedWHOISData", required=False)
+    rdap_error: Optional[str] = StringField(input_name="rdapError", required=False)
+    is_for_source_name: bool = BooleanField(input_name="forSourceName", required=True)
+
+
+class RDAPRequest(Record, coerce=True):
+    zone: Optional[str] = StringField(required=False)

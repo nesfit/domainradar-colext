@@ -37,8 +37,17 @@ public final class ResultCodes {
     public static final int CANNOT_FETCH = 50;
 
     /**
+     * We are rate limited at the remote source.
+     */
+    public static final int RATE_LIMITED = 51;
+
+    /**
      * Unexpected DNS error.
      */
     public static final int OTHER_DNS_ERROR = 70;
 
+    /**
+     * RDAP servers are not available for the entity.
+     */
+    public static final int RDAP_NOT_AVAILABLE = 80;
 }
