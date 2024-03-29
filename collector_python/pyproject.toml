@@ -15,6 +15,7 @@ python = "^3.11"
 faust-streaming = {extras = ["rocksdict"], version = "^0.10.24"}
 asyncwhois = "^1.1.0"
 whodap = "^0.1.12"
+icmplib = "^3.0.4"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0.0"

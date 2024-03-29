@@ -1,3 +1,5 @@
+import ssl
+from datetime import datetime
 from typing import List
 
 from whodap import DNSClient
@@ -37,6 +39,16 @@ async def fetch_entities(response: DomainResponse, client: RDAPClient) -> List[R
 
     del response.entities
     return result
+
+
+def make_ssl_context():
+    context = ssl.create_default_context()
+    context.set_ciphers("ALL:@SECLEVEL=1")
+    return context
+
+
+def timestamp_now_millis():
+    return int(datetime.now().timestamp() * 1e3)
 
 
 def extract_known_tld(domain_name: str, client: DNSClient) -> tuple[str | None, str | None]:
