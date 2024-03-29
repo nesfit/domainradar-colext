@@ -7,6 +7,7 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import cz.vut.fit.domainradar.CollectorConfig;
 import cz.vut.fit.domainradar.standalone.collectors.DNSCollector;
 import cz.vut.fit.domainradar.standalone.collectors.NERDCollector;
+import cz.vut.fit.domainradar.standalone.collectors.TestCollector;
 import cz.vut.fit.domainradar.standalone.collectors.ZoneCollector;
 import org.apache.commons.cli.*;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -96,6 +97,10 @@ public class StandaloneCollectorRunner {
             if (useAll || cmd.hasOption("col-nerd")) {
                 components.add(new NERDCollector(mapper, appId, properties));
             }
+
+            if (cmd.hasOption("col-test")) {
+                components.add(new TestCollector(mapper, appId, properties));
+            }
         } catch (Exception e) {
             Logger.error("Failed to initialize a collector", e);
             System.exit(4);
@@ -138,6 +143,9 @@ public class StandaloneCollectorRunner {
         options.addOption(null, "col-dns", false, "Use the DNS+TLS collector");
         options.addOption(null, "col-zone", false, "Use the zone collector");
         options.addOption(null, "col-nerd", false, "Use the NERD collector");
+
+        options.addOption(null, "col-test", false, "Use the TEST collector");
+
 
         options.addOption(Option.builder("id")
                 .longOpt("app-id")

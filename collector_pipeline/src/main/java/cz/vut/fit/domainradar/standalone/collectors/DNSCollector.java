@@ -115,6 +115,7 @@ public class DNSCollector extends BiProducerStandaloneCollector<String, DNSProce
                             var unique = result.ips().stream().map(DNSResult.IPFromRecord::ip)
                                     .collect(Collectors.toSet());
 
+                            // TODO: Use transactions? https://www.confluent.io/blog/transactions-apache-kafka/
                             for (var ip : unique) {
                                 _producer2.send(new ProducerRecord<>(Topics.IN_IP,
                                         new StringPair(dn, ip), null));
