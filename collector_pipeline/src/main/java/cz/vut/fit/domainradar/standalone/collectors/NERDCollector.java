@@ -3,6 +3,7 @@ package cz.vut.fit.domainradar.standalone.collectors;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import cz.vut.fit.domainradar.CollectorConfig;
 import cz.vut.fit.domainradar.Topics;
+import cz.vut.fit.domainradar.models.IPToProcess;
 import cz.vut.fit.domainradar.models.ResultCodes;
 import cz.vut.fit.domainradar.models.StringPair;
 import cz.vut.fit.domainradar.models.ip.NERDData;
@@ -66,8 +67,8 @@ public class NERDCollector extends IPStandaloneCollector<NERDData> {
         });
     }
 
-    private void processIps(List<StringPair> entries) {
-        var ips = entries.stream().map(StringPair::ip).toList();
+    private void processIps(List<IPToProcess> entries) {
+        var ips = entries.stream().map(IPToProcess::ip).toList();
         var bytes = new byte[ips.size() * 4];
         var ptr = 0;
         for (var ip : ips) {
@@ -121,7 +122,7 @@ public class NERDCollector extends IPStandaloneCollector<NERDData> {
                 });
     }
 
-    private void sendAboutAll(List<StringPair> entries, CommonIPResult<NERDData> result) {
+    private void sendAboutAll(List<IPToProcess> entries, CommonIPResult<NERDData> result) {
         sendAboutAll(Topics.OUT_IP, entries, result);
     }
 

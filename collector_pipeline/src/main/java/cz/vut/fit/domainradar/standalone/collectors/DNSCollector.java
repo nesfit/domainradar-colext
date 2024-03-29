@@ -3,6 +3,7 @@ package cz.vut.fit.domainradar.standalone.collectors;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import cz.vut.fit.domainradar.CollectorConfig;
 import cz.vut.fit.domainradar.Topics;
+import cz.vut.fit.domainradar.models.IPToProcess;
 import cz.vut.fit.domainradar.models.ResultCodes;
 import cz.vut.fit.domainradar.models.StringPair;
 import cz.vut.fit.domainradar.models.dns.DNSData;
@@ -118,7 +119,7 @@ public class DNSCollector extends BiProducerStandaloneCollector<String, DNSProce
                             // TODO: Use transactions? https://www.confluent.io/blog/transactions-apache-kafka/
                             for (var ip : unique) {
                                 _producer2.send(new ProducerRecord<>(Topics.IN_IP,
-                                        new StringPair(dn, ip), null));
+                                        new IPToProcess(dn, ip), null));
                             }
                         }
                     });

@@ -2,6 +2,7 @@ package cz.vut.fit.domainradar.standalone;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import cz.vut.fit.domainradar.models.IPToProcess;
 import cz.vut.fit.domainradar.models.ResultCodes;
 import cz.vut.fit.domainradar.models.StringPair;
 import cz.vut.fit.domainradar.models.results.CommonIPResult;
@@ -14,8 +15,8 @@ import org.jetbrains.annotations.Nullable;
 import java.time.Instant;
 import java.util.Properties;
 
-public abstract class IPStandaloneCollector<TData> extends BaseStandaloneCollector<StringPair, Void,
-        StringPair, CommonIPResult<TData>> {
+public abstract class IPStandaloneCollector<TData> extends BaseStandaloneCollector<IPToProcess, Void,
+        IPToProcess, CommonIPResult<TData>> {
     public IPStandaloneCollector(@NotNull ObjectMapper jsonMapper,
                                  @NotNull String appName,
                                  @Nullable Properties properties) {
