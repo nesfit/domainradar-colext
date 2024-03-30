@@ -9,6 +9,7 @@ import com.maxmind.geoip2.model.CityResponse;
 import com.maxmind.geoip2.record.*;
 import cz.vut.fit.domainradar.CollectorConfig;
 import cz.vut.fit.domainradar.Topics;
+import cz.vut.fit.domainradar.models.IPToProcess;
 import cz.vut.fit.domainradar.models.ResultCodes;
 import cz.vut.fit.domainradar.models.ip.GeoIPData;
 import cz.vut.fit.domainradar.models.results.CommonIPResult;
@@ -52,7 +53,8 @@ public class GeoIPCollector implements CommonResultIPCollector<GeoIPData> {
 
     @Override
     public void use(StreamsBuilder builder) {
-        builder.stream(Topics.IN_IP, Consumed.with(StringPairSerde.build(), Serdes.Void()))
+        var toProcessIpSerde = StringPairSerde.<IPToProcess>build();
+        builder.stream(Topics.IN_IP, Consumed.with(toProcessIpSerde, Serdes.Void()))
                 .mapValues((ip, noValue) -> {
                     try {
                         var inetAddr = InetAddress.getByName(ip.ip());
@@ -89,7 +91,7 @@ public class GeoIPCollector implements CommonResultIPCollector<GeoIPData> {
                     }
 
                 }, namedOp("resolve"))
-                .to(Topics.OUT_IP, Produced.with(StringPairSerde.build(), JsonSerde.of(_jsonMapper, _resultTypeRef)));
+                .to(Topics.OUT_IP, Produced.with(toProcessIpSerde, JsonSerde.of(_jsonMapper, _resultTypeRef)));
     }
 
     @Override
