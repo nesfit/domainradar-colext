@@ -2,4 +2,4 @@
 data/*.mmdb
 **/__pycache__
 *.iml
-
+faust_data/

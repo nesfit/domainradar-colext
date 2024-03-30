@@ -1,0 +1,32 @@
+[tool.poetry]
+package-mode = false
+name = "domrad-python"
+version = "0.1.0"
+description = "The DomainRadar Python pipeline"
+authors = ["Ondřej Ondryáš <xondry02@stud.fit.vut.cz>"]
+license = "MIT"
+repository = "https://github.com/nesfit/domainradar-colext"
+readme = "README.md"
+packages = [
+    { include = "common" },
+    { include = "collector" },
+    { include = "extractor" }
+]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+faust-streaming = {extras = ["rocksdict"], version = "^0.11.0"}
+asyncwhois = "^1.1.0"
+whodap = "^0.1.12"
+icmplib = "^3.0.4"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0.0"
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+testpaths = [ "tests" ]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
