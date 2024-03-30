@@ -9,12 +9,14 @@ RUN apt-get update && \
 # Set the working directory inside the container
 WORKDIR /src
 
-# Copy the project into the image
+# Copy just the POM to resolve dependencies
+COPY pom.xml ./
+RUN --mount=type=cache,target=/root/.m2/ mvn clean && mvn dependency:resolve
+
+# Copy the project and build
 COPY ./ .
-# Use Maven to compile and package the Java project
-RUN mvn clean
-RUN mvn package
-RUN mv "$(echo 'target/${project.artifactId}-${project.version}-jar-with-dependencies.jar' | mvn -N -q -DforceStdout help:evaluate)" target.jar
+RUN --mount=type=cache,target=/root/.m2/ mvn package && \
+    mv "$(echo 'target/${project.artifactId}-${project.version}-jar-with-dependencies.jar' | mvn -N -q -DforceStdout help:evaluate)" target.jar
 
 FROM eclipse-temurin:21-jre AS runtime
 WORKDIR /app
