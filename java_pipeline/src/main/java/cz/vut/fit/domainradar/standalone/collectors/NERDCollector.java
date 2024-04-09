@@ -1,6 +1,7 @@
 package cz.vut.fit.domainradar.standalone.collectors;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.net.InetAddresses;
 import cz.vut.fit.domainradar.CollectorConfig;
 import cz.vut.fit.domainradar.Topics;
 import cz.vut.fit.domainradar.models.IPToProcess;
@@ -34,6 +35,7 @@ public class NERDCollector extends IPStandaloneCollector<NERDData> {
     private static final String NERD_BASE = "https://nerd.cesnet.cz/nerd/api/v1/";
 
     private final Duration _httpTimeout;
+    private final String _token;
 
     private HttpClient _client;
     private ExecutorService _executor;
@@ -45,6 +47,10 @@ public class NERDCollector extends IPStandaloneCollector<NERDData> {
         _httpTimeout = Duration.ofSeconds(Integer.parseInt(
                 properties.getProperty(CollectorConfig.NERD_HTTP_TIMEOUT_CONFIG,
                         CollectorConfig.NERD_HTTP_TIMEOUT_DEFAULT)));
+        _token = properties.getProperty(CollectorConfig.NERD_TOKEN_CONFIG, CollectorConfig.NERD_TOKEN_DEFAULT);
+
+        if (_token.isBlank())
+            throw new IllegalArgumentException("NERD token is not set.");
     }
 
     @Override
@@ -71,23 +77,19 @@ public class NERDCollector extends IPStandaloneCollector<NERDData> {
         var bytes = new byte[ips.size() * 4];
         var ptr = 0;
         for (var ip : ips) {
-            try {
-                var inetAddr = InetAddress.getByName(ip);
-                if (!(inetAddr instanceof Inet4Address))
-                    continue;
-
-                System.arraycopy(inetAddr.getAddress(), 0, bytes, ptr, 4);
-                ptr += 4;
-            } catch (UnknownHostException e) {
+            var inetAddr = InetAddresses.forString(ip);
+            if (!(inetAddr instanceof Inet4Address))
                 continue;
-            }
+
+            System.arraycopy(inetAddr.getAddress(), 0, bytes, ptr, 4);
+            ptr += 4;
         }
 
         var listRequest = HttpRequest.newBuilder()
                 .uri(URI.create(NERD_BASE + "ip/bulk/"))
                 .timeout(_httpTimeout)
                 .header("Content-Type", "application/octet-stream")
-                .header("Authorization", "token TOKENHERE")
+                .header("Authorization", _token)
                 .header("Accept", "*/*")
                 .POST(HttpRequest.BodyPublishers.ofByteArray(bytes))
                 .build();
