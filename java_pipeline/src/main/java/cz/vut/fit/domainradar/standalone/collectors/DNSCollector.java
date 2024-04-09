@@ -17,12 +17,17 @@ import org.apache.kafka.common.serialization.Serdes;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.LoggerFactory;
-import org.xbill.DNS.ExtendedResolver;
 import org.xbill.DNS.TextParseException;
 import pl.tlinkowski.unij.api.UniLists;
 
+import javax.net.ssl.*;
+import javax.security.auth.x500.X500Principal;
+import java.io.IOException;
 import java.net.UnknownHostException;
-import java.time.Duration;
+import java.security.KeyManagementException;
+import java.security.NoSuchAlgorithmException;
+import java.security.cert.Certificate;
+import java.security.cert.X509Certificate;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -84,8 +89,8 @@ public class DNSCollector extends BiProducerStandaloneCollector<String, DNSProce
 
         _parallelProcessor.subscribe(UniLists.of(Topics.IN_DNS));
         _parallelProcessor.poll(ctx -> {
-            var dn = ctx.key();
-            var request = ctx.value();
+            final var dn = ctx.key();
+            final var request = ctx.value();
 
             InternalDNSResolver.DNSScanner scanner;
             try {
@@ -101,7 +106,7 @@ public class DNSCollector extends BiProducerStandaloneCollector<String, DNSProce
                             return CompletableFuture.completedFuture(errorResult(ResultCodes.OTHER_DNS_ERROR,
                                     exc.getMessage()));
                         } else {
-                            return runTlsResolve(result);
+                            return runTlsResolve(dn, result, _executor);
                         }
                     })
                     .thenCompose(Function.identity())
@@ -124,25 +129,115 @@ public class DNSCollector extends BiProducerStandaloneCollector<String, DNSProce
         });
     }
 
-    private CompletableFuture<DNSResult> runTlsResolve(DNSData dnsData) {
-        String targetIp = null;
+    public CompletableFuture<DNSResult> runTlsResolve(String hostName, DNSData dnsData, ExecutorService executor) {
+        String targetIp, fromType;
         // TODO: handle empty sets
         if (dnsData.CNAME() != null && dnsData.CNAME().relatedIps() != null && !dnsData.CNAME().relatedIps().isEmpty()) {
             targetIp = dnsData.CNAME().relatedIps().getFirst();
+            fromType = "CNAME";
         } else if (dnsData.A() != null) {
             targetIp = dnsData.A().iterator().next();
+            fromType = "A";
         } else if (dnsData.AAAA() != null) {
             targetIp = dnsData.AAAA().iterator().next();
+            fromType = "AAAA";
+        } else {
+            targetIp = fromType = null;
         }
 
         if (targetIp == null) {
+            // TODO: log
             return CompletableFuture.completedFuture(new DNSResult(ResultCodes.OK, null, Instant.now(),
                     dnsData, null, makeIps(dnsData)));
         }
 
-        // TODO: Do TLS magic
-        return CompletableFuture.completedFuture(new DNSResult(ResultCodes.OK, null, Instant.now(),
-                dnsData, new TLSData("", "", 0, new ArrayList<>()), makeIps(dnsData)));
+        return CompletableFuture.supplyAsync(() -> {
+            SSLContext context;
+            try {
+                context = SSLContext.getInstance("TLS");
+                context.init(null, null, null);
+            } catch (NoSuchAlgorithmException | KeyManagementException e) {
+                // Should not happen
+                // TODO: log
+                return new DNSResult(ResultCodes.OK, null, Instant.now(),
+                        dnsData, null, makeIps(dnsData));
+            }
+
+            SSLSocketFactory factory = context.getSocketFactory();
+
+            try (SSLSocket socket = (SSLSocket) factory.createSocket(targetIp, 443)) {
+                // Enable SNI
+                SSLParameters sslParams = new SSLParameters();
+                sslParams.setServerNames(List.of(new SNIHostName(hostName)));
+                socket.setSSLParameters(sslParams);
+
+                // Start handshake to retrieve session details
+                socket.startHandshake();
+
+                SSLSession session = socket.getSession();
+
+                // Extract negotiated protocol and cipher
+                var protocol = session.getProtocol();
+                var cipher = session.getCipherSuite();
+
+                // Extract certificates from the server
+                Certificate[] serverCerts = session.getPeerCertificates();
+                var certificates = new ArrayList<TLSData.Certificate>();
+                for (var cert : serverCerts) {
+                    if (cert instanceof X509Certificate) {
+                        certificates.add(parseCertificate((X509Certificate) cert));
+                    }
+                }
+
+                final var tlsData = new TLSData(new DNSResult.IPFromRecord(targetIp, fromType),
+                        protocol, cipher, certificates);
+                return new DNSResult(ResultCodes.OK, null, Instant.now(),
+                        dnsData, tlsData, makeIps(dnsData));
+            } catch (IOException e) {
+                // TODO: log
+                return new DNSResult(ResultCodes.OK, null, Instant.now(),
+                        dnsData, null, makeIps(dnsData));
+            }
+        }, executor);
+    }
+
+    public static TLSData.Certificate parseCertificate(X509Certificate cert) {
+        String commonName = "", country = "", organization = "";
+        boolean isRoot = cert.getBasicConstraints() != -1; // A simple check for root CA
+        Instant validityStart = cert.getNotBefore().toInstant();
+        Instant validityEnd = cert.getNotAfter().toInstant();
+        long validLen = validityEnd.getEpochSecond() - validityStart.getEpochSecond();
+
+        // Parsing the subject DN for CN, O, and C
+        X500Principal subject = cert.getSubjectX500Principal();
+        String subjectDN = subject.getName(X500Principal.RFC1779);
+        String[] subjectParts = subjectDN.split(",");
+        for (String part : subjectParts) {
+            part = part.trim();
+            if (part.startsWith("CN=")) {
+                commonName = part.substring(3);
+            } else if (part.startsWith("O=")) {
+                organization = part.substring(2);
+            } else if (part.startsWith("C=")) {
+                country = part.substring(2);
+            }
+        }
+
+        // Extracting extensions
+        List<TLSData.CertificateExtension> extensions = new ArrayList<>();
+        var encoder = Base64.getEncoder();
+        for (var extensionOID : cert.getCriticalExtensionOIDs()) {
+            extensions.add(new TLSData.CertificateExtension(true, extensionOID, encoder.encodeToString(
+                    cert.getExtensionValue(extensionOID))));
+        }
+
+        for (var extensionOID : cert.getNonCriticalExtensionOIDs()) {
+            extensions.add(new TLSData.CertificateExtension(false, extensionOID, encoder.encodeToString(
+                    cert.getExtensionValue(extensionOID))));
+        }
+
+        return new TLSData.Certificate(commonName, country, isRoot, organization,
+                (int) validLen, validityEnd, validityStart, extensions.size(), extensions);
     }
 
     private static <T> Stream<T> streamIfNotNull(Collection<T> collection) {

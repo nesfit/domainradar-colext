@@ -1,18 +1,19 @@
 package cz.vut.fit.domainradar.models.tls;
 
+import cz.vut.fit.domainradar.models.results.DNSResult;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.time.Instant;
 import java.util.List;
 
-public record TLSData(@NotNull String protocol,
+public record TLSData(@NotNull DNSResult.IPFromRecord fromIp,
+                      @NotNull String protocol,
                       @NotNull String cipher,
-                      int count,
                       @NotNull List<Certificate> certificates) {
     public record CertificateExtension(boolean critical,
-                                       @NotNull String name,
-                                       @NotNull String value) {
+                                       @NotNull String oid,
+                                       @NotNull String valueEncoded) {
     }
 
     public record Certificate(@NotNull String commonName,
