@@ -5,7 +5,6 @@ import cz.vut.fit.domainradar.CollectorConfig;
 import cz.vut.fit.domainradar.Topics;
 import cz.vut.fit.domainradar.models.IPToProcess;
 import cz.vut.fit.domainradar.models.ResultCodes;
-import cz.vut.fit.domainradar.models.StringPair;
 import cz.vut.fit.domainradar.models.ip.NERDData;
 import cz.vut.fit.domainradar.models.results.CommonIPResult;
 import cz.vut.fit.domainradar.standalone.IPStandaloneCollector;

@@ -2,6 +2,7 @@ package cz.vut.fit.domainradar.streams.collectors;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.net.InetAddresses;
 import com.maxmind.db.CHMCache;
 import com.maxmind.geoip2.DatabaseReader;
 import com.maxmind.geoip2.model.AsnResponse;
@@ -14,7 +15,6 @@ import cz.vut.fit.domainradar.models.ResultCodes;
 import cz.vut.fit.domainradar.models.ip.GeoIPData;
 import cz.vut.fit.domainradar.models.results.CommonIPResult;
 import cz.vut.fit.domainradar.serialization.JsonSerde;
-import cz.vut.fit.domainradar.serialization.StringPairSerde;
 import cz.vut.fit.domainradar.streams.CommonResultIPCollector;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.StreamsBuilder;
@@ -53,11 +53,11 @@ public class GeoIPCollector implements CommonResultIPCollector<GeoIPData> {
 
     @Override
     public void use(StreamsBuilder builder) {
-        var toProcessIpSerde = StringPairSerde.<IPToProcess>build();
+        var toProcessIpSerde = JsonSerde.of(_jsonMapper, IPToProcess.class);
         builder.stream(Topics.IN_IP, Consumed.with(toProcessIpSerde, Serdes.Void()))
                 .mapValues((ip, noValue) -> {
                     try {
-                        var inetAddr = InetAddress.getByName(ip.ip());
+                        var inetAddr = InetAddresses.forString(ip.ip());
                         var cityOpt = _cityReader.tryCity(inetAddr);
                         var asnOpt = _asnReader.tryAsn(inetAddr);
                         var city = cityOpt.orElse(_emptyCity);

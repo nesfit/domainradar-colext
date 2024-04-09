@@ -4,10 +4,8 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import cz.vut.fit.domainradar.models.IPToProcess;
 import cz.vut.fit.domainradar.models.ResultCodes;
-import cz.vut.fit.domainradar.models.StringPair;
 import cz.vut.fit.domainradar.models.results.CommonIPResult;
 import cz.vut.fit.domainradar.serialization.JsonSerde;
-import cz.vut.fit.domainradar.serialization.StringPairSerde;
 import org.apache.kafka.common.serialization.Serdes;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -21,8 +19,8 @@ public abstract class IPStandaloneCollector<TData> extends BaseStandaloneCollect
                                  @NotNull String appName,
                                  @Nullable Properties properties) {
         super(jsonMapper, appName, properties,
-                StringPairSerde.build(),
-                StringPairSerde.build(),
+                JsonSerde.of(jsonMapper, IPToProcess.class),
+                JsonSerde.of(jsonMapper, IPToProcess.class),
                 Serdes.Void(),
                 JsonSerde.of(jsonMapper, new TypeReference<>() {
                 }));

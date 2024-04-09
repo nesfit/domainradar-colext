@@ -10,7 +10,6 @@ import cz.vut.fit.domainradar.models.results.CommonIPResult;
 import cz.vut.fit.domainradar.models.results.DNSResult;
 import cz.vut.fit.domainradar.models.results.ExtendedDNSResult;
 import cz.vut.fit.domainradar.serialization.JsonSerde;
-import cz.vut.fit.domainradar.serialization.StringPairSerde;
 import cz.vut.fit.domainradar.streams.PipelineComponent;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.KeyValue;
@@ -47,7 +46,7 @@ public class IPDataMergerComponent implements PipelineComponent {
         };
         final var hashMapWithAllIpResultsSerde = JsonSerde.of(_jsonMapper, hashMapWithAllIpResultsTypeRef);
 
-        final var ipToProcessSerde = StringPairSerde.<IPToProcess>build();
+        final var ipToProcessSerde = JsonSerde.of(_jsonMapper, IPToProcess.class);
         final var ipDataPairSerde = JsonSerde.of(_jsonMapper, IPDataPair.class);
         final var dnsResultSerde = JsonSerde.of(_jsonMapper, DNSResult.class);
         final var extendedDnsResultSerde = JsonSerde.of(_jsonMapper, ExtendedDNSResult.class);

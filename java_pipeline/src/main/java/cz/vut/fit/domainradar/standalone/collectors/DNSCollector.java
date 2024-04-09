@@ -5,13 +5,11 @@ import cz.vut.fit.domainradar.CollectorConfig;
 import cz.vut.fit.domainradar.Topics;
 import cz.vut.fit.domainradar.models.IPToProcess;
 import cz.vut.fit.domainradar.models.ResultCodes;
-import cz.vut.fit.domainradar.models.StringPair;
 import cz.vut.fit.domainradar.models.dns.DNSData;
 import cz.vut.fit.domainradar.models.requests.DNSProcessRequest;
 import cz.vut.fit.domainradar.models.results.DNSResult;
 import cz.vut.fit.domainradar.models.tls.TLSData;
 import cz.vut.fit.domainradar.serialization.JsonSerde;
-import cz.vut.fit.domainradar.serialization.StringPairSerde;
 import cz.vut.fit.domainradar.standalone.BiProducerStandaloneCollector;
 import org.apache.commons.cli.CommandLine;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -35,7 +33,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class DNSCollector extends BiProducerStandaloneCollector<String, DNSProcessRequest, String, DNSResult,
-        StringPair, Void> {
+        IPToProcess, Void> {
     private static final org.slf4j.Logger Logger = LoggerFactory.getLogger(DNSCollector.class);
 
     private final ExecutorService _executor;
@@ -49,7 +47,7 @@ public class DNSCollector extends BiProducerStandaloneCollector<String, DNSProce
         super(jsonMapper, appName, properties,
                 Serdes.String(),
                 Serdes.String(),
-                StringPairSerde.build(),
+                JsonSerde.of(jsonMapper, IPToProcess.class),
                 JsonSerde.of(jsonMapper, DNSProcessRequest.class),
                 JsonSerde.of(jsonMapper, DNSResult.class),
                 Serdes.Void());
