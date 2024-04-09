@@ -1,11 +1,14 @@
 package cz.vut.fit.domainradar;
 
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.google.common.net.InternetDomainName;
+import cz.vut.fit.domainradar.standalone.collectors.DNSCollector;
 import cz.vut.fit.domainradar.standalone.collectors.InternalDNSResolver;
 import org.xbill.DNS.SimpleResolver;
 import org.xbill.DNS.TextParseException;
 
 import java.net.UnknownHostException;
+import java.util.Properties;
 import java.util.concurrent.Executors;
 
 public class Foobar {
@@ -66,8 +69,8 @@ public class Foobar {
 
         var ex = Executors.newVirtualThreadPerTaskExecutor();
         try {
-            var resolver = new SimpleResolver("1.1.1.1");
-            var dns = new InternalDNSResolver(resolver, ex);
+            var dns = new InternalDNSResolver(ex, new Properties());
+            var col = new DNSCollector(JsonMapper.builder().build(), "", new Properties());
 
             for (var name : names) {
                 var zoneInfo = dns.getZoneInfo(name.toString())
@@ -83,8 +86,10 @@ public class Foobar {
                 }
                 var scanner = dns.makeScanner(name.toString(), zoneInfo.zone());
                 var data = scanner.scan(null).toCompletableFuture().join();
-                System.out.println(data);
-                System.out.println();
+
+                if (data != null) {
+                    col.runTlsResolve(name.toString(), data, ex);
+                }
             }
         } catch (UnknownHostException | TextParseException e) {
             throw new RuntimeException(e);

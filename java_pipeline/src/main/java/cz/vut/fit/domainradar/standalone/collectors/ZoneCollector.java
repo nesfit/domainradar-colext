@@ -14,11 +14,9 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.Serdes;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.xbill.DNS.ExtendedResolver;
 import pl.tlinkowski.unij.api.UniLists;
 
 import java.net.UnknownHostException;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.Properties;
 import java.util.concurrent.ExecutorService;
@@ -38,16 +36,8 @@ public class ZoneCollector extends TriProducerStandaloneCollector<String, ZonePr
                 JsonSerde.of(jsonMapper, DNSProcessRequest.class),
                 JsonSerde.of(jsonMapper, RDAPDomainProcessRequest.class));
 
-        // TODO: Configuration
-        var dnsServers = new String[]{"195.113.144.194", "193.17.47.1", "195.113.144.233", "185.43.135.1"};
-
-        var resolver = new ExtendedResolver(dnsServers);
-        resolver.setTimeout(Duration.ofSeconds(10));
-        resolver.setLoadBalance(false);
-        resolver.setRetries(2);
-
         _executor = Executors.newVirtualThreadPerTaskExecutor();
-        _dns = new InternalDNSResolver(resolver, _executor);
+        _dns = new InternalDNSResolver(_executor, _properties);
     }
 
     @Override

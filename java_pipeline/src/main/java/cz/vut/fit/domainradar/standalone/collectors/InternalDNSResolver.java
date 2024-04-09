@@ -1,18 +1,21 @@
 package cz.vut.fit.domainradar.standalone.collectors;
 
+import com.google.common.net.InetAddresses;
 import com.google.common.net.InternetDomainName;
+import cz.vut.fit.domainradar.CollectorConfig;
 import cz.vut.fit.domainradar.models.ResultCodes;
 import cz.vut.fit.domainradar.models.dns.DNSData;
 import cz.vut.fit.domainradar.models.dns.ZoneInfo;
 import cz.vut.fit.domainradar.models.results.ZoneResult;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.LoggerFactory;
 import org.xbill.DNS.*;
 import org.xbill.DNS.lookup.LookupResult;
 import org.xbill.DNS.lookup.LookupSession;
 
 import java.io.IOException;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
+import java.net.*;
+import java.nio.channels.UnsupportedAddressTypeException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
@@ -55,6 +58,7 @@ public class InternalDNSResolver {
         private final Name _name;
         private final ZoneInfo _zoneInfo;
         private LookupSession _primaryLookupSession, _fallbackLookupSession;
+        private boolean _ipv6EnabledLocally = true;
 
         private DNSScanner(Name name, ZoneInfo zoneInfo) {
             var nameNotNull = Objects.requireNonNull(name);
@@ -68,8 +72,8 @@ public class InternalDNSResolver {
             }
         }
 
-        private static <T> CompletableFuture<TTLTuple<T>> resolveIfWanted(List<String> toCollect, String record,
-                                                                          Supplier<CompletionStage<TTLTuple<T>>> supplier) {
+        private static <T> CompletableFuture<TTLTuple<T>> resolveIfWanted(
+                List<String> toCollect, String record, Supplier<CompletionStage<TTLTuple<T>>> supplier) {
             if (toCollect == null || toCollect.contains(record)) {
                 return supplier.get().toCompletableFuture();
             } else {
@@ -244,25 +248,67 @@ public class InternalDNSResolver {
         }
 
         private CompletionStage<LookupResult> resolve(int type) {
+            // A wrapper for resolveUnsafe that handles exceptions thrown outside the
+            // CompletionStage chain
+            try {
+                return resolveUnsafe(type);
+            } catch (UnsupportedAddressTypeException unused) {
+                if (_ipv6EnabledLocally) {
+                    _ipv6EnabledLocally = false;
+                    return resolve(type);
+                } else {
+                    return CompletableFuture.completedFuture(null);
+                }
+            } catch (Exception e) {
+                Logger.error("Top-level exception when resolving record type {} for {}", type, _name, e);
+                return CompletableFuture.completedFuture(null);
+            }
+        }
+
+        private CompletionStage<LookupResult> resolveUnsafe(int type) {
             // TODO: log stuff
-            return getPrimaryLookupSession().lookupAsync(_name, type)
-                    .thenApply(result -> {
-                        if (result.getRecords().isEmpty()) {
-                            return null;
-                        } else {
-                            return result;
-                        }
-                    })
+            var lookupSession = getPrimaryLookupSession();
+
+            // If we couldn't create a session from the primary NSs, use the main resolver
+            // In this case, we won't bother trying with the secondary NSs
+            final var isMain = lookupSession == null;
+            if (isMain) {
+                lookupSession = getLookupSession();
+            }
+
+            // Do a lookup with the primary or main resolver
+            return lookupSession.lookupAsync(_name, type)
                     .exceptionallyCompose(e -> {
+                        // Extract the actual exception
                         if (e instanceof CompletionException) {
                             e = e.getCause();
                         }
 
+                        // IOExceptions are thrown when the query fails for a network reason
+                        // In this case, we want to try another of the domain's NSs
+                        // but only if we didn't use the main resolver
                         if (e instanceof IOException) {
+                            if (isMain) {
+                                return CompletableFuture.completedFuture(null);
+                            }
+
+                            var secondaryLookupSession = getSecondaryLookupSession();
+                            if (secondaryLookupSession == null) {
+                                return CompletableFuture.completedFuture(null);
+                            }
+
                             return getSecondaryLookupSession().lookupAsync(_name, type)
                                     .exceptionallyCompose(e2 -> CompletableFuture.completedFuture(null));
                         } else {
                             return CompletableFuture.completedFuture(null);
+                        }
+                    })
+                    .thenApply(result -> {
+                        // If we got no records in the response, return null (as expected by the lookup methods)
+                        if (result == null || result.getRecords().isEmpty()) {
+                            return null;
+                        } else {
+                            return result;
                         }
                     });
         }
@@ -290,9 +336,18 @@ public class InternalDNSResolver {
             }
 
             try {
-                var resolver = new ExtendedResolver(nameservers.toArray(String[]::new));
-                resolver.setRetries(2);
-                resolver.setTimeout(Duration.ofSeconds(10)); // TODO
+                String[] nameserversToUse;
+                if (_ipv6Enabled && _ipv6EnabledLocally) {
+                    nameserversToUse = nameservers.toArray(String[]::new);
+                } else {
+                    nameserversToUse = nameservers.stream()
+                            .filter(x -> InetAddresses.forString(x) instanceof Inet4Address)
+                            .toArray(String[]::new);
+                }
+
+                var resolver = new ExtendedResolver(nameserversToUse);
+                resolver.setRetries(_perDomainNSRetries);
+                resolver.setTimeout(_perDomainNSTimeout);
                 resolver.setLoadBalance(true);
                 resolver.setTCP(false);
 
@@ -306,12 +361,62 @@ public class InternalDNSResolver {
         }
     }
 
+    public static ExtendedResolver makeMainResolver(Properties properties) throws UnknownHostException {
+        var dnsServers = properties.getProperty(CollectorConfig.DNS_MAIN_RESOLVER_IPS_CONFIG,
+                CollectorConfig.DNS_MAIN_RESOLVER_IPS_DEFAULT).split(",");
+
+        var resolver = new ExtendedResolver(dnsServers);
+
+        resolver.setTimeout(Duration.ofSeconds(Integer.parseInt(properties.getProperty(
+                CollectorConfig.DNS_MAIN_RESOLVER_TIMEOUT_SEC_CONFIG, CollectorConfig.DNS_MAIN_RESOLVER_TIMEOUT_SEC_DEFAULT))));
+        resolver.setLoadBalance(Boolean.parseBoolean(properties.getProperty(
+                CollectorConfig.DNS_MAIN_RESOLVER_ROUND_ROBIN_CONFIG, CollectorConfig.DNS_MAIN_RESOLVER_ROUND_ROBIN_DEFAULT)));
+        resolver.setRetries(Integer.parseInt(properties.getProperty(
+                CollectorConfig.DNS_MAIN_RESOLVER_RETRIES_CONFIG, CollectorConfig.DNS_MAIN_RESOLVER_RETRIES_DEFAULT)));
+
+        return resolver;
+    }
+
+    public static boolean isIPv6Available() throws SocketException {
+        final var interfaces = NetworkInterface.getNetworkInterfaces();
+        while (interfaces.hasMoreElements()) {
+            for (InterfaceAddress interfaceAddress : interfaces.nextElement().getInterfaceAddresses()) {
+                final InetAddress ip = interfaceAddress.getAddress();
+                if (ip.isLoopbackAddress() || ip instanceof Inet4Address) {
+                    continue;
+                }
+                return true;
+            }
+        }
+        return false;
+    }
+
     private final Resolver _mainResolver;
     private final ExecutorService _executor;
+    private final boolean _ipv6Enabled;
 
-    public InternalDNSResolver(Resolver resolver, ExecutorService executor) {
-        _mainResolver = resolver;
+    private final Duration _perDomainNSTimeout;
+    private final int _perDomainNSRetries;
+
+    public InternalDNSResolver(@NotNull ExecutorService executor,
+                               @NotNull Properties properties) throws UnknownHostException {
+        _mainResolver = makeMainResolver(properties);
         _executor = executor;
+
+        _perDomainNSRetries = Integer.parseInt(properties.getProperty(
+                CollectorConfig.DNS_PER_DOMAIN_RESOLVER_RETRIES_CONFIG,
+                CollectorConfig.DNS_PER_DOMAIN_RESOLVER_RETRIES_DEFAULT));
+        _perDomainNSTimeout = Duration.ofSeconds(Integer.parseInt(properties.getProperty(
+                CollectorConfig.DNS_PER_DOMAIN_RESOLVER_TIMEOUT_SEC_CONFIG,
+                CollectorConfig.DNS_PER_DOMAIN_RESOLVER_TIMEOUT_SEC_DEFAULT)));
+
+        boolean ipv6Enabled;
+        try {
+            ipv6Enabled = isIPv6Available();
+        } catch (SocketException unused) {
+            ipv6Enabled = false;
+        }
+        _ipv6Enabled = ipv6Enabled;
     }
 
     public DNSScanner makeScanner(String name, ZoneInfo zoneInfo) throws TextParseException {
@@ -346,7 +451,6 @@ public class InternalDNSResolver {
             var lookupResult = findTopmostZoneSOA(baseName, components, components.size() - 1,
                     lookupSession, null, false);
 
-            //
             return resolveIpsForZone(lookupResult, guavaName);
         } else if (guavaName.registrySuffix() != null) {
             // Start at the name

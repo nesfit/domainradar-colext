@@ -25,6 +25,32 @@ public class CollectorConfig {
     public static final String DNS_DEFAULT_TYPES_TO_COLLECT_IPS_FROM_DOC = "The DNS record types to collect additional IP data for if none are specified in the request (comma-separated).";
     public static final String DNS_DEFAULT_TYPES_TO_COLLECT_IPS_FROM_DEFAULT = "A,AAAA,CNAME,MX";
 
+    public static final String DNS_MAIN_RESOLVER_IPS_CONFIG = "collectors.dns.main.resolver.ips";
+    public static final String DNS_MAIN_RESOLVER_IPS_DOC = "IP addresses of the DNS resolvers (comma-separated).";
+    public static final String DNS_MAIN_RESOLVER_IPS_DEFAULT = "195.113.144.194,193.17.47.1,195.113.144.233,185.43.135.1";
+
+    public static final String DNS_MAIN_RESOLVER_ROUND_ROBIN_CONFIG = "collectors.dns.main.resolver.round.robin";
+    public static final String DNS_MAIN_RESOLVER_ROUND_ROBIN_DOC = "If true, queries will be distributed across the configured DNS resolvers. Otherwise, the first server will be used until it is not available.";
+    public static final String DNS_MAIN_RESOLVER_ROUND_ROBIN_DEFAULT = "false";
+
+    public static final String DNS_MAIN_RESOLVER_TIMEOUT_SEC_CONFIG = "collectors.dns.main.resolver.timeout";
+    public static final String DNS_MAIN_RESOLVER_TIMEOUT_SEC_DOC = "The timeout for a DNS query when doing the  (seconds).";
+    public static final String DNS_MAIN_RESOLVER_TIMEOUT_SEC_DEFAULT = "5";
+
+    public static final String DNS_MAIN_RESOLVER_RETRIES_CONFIG = "collectors.dns.main.resolver.retries";
+    public static final String DNS_MAIN_RESOLVER_RETRIES_DOC = "The number of attempts to query a single DNS server until the next one is used.";
+    public static final String DNS_MAIN_RESOLVER_RETRIES_DEFAULT = "1";
+
+
+    public static final String DNS_PER_DOMAIN_RESOLVER_TIMEOUT_SEC_CONFIG = "collectors.dns.per.domain.resolver.timeout";
+    public static final String DNS_PER_DOMAIN_RESOLVER_TIMEOUT_SEC_DOC = "The timeout for a DNS query (seconds).";
+    public static final String DNS_PER_DOMAIN_RESOLVER_TIMEOUT_SEC_DEFAULT = "5";
+
+    public static final String DNS_PER_DOMAIN_RESOLVER_RETRIES_CONFIG = "collectors.dns.per.domain.resolver.retries";
+    public static final String DNS_PER_DOMAIN_RESOLVER_RETRIES_DOC = "The number of attempts to query a single DNS server until the next one is used.";
+    public static final String DNS_PER_DOMAIN_RESOLVER_RETRIES_DEFAULT = "1";
+
+
     public static final String CLOSE_TIMEOUT_SEC_CONFIG = "collectors.kafka.close.timeout";
     public static final String CLOSE_TIMEOUT_SEC_DOC = "The time to wait for a standalone collector producer/consumer to close (seconds).";
     public static final String CLOSE_TIMEOUT_SEC_DEFAULT = "5";

@@ -57,16 +57,8 @@ public class DNSCollector extends BiProducerStandaloneCollector<String, DNSProce
                 JsonSerde.of(jsonMapper, DNSResult.class),
                 Serdes.Void());
 
-        // TODO: Configuration
-        var dnsServers = new String[]{"195.113.144.194", "193.17.47.1", "195.113.144.233", "185.43.135.1"};
-
-        var resolver = new ExtendedResolver(dnsServers);
-        resolver.setTimeout(Duration.ofSeconds(10));
-        resolver.setLoadBalance(false);
-        resolver.setRetries(2);
-
         _executor = Executors.newVirtualThreadPerTaskExecutor();
-        _dns = new InternalDNSResolver(resolver, _executor);
+        _dns = new InternalDNSResolver(_executor, _properties);
 
         _toCollect = this.parseConfig(CollectorConfig.DNS_DEFAULT_RECORD_TYPES_TO_COLLECT_CONFIG,
                 CollectorConfig.DNS_DEFAULT_RECORD_TYPES_TO_COLLECT_DEFAULT);
