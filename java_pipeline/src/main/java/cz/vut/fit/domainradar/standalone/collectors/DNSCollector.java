@@ -92,7 +92,12 @@ public class DNSCollector extends BiProducerStandaloneCollector<String, DNSProce
                 return;
             }
 
-            scanner.scan(_toCollect)
+            var toCollect = _toCollect;
+            if (request.toCollect() != null && !request.toCollect().isEmpty()) {
+                toCollect = request.toCollect();
+            }
+
+            scanner.scan(toCollect)
                     .handle((result, exc) -> {
                         if (exc != null) {
                             return CompletableFuture.completedFuture(errorResult(ResultCodes.OTHER_DNS_ERROR,
