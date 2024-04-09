@@ -84,23 +84,12 @@ public class StreamsPipelineRunner {
         props.put(StreamsConfig.DEFAULT_DESERIALIZATION_EXCEPTION_HANDLER_CLASS_CONFIG,
                 "org.apache.kafka.streams.errors.LogAndContinueExceptionHandler");
 
-        // TODO: remove me?
-        props.put(CollectorConfig.GEOIP_DIRECTORY_CONFIG, "../data/");
-
         final StreamsBuilder builder = new StreamsBuilder();
         final ObjectMapper jsonMapper = JsonMapper.builder()
                 .addModule(new JavaTimeModule())
                 .configure(SerializationFeature.WRITE_DATE_TIMESTAMPS_AS_NANOSECONDS, false)
                 .configure(DeserializationFeature.READ_DATE_TIMESTAMPS_AS_NANOSECONDS, false)
                 .build();
-
-        try {
-            System.err.println(jsonMapper.writeValueAsString(new DNSResult(2,
-                    "", java.time.Instant.now(), null, null, null)));
-            System.exit(0);
-        } catch (JsonProcessingException e) {
-            throw new RuntimeException(e);
-        }
 
         List<PipelineComponent> components;
 
