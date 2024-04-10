@@ -5,7 +5,7 @@ from faust.models.fields import FieldDescriptor, IntegerField, StringField, Bool
 
 
 class IPToProcess(Record, coerce=True, serializer='json'):
-    domain_name: str = StringField(field="domain_name", required=True)
+    domain_name: str = StringField(field="domainName", required=True)
     ip: str = StringField(field="ip", required=True)
 
 
@@ -87,10 +87,15 @@ class DNSData(Record):
     txt: Optional[list[str]] = FieldDescriptor[list[str]](input_name="TXT", required=False)
 
 
+class IPFromRecord(Record):
+    ip: str = StringField()
+    type: str = StringField()
+
+
 class TLSCertificateExtension(Record):
     critical: bool
-    name: str
-    value: str
+    oid: str
+    valueEncoded: str
 
 
 class TLSCertificate(Record):
@@ -99,22 +104,17 @@ class TLSCertificate(Record):
     is_root: bool = BooleanField(input_name="isRoot")
     organization: Optional[str] = StringField(input_name="organization", required=False)
     valid_len: int = IntegerField(input_name="validLen")
-    validity_end: float = FloatField(input_name="validityEnd")
-    validity_start: float = FloatField(input_name="validityStart")
+    validity_end: float = IntegerField(input_name="validityEnd")
+    validity_start: float = IntegerField(input_name="validityStart")
     extension_count: int = IntegerField(input_name="extensionCount")
     extensions: Optional[list[TLSCertificateExtension]] = FieldDescriptor[list[TLSCertificateExtension]](required=False)
 
 
 class TLSData(Record):
+    fromIp: IPFromRecord
     protocol: str
     cipher: str
-    count: int
     certificates: list[TLSCertificate]
-
-
-class IPFromRecord(Record):
-    ip: str = StringField()
-    type: str = StringField()
 
 
 class DNSResult(Result):
