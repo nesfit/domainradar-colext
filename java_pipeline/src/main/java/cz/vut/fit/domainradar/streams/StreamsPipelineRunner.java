@@ -1,5 +1,6 @@
 package cz.vut.fit.domainradar.streams;
 
+import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -87,8 +88,10 @@ public class StreamsPipelineRunner {
         final StreamsBuilder builder = new StreamsBuilder();
         final ObjectMapper jsonMapper = JsonMapper.builder()
                 .addModule(new JavaTimeModule())
+                .configure(JsonParser.Feature.INCLUDE_SOURCE_IN_LOCATION, true)
                 .configure(SerializationFeature.WRITE_DATE_TIMESTAMPS_AS_NANOSECONDS, false)
                 .configure(DeserializationFeature.READ_DATE_TIMESTAMPS_AS_NANOSECONDS, false)
+                .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
                 .build();
 
         List<PipelineComponent> components;
