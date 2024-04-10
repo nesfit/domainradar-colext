@@ -1,5 +1,6 @@
 from faust.serializers import codecs
 import httpx
+import tldextract
 
 import asyncwhois
 from asyncwhois import DomainClient
@@ -101,15 +102,23 @@ async def process_entries(stream):
         if zone is not None:
             # If the zone DN is available, get RDAP data for it. There's no point in trying the actual
             # source domain name, RDAP should only provide data for points of delegation
-            for_source = zone == dn
-            rdap_data, entities, err_code, err_msg = await fetch_rdap(zone, rdap_client)
+            rdap_target = zone
         else:
             # If the zone DN is not available, try to get RDAP data for the actual source domain name
-            for_source = True
-            rdap_data, entities, err_code, err_msg = await fetch_rdap(dn, rdap_client)
+            rdap_target = dn
+
+        rdap_data, entities, err_code, err_msg = await fetch_rdap(rdap_target, rdap_client)
 
         if rdap_data is None:
-            # Only try WHOIS if RDAP data is not available
+            # If the RDAP data is not available for the source DN, try to get it for the registered domain name
+            # (i.e. one level above the public suffix)
+            target_parts = tldextract.extract(rdap_target)
+            if target_parts.domain != "" and target_parts.suffix != "":
+                rdap_target = target_parts.domain + "." + target_parts.suffix
+                rdap_data, entities, err_code, err_msg = await fetch_rdap(rdap_target, rdap_client)
+
+        if rdap_data is None:
+            # Only try WHOIS if no RDAP data is available at any level of the source DN
             (whois_raw, whois_parsed,
              whois_err_code, whois_err_msg) = await fetch_whois(zone or dn, whois_client)
         else:
@@ -120,7 +129,7 @@ async def process_entries(stream):
         result = RDAPDomainResult(status_code=err_code, error=err_msg,
                                   last_attempt=timestamp_now_millis(),
                                   rdap_data=rdap_data, entities=entities,
-                                  is_for_source_name=for_source,
+                                  rdap_target=rdap_target,
                                   whois_status_code=whois_err_code, whois_error=whois_err_msg,
                                   raw_whois_data=whois_raw, parsed_whois_data=whois_parsed)
 
