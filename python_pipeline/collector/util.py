@@ -41,7 +41,7 @@ async def fetch_entities(response: DomainResponse, client: RDAPClient) -> List[R
     return result
 
 
-def make_ssl_context():
+def make_rdap_ssl_context():
     context = ssl.create_default_context()
     context.set_ciphers("ALL:@SECLEVEL=1")
     return context

@@ -1,17 +1,31 @@
 import ipaddress
-
-import faust
+import httpx
 
 from asyncwhois.errors import *
+
 import whodap
 from whodap import IPv4Client, IPv6Client
 from whodap.response import IPv4Response, IPv6Response
 from whodap.errors import *
-import httpx
 
 import common.result_codes as rc
-from collector.util import make_ssl_context, timestamp_now_millis
 from common.models import *
+from common.util import read_config, make_app
+from collector.util import make_rdap_ssl_context, timestamp_now_millis
+
+COLLECTOR = "rdap_ip"
+
+# Read the config
+config = read_config()
+component_config = config.get(COLLECTOR, {})
+
+# The Faust application
+rdap_ip_app = make_app(COLLECTOR, config)
+
+# The input and output topics
+topic_to_process = rdap_ip_app.topic('to_process_IP', key_type=IPToProcess, value_type=None, allow_empty=True)
+
+topic_processed = rdap_ip_app.topic('collected_IP_data', key_type=IPToProcess, value_type=RDAPDomainResult)
 
 
 async def fetch_ip(address, client_v4: IPv4Client, client_v6: IPv6Client) \
@@ -32,26 +46,18 @@ async def fetch_ip(address, client_v4: IPv4Client, client_v6: IPv6Client) \
         return None, rc.RATE_LIMITED, str(e)
     except WhodapError as e:
         return None, rc.OTHER_EXTERNAL_ERROR, str(e)
+    except ValueError as e:
+        return None, rc.INVALID_ADDRESS, str(e)
     except Exception as e:
         return None, rc.INTERNAL_ERROR, str(e)
 
 
-# The Faust application
-rdap_ip_app = faust.App('drcol-rdap-ip',
-                        broker='kafka://localhost:9092',
-                        debug=True)
-
-# The input and output topics
-topic_to_process = rdap_ip_app.topic('to_process_IP', key_type=IPToProcess, value_type=None, allow_empty=True)
-
-topic_processed = rdap_ip_app.topic('collected_IP_data', key_type=IPToProcess, value_type=RDAPDomainResult)
-
-
-# The RDAP-DN processor
+# The RDAP-IP processor
 @rdap_ip_app.agent(topic_to_process, concurrency=4)
 async def process_entries(stream):
     # The RDAP & WHOIS clients
-    httpx_client = httpx.AsyncClient(verify=make_ssl_context(), follow_redirects=True, timeout=5)
+    httpx_client = httpx.AsyncClient(verify=make_rdap_ssl_context(), follow_redirects=True,
+                                     timeout=component_config.get("http_timeout_sec", 5))
     ipv4_client = await whodap.IPv4Client.new_aio_client(httpx_client=httpx_client)
     ipv6_client = await whodap.IPv6Client.new_aio_client(httpx_client=httpx_client)
 
@@ -65,7 +71,7 @@ async def process_entries(stream):
 
         result = RDAPIPResult(status_code=err_code, error=err_msg,
                               last_attempt=timestamp_now_millis(),
-                              collector="rdap-ip",
+                              collector=COLLECTOR,
                               data=rdap_data)
 
         # (this could probably be send_soon not to block the loop)
@@ -74,7 +80,3 @@ async def process_entries(stream):
     await ipv4_client.aio_close()
     await ipv6_client.aio_close()
     await httpx_client.aclose()
-
-
-if __name__ == '__main__':
-    rdap_ip_app.main()

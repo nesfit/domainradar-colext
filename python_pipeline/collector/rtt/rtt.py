@@ -1,24 +1,26 @@
-import faust
 from icmplib import async_ping, ICMPSocketError, DestinationUnreachable, TimeExceeded
 
-import common.result_codes as rc
 from collector.util import timestamp_now_millis
+from common.util import read_config, make_app
 from common.models import *
+import common.result_codes as rc
 
-COLLECTOR = "icmp"
-COUNT = 5
-PRIVILEGED = False
+COLLECTOR = "rtt"
+
+# Read the config
+config = read_config()
+component_config = config.get(COLLECTOR, {})
 
 # The Faust application
-rtt_app = faust.App('drcol-rtt',
-                    broker='kafka://localhost:9092',
-                    debug=True)
+rtt_app = make_app(COLLECTOR, config)
+
+COUNT = component_config.get("ping_count", 5)
+PRIVILEGED = component_config.get("privileged_mode", False)
 
 # The input and output topics
 topic_to_process = rtt_app.topic('to_process_IP', key_type=IPToProcess, value_type=None, allow_empty=True)
 
 topic_processed = rtt_app.topic('collected_IP_data', key_type=IPToProcess, value_type=RTTResult)
-
 
 # The RDAP-DN processor
 @rtt_app.agent(topic_to_process, concurrency=4)
@@ -52,7 +54,3 @@ async def process_entries(stream):
                                                               last_attempt=timestamp_now_millis(),
                                                               collector=COLLECTOR,
                                                               data=rtt_data))
-
-
-if __name__ == '__main__':
-    rtt_app.main()

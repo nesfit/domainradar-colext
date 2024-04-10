@@ -1,21 +1,38 @@
-import faust
 from faust.serializers import codecs
+import httpx
 
 import asyncwhois
 from asyncwhois import DomainClient
 from asyncwhois.errors import *
+
 import whodap
 from whodap import DNSClient
 from whodap.response import DomainResponse
 from whodap.errors import *
-import httpx
 
 import common.result_codes as rc
 from common.custom_codecs import StringCodec
-from collector.util import fetch_entities, extract_known_tld, make_ssl_context, timestamp_now_millis
 from common.models import *
+from common.util import read_config, make_app
+from collector.util import fetch_entities, extract_known_tld, make_rdap_ssl_context, timestamp_now_millis
 
 codecs.register("str", StringCodec())
+
+COLLECTOR = "rdap_dn"
+
+# Read the config
+config = read_config()
+component_config = config.get(COLLECTOR, {})
+
+# The Faust application
+rdap_dn_app = make_app(COLLECTOR, config)
+
+# The input and output topics
+topic_to_process = rdap_dn_app.topic('to_process_RDAP_DN', key_type=str, value_type=RDAPRequest,
+                                     key_serializer="str", allow_empty=True)
+
+topic_processed = rdap_dn_app.topic('processed_RDAP_DN', key_type=str, value_type=RDAPDomainResult,
+                                    key_serializer="str")
 
 
 async def fetch_rdap(domain_name, client: DNSClient) \
@@ -60,24 +77,12 @@ async def fetch_whois(domain_name, client: DomainClient) -> tuple[str | None, di
         return None, None, rc.OTHER_EXTERNAL_ERROR, str(e)
 
 
-# The Faust application
-rdap_dn_app = faust.App('drcol-rdap-dn',
-                        broker='kafka://localhost:9092',
-                        debug=True)
-
-# The input and output topics
-topic_to_process = rdap_dn_app.topic('to_process_RDAP_DN', key_type=str, value_type=RDAPRequest,
-                                     key_serializer="str", allow_empty=True)
-
-topic_processed = rdap_dn_app.topic('processed_RDAP_DN', key_type=str, value_type=RDAPDomainResult,
-                                    key_serializer="str")
-
-
 # The RDAP-DN processor
 @rdap_dn_app.agent(topic_to_process, concurrency=4)
 async def process_entries(stream):
     # The RDAP & WHOIS clients
-    httpx_client = httpx.AsyncClient(verify=make_ssl_context(), follow_redirects=True, timeout=5)
+    httpx_client = httpx.AsyncClient(verify=make_rdap_ssl_context(), follow_redirects=True,
+                                     timeout=component_config.get("http_timeout_sec", 5))
     rdap_client = await whodap.DNSClient.new_aio_client(httpx_client=httpx_client)
     whois_client = asyncwhois.client.DomainClient()
 
@@ -124,6 +129,3 @@ async def process_entries(stream):
 
     await rdap_client.aio_close()
     await httpx_client.aclose()
-
-
-

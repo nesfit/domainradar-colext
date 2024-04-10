@@ -1,0 +1,27 @@
+[connection]
+brokers = ["aiokafka://localhost:9092"]
+use_ssl = false
+
+[connection.ssl]
+ca_file = "/path/to/ca.pem"
+server_verification_required = true
+client_cert_file = "/path/to/client_certificate.pem"
+client_key_file = "/path/to/client_key.pem"
+client_key_password = "password for the private key"
+check_hostname = true
+
+[rdap_dn]
+app_id = "domrad-rdap-dn"
+debug = false
+http_timeout_sec = 5
+
+[rdap_ip]
+app_id = "domrad-rdap-ip"
+debug = false
+http_timeout_sec = 5
+
+[rtt]
+app_id = "domrad-rtt"
+debug = false
+ping_count = 5
+privileged_mode = false
