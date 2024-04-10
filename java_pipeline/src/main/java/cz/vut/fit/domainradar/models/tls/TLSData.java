@@ -23,7 +23,6 @@ public record TLSData(@NotNull DNSResult.IPFromRecord fromIp,
                               @NotNull Integer validLen,
                               @NotNull Instant validityEnd,
                               @NotNull Instant validityStart,
-                              int extensionCount,
                               @Nullable List<CertificateExtension> extensions) {
     }
 

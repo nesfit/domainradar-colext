@@ -234,7 +234,7 @@ public class DNSCollector extends BiProducerStandaloneCollector<String, DNSProce
         }
 
         return new TLSData.Certificate(commonName, country, isRoot, organization,
-                (int) validLen, validityEnd, validityStart, extensions.size(), extensions);
+                (int) validLen, validityEnd, validityStart, extensions);
     }
 
     private static <T> Stream<T> streamIfNotNull(Collection<T> collection) {
