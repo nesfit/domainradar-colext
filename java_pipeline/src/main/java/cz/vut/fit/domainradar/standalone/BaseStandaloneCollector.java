@@ -11,6 +11,7 @@ import org.apache.commons.cli.Options;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.Deserializer;
 import org.apache.kafka.common.serialization.Serde;
@@ -50,6 +51,7 @@ public abstract class BaseStandaloneCollector<KIn, VIn, KOut, VOut extends Resul
         _properties = new Properties();
         if (properties != null)
             _properties.putAll(properties);
+
         _properties.setProperty(ConsumerConfig.GROUP_ID_CONFIG, groupId);
         _properties.setProperty(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
         _properties.setProperty(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, "60000");
@@ -99,7 +101,11 @@ public abstract class BaseStandaloneCollector<KIn, VIn, KOut, VOut extends Resul
 
     protected @NotNull KafkaProducer<KOut, VOut> createProducer(@NotNull Serializer<KOut> keySerializer,
                                                                 @NotNull Serializer<VOut> valueSerializer) {
-        return new KafkaProducer<>(_properties, keySerializer, valueSerializer);
+        var properties = new Properties();
+        properties.putAll(_properties);
+        properties.setProperty(ProducerConfig.CLIENT_ID_CONFIG, "producer-" + getName() + "-A");
+        
+        return new KafkaProducer<>(properties, keySerializer, valueSerializer);
     }
 
     public void addOptions(@NotNull Options options) {

@@ -3,6 +3,7 @@ package cz.vut.fit.domainradar.standalone;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import cz.vut.fit.domainradar.models.results.Result;
 import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serializer;
 import org.jetbrains.annotations.NotNull;
@@ -31,7 +32,11 @@ public abstract class BiProducerStandaloneCollector<KIn, VIn, KOut1, VOut1 exten
 
     protected @NotNull KafkaProducer<KOut2, VOut2> createProducer2(@NotNull Serializer<KOut2> keySerializer,
                                                                 @NotNull Serializer<VOut2> valueSerializer) {
-        return new KafkaProducer<>(_properties, keySerializer, valueSerializer);
+        var properties = new Properties();
+        properties.putAll(_properties);
+        properties.setProperty(ProducerConfig.CLIENT_ID_CONFIG, "producer-" + getName() + "-B");
+        
+        return new KafkaProducer<>(properties, keySerializer, valueSerializer);
     }
 
     @Override
