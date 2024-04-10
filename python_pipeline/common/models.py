@@ -39,7 +39,7 @@ class RTTResult(IPResult, abstract=False):
 class RDAPDomainResult(Result, abstract=False):
     rdap_data: Optional[dict] = FieldDescriptor[dict](field="rdapData", required=False)
     entities: Optional[list[dict]] = FieldDescriptor[list[dict]](required=False)
-    is_for_source_name: bool = BooleanField(field="forSourceName", required=True)
+    rdap_target: bool = StringField(field="rdapTarget", required=True)
 
     whois_status_code: int = IntegerField(field="whoisStatusCode", required=True)
     whois_error: Optional[str] = StringField(field="whoisError", required=False)
