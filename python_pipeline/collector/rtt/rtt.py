@@ -1,6 +1,6 @@
 from icmplib import async_ping, ICMPSocketError, DestinationUnreachable, TimeExceeded
 
-from collector.util import timestamp_now_millis
+from collector.util import timestamp_now_millis, should_omit_ip
 from common.util import read_config, make_app
 from common.models import *
 import common.result_codes as rc
@@ -18,16 +18,23 @@ COUNT = component_config.get("ping_count", 5)
 PRIVILEGED = component_config.get("privileged_mode", False)
 
 # The input and output topics
-topic_to_process = rtt_app.topic('to_process_IP', key_type=IPToProcess, value_type=None, allow_empty=True)
+topic_to_process = rtt_app.topic('to_process_IP', key_type=IPToProcess,
+                                 value_type=IPProcessRequest, allow_empty=True)
 
-topic_processed = rtt_app.topic('collected_IP_data', key_type=IPToProcess, value_type=RTTResult)
+topic_processed = rtt_app.topic('collected_IP_data', key_type=IPToProcess,
+                                value_type=RTTResult)
+
 
 # The RDAP-DN processor
 @rtt_app.agent(topic_to_process, concurrency=4)
 async def process_entries(stream):
     # Main message processing loop
     # dn is the domain name / IP address pair
-    async for dn_ip, _ in stream.items():
+    async for dn_ip, process_request in stream.items():
+        # Omit the DN if the collector is not in the list of collectors to process
+        if should_omit_ip(process_request, COLLECTOR):
+            continue
+
         rtt_data = None
         try:
             ping_result = await async_ping(dn_ip.ip, count=COUNT, privileged=PRIVILEGED)

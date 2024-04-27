@@ -17,9 +17,7 @@ import org.jetbrains.annotations.NotNull;
 import pl.tlinkowski.unij.api.UniLists;
 
 import java.net.Inet4Address;
-import java.net.InetAddress;
 import java.net.URI;
-import java.net.UnknownHostException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -32,6 +30,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class NERDCollector extends IPStandaloneCollector<NERDData> {
+    public final String NAME = "nerd";
     private static final String NERD_BASE = "https://nerd.cesnet.cz/nerd/api/v1/";
 
     private final Duration _httpTimeout;
@@ -67,7 +66,14 @@ public class NERDCollector extends IPStandaloneCollector<NERDData> {
 
         _parallelProcessor.subscribe(UniLists.of(Topics.IN_IP));
         _parallelProcessor.poll(ctx -> {
-            var entries = ctx.streamConsumerRecords().map(ConsumerRecord::key).toList();
+            var entries = ctx.streamConsumerRecords()
+                    .filter(record -> {
+                        final var request = record.value();
+                        return request == null || request.collectors() == null
+                                || request.collectors().contains(NAME);
+                    })
+                    .map(ConsumerRecord::key)
+                    .toList();
             this.processIps(entries);
         });
     }
@@ -129,7 +135,7 @@ public class NERDCollector extends IPStandaloneCollector<NERDData> {
 
     @Override
     public @NotNull String getName() {
-        return "nerd";
+        return NAME;
     }
 
     @Override

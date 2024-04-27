@@ -11,7 +11,7 @@ from whodap.errors import *
 import common.result_codes as rc
 from common.models import *
 from common.util import read_config, make_app
-from collector.util import make_rdap_ssl_context, timestamp_now_millis
+from collector.util import make_rdap_ssl_context, timestamp_now_millis, should_omit_ip
 
 COLLECTOR = "rdap_ip"
 
@@ -23,9 +23,11 @@ component_config = config.get(COLLECTOR, {})
 rdap_ip_app = make_app(COLLECTOR, config)
 
 # The input and output topics
-topic_to_process = rdap_ip_app.topic('to_process_IP', key_type=IPToProcess, value_type=None, allow_empty=True)
+topic_to_process = rdap_ip_app.topic('to_process_IP', key_type=IPToProcess,
+                                     value_type=IPProcessRequest, allow_empty=True)
 
-topic_processed = rdap_ip_app.topic('collected_IP_data', key_type=IPToProcess, value_type=RDAPDomainResult)
+topic_processed = rdap_ip_app.topic('collected_IP_data', key_type=IPToProcess,
+                                    value_type=RDAPDomainResult)
 
 
 async def fetch_ip(address, client_v4: IPv4Client, client_v6: IPv6Client) \
@@ -63,7 +65,11 @@ async def process_entries(stream):
 
     # Main message processing loop
     # dn is the domain name / IP address pair
-    async for dn_ip, _ in stream.items():
+    async for dn_ip, process_request in stream.items():
+        # Omit the DN if the collector is not in the list of collectors to process
+        if should_omit_ip(process_request, COLLECTOR):
+            continue
+
         # TODO: implement a per-endpoint local rate limiter (see aiolimiter)
         rdap_data, err_code, err_msg = await fetch_ip(dn_ip.ip, ipv4_client, ipv6_client)
         if rdap_data is not None:

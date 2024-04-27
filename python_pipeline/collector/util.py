@@ -1,10 +1,12 @@
 import ssl
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 
 from whodap import DNSClient
 from whodap.response import DomainResponse, RDAPResponse
 from whodap.client import RDAPClient
+
+from common.models import IPProcessRequest
 
 
 async def fetch_entities(response: DomainResponse, client: RDAPClient) -> List[RDAPResponse]:
@@ -77,3 +79,7 @@ def extract_known_tld(domain_name: str, client: DNSClient) -> tuple[str | None, 
 
     # Return the domain and the suffix part
     return domain, parts[-1]
+
+
+def should_omit_ip(request: Optional[IPProcessRequest], collector_name: str) -> bool:
+    return request is not None and request.collectors is not None and collector_name not in request.collectors

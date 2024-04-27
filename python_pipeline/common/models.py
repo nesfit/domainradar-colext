@@ -9,6 +9,10 @@ class IPToProcess(Record, coerce=True, serializer='json'):
     ip: str = StringField(field="ip", required=True)
 
 
+class IPProcessRequest(Record, coerce=True, serializer='json'):
+    collectors: Optional[list[str]] = FieldDescriptor[list[str]](field="collectors", required=False)
+
+
 class Result(Record, abstract=True, coerce=True, serializer='json'):
     status_code: int = IntegerField(field="statusCode", required=True)
     error: Optional[str] = StringField(required=False)

@@ -13,21 +13,22 @@ import cz.vut.fit.domainradar.Topics;
 import cz.vut.fit.domainradar.models.IPToProcess;
 import cz.vut.fit.domainradar.models.ResultCodes;
 import cz.vut.fit.domainradar.models.ip.GeoIPData;
+import cz.vut.fit.domainradar.models.requests.IPProcessRequest;
 import cz.vut.fit.domainradar.models.results.CommonIPResult;
 import cz.vut.fit.domainradar.serialization.JsonSerde;
 import cz.vut.fit.domainradar.streams.CommonResultIPCollector;
-import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.kstream.Consumed;
 import org.apache.kafka.streams.kstream.Produced;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Properties;
 
 public class GeoIPCollector implements CommonResultIPCollector<GeoIPData> {
+    public final String NAME = "geo_asn";
+
     private final ObjectMapper _jsonMapper;
     private final TypeReference<CommonIPResult<GeoIPData>> _resultTypeRef = new TypeReference<>() {
     };
@@ -54,8 +55,13 @@ public class GeoIPCollector implements CommonResultIPCollector<GeoIPData> {
     @Override
     public void use(StreamsBuilder builder) {
         var toProcessIpSerde = JsonSerde.of(_jsonMapper, IPToProcess.class);
-        builder.stream(Topics.IN_IP, Consumed.with(toProcessIpSerde, Serdes.Void()))
-                .mapValues((ip, noValue) -> {
+        var ipRequestSerde = JsonSerde.of(_jsonMapper, IPProcessRequest.class);
+
+        builder.stream(Topics.IN_IP, Consumed.with(toProcessIpSerde, ipRequestSerde))
+                .filter((ip, request) -> request == null
+                        || request.collectors() == null
+                        || request.collectors().contains(NAME))
+                .mapValues((ip, ignored) -> {
                     try {
                         var inetAddr = InetAddresses.forString(ip.ip());
                         var cityOpt = _cityReader.tryCity(inetAddr);
@@ -101,6 +107,6 @@ public class GeoIPCollector implements CommonResultIPCollector<GeoIPData> {
 
     @Override
     public String getCollectorName() {
-        return "geo_asn";
+        return NAME;
     }
 }
