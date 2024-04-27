@@ -93,8 +93,8 @@ public class DNSCollector extends BiProducerStandaloneCollector<String, DNSProce
             }
 
             var toCollect = _toCollect;
-            if (request.toCollect() != null && !request.toCollect().isEmpty()) {
-                toCollect = request.toCollect();
+            if (request.typesToCollect() != null && !request.typesToCollect().isEmpty()) {
+                toCollect = request.typesToCollect();
             }
 
             scanner.scan(toCollect)

@@ -43,6 +43,7 @@ public class ZoneCollector extends TriProducerStandaloneCollector<String, ZonePr
     @Override
     public void run(CommandLine cmd) {
         buildProcessor(0);
+        final var defaultRequestValue = new ZoneProcessRequest(true, true, null, null);
 
         _parallelProcessor.subscribe(UniLists.of(Topics.IN_ZONE));
         _parallelProcessor.poll(ctx -> {
@@ -61,14 +62,19 @@ public class ZoneCollector extends TriProducerStandaloneCollector<String, ZonePr
 
                         if (result.zone() != null) {
                             var reqValue = ctx.value();
-                            var toCollect = reqValue == null ? null : reqValue.toCollect();
-                            var toProcessIPsFrom = reqValue == null ? null : reqValue.typesToProcessIPsFrom();
+                            if (reqValue == null)
+                                reqValue = defaultRequestValue;
 
-                            _producer2.send(new ProducerRecord<>(Topics.IN_DNS, dn, new DNSProcessRequest(
-                                    toCollect, toProcessIPsFrom, result.zone())));
-                            _producer3.send(new ProducerRecord<>(Topics.IN_RDAP_DN, dn, new RDAPDomainProcessRequest(
-                                    result.zone().zone()
-                            )));
+                            if (reqValue.collectDNS()) {
+                                _producer2.send(new ProducerRecord<>(Topics.IN_DNS, dn, new DNSProcessRequest(
+                                        reqValue.dnsTypesToCollect(), reqValue.dnsTypesToProcessIPsFrom(), result.zone())));
+                            }
+
+                            if (reqValue.collectRDAP()) {
+                                _producer3.send(new ProducerRecord<>(Topics.IN_RDAP_DN, dn, new RDAPDomainProcessRequest(
+                                        result.zone().zone()
+                                )));
+                            }
                         } else {
                             _producer3.send(new ProducerRecord<>(Topics.IN_RDAP_DN, dn, new RDAPDomainProcessRequest(
                                     null)));

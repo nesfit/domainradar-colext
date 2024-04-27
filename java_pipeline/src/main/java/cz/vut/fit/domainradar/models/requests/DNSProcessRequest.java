@@ -8,7 +8,7 @@ import java.util.List;
 
 public record DNSProcessRequest(
         @Nullable
-        List<String> toCollect,
+        List<String> typesToCollect,
         @Nullable
         List<String> typesToProcessIPsFrom,
         @UnknownNullability
