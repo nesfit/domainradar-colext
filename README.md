@@ -3,12 +3,12 @@
 This project contains applications that together make up the core process of DomainRadar:
 - the **data collectors** fetch data on domain names from external sources (such as DNS),
 - the **mergers** combine data from various collectors,
-- the **feature extractor** fetches the (semi-)integrated results from the mergers and ,
+- the **feature extractor** fetches the (semi-)integrated results from the mergers, and
 - the **classifier pipeline component** fetches data from the extractor, passes them to the classifiers ([domainradar-clf](https://github.com/nesfit/domainradar-clf)) and stores the results.
 
 ## Architecture
 
-The pipeline is constituted by a series of lightweight applications that perform a consume-process-produce cycle; the output of a certain collector is the input of another. This way, each pipeline component can be deployed separately and run in one or multiple instances to distribute the workload (limited by the number of partitions configured in Kafka for the source topics). 
+The pipeline is constituted by a series of lightweight applications that perform a consume-process-produce cycle; the output of a certain collector is the input of another. This way, each pipeline component can be deployed separately and run in one or multiple instances to distribute the workload (limited by the number of partitions configured in Kafka for the source topics). At the end of the pipeline are the merger components that combine results from the collectors.
 
 The components are implemented using several frameworks:
 
@@ -36,4 +36,3 @@ For each Streams-based component, you **must** use the same app ID for all runne
 The ParallelConsumer-based components are also executed using a common [runner](cz.vut.fit.domainradar.standalone.StandaloneCollectorRunner). Several different components may be started from a single runner instance. In this case, the components are totally independent: their consumer group ID is formed as "[provided app ID]-[component name]". Therefore, all instances of a given component **must** be started with the same app ID; but it doesn't matter what components are started inside a single runner instance.
 
 The Faust-based components do not have a shared runner and each must be started separately. It still holds that the same app ID **must** be used for all running instances of a single component.
-
