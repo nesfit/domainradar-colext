@@ -1,0 +1,52 @@
+from collections import OrderedDict
+from typing import Iterable
+
+from pandas import DataFrame
+
+from .compat import CompatibilityTransformation
+from .transformations.base_transformation import Transformation
+from .transformations.dns import DNSTransformation
+from .transformations.geo import GeoTransformation
+from .transformations.ip import IPTransformation
+from .transformations.lexical import LexicalTransformation
+from .transformations.rdap_dn import RDAPDomainTransformation
+from .transformations.rdap_ip import RDAPAddressTransformation
+from .transformations.tls import TLSTransformation
+
+_all_transformations = OrderedDict([
+    ("dns", DNSTransformation()),
+    ("ip", IPTransformation()),
+    ("geo", GeoTransformation()),
+    ("tls", TLSTransformation()),
+    ("lexical", LexicalTransformation()),
+    ("rdap_dn", RDAPDomainTransformation()),
+    ("rdap_ip", RDAPAddressTransformation())
+])
+
+_enabled_transformations: list[Transformation] = []
+_compat_transformation = CompatibilityTransformation()
+
+
+def init_transformations(config: dict):
+    global _enabled_transformations
+
+    enabled_transformation_ids: Iterable[str] | None = config.get("enabled_transformations", None)
+
+    if enabled_transformation_ids is None:
+        _enabled_transformations = list(_all_transformations.values())
+    else:
+        for tid, transformation in _all_transformations.items():
+            if tid in enabled_transformation_ids:
+                _enabled_transformations.append(transformation)
+
+
+def extract_features(raw_data: Iterable[dict]) -> Iterable[dict]:
+    # Transform the raw data into a format compatible with the transformations
+    raw_data_compatible = (_compat_transformation.transform(x) for x in raw_data)
+    # Create a DataFrame where each row is one entry from the raw_data iterable
+    data_frame = DataFrame(raw_data_compatible, copy=False)
+    # Apply the transformations
+    for transformation in _enabled_transformations:
+        data_frame = transformation.transform(data_frame)
+    # Return a list of dictionaries
+    return data_frame.to_dict(orient="records")

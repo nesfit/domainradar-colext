@@ -1,0 +1,5 @@
+from extractor.transformations.base_transformation import Transformation
+
+
+class GeoTransformation(Transformation):
+    ...
