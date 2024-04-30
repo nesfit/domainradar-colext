@@ -1,3 +1,5 @@
+import asyncio
+
 from faust.serializers import codecs
 import httpx
 import tldextract
@@ -84,8 +86,15 @@ async def process_entries(stream):
     # The RDAP & WHOIS clients
     httpx_client = httpx.AsyncClient(verify=make_rdap_ssl_context(), follow_redirects=True,
                                      timeout=component_config.get("http_timeout_sec", 5))
-    rdap_client = await whodap.DNSClient.new_aio_client(httpx_client=httpx_client)
     whois_client = asyncwhois.client.DomainClient()
+
+    while True:
+        try:
+            rdap_client = await whodap.DNSClient.new_aio_client(httpx_client=httpx_client)
+            break
+        except Exception as e:
+            rdap_dn_app.logger.error("Error initializing RDAP client. Retrying in 10 seconds.", exc_info=e)
+            await asyncio.sleep(10)
 
     # Main message processing loop
     # dn is the domain name, req is the optional RDAPRequest object

@@ -63,8 +63,15 @@ async def process_entries(stream):
     # The RDAP & WHOIS clients
     httpx_client = httpx.AsyncClient(verify=make_rdap_ssl_context(), follow_redirects=True,
                                      timeout=component_config.get("http_timeout_sec", 5))
-    ipv4_client = await whodap.IPv4Client.new_aio_client(httpx_client=httpx_client)
-    ipv6_client = await whodap.IPv6Client.new_aio_client(httpx_client=httpx_client)
+
+    while True:
+        try:
+            ipv4_client = await whodap.IPv4Client.new_aio_client(httpx_client=httpx_client)
+            ipv6_client = await whodap.IPv6Client.new_aio_client(httpx_client=httpx_client)
+            break
+        except Exception as e:
+            rdap_ip_app.logger.error("Error initializing RDAP clients. Retrying in 10 seconds.", exc_info=e)
+            await asyncio.sleep(10)
 
     # Main message processing loop
     # dn is the domain name / IP address pair
