@@ -1,4 +1,6 @@
+import asyncio
 import ipaddress
+
 import httpx
 
 from asyncwhois.errors import *
@@ -10,7 +12,7 @@ from whodap.errors import *
 
 import common.result_codes as rc
 from common.models import *
-from common.util import read_config, make_app
+from common.util import read_config, make_app, serialize_ip_to_process
 from collector.util import make_rdap_ssl_context, timestamp_now_millis, should_omit_ip
 
 COLLECTOR = "rdap_ip"
@@ -26,7 +28,8 @@ rdap_ip_app = make_app(COLLECTOR, config)
 topic_to_process = rdap_ip_app.topic('to_process_IP', key_type=IPToProcess,
                                      value_type=IPProcessRequest, allow_empty=True)
 
-topic_processed = rdap_ip_app.topic('collected_IP_data', key_type=IPToProcess,
+# The key is explicitly serialized to avoid Faust injecting its metadata in the output object
+topic_processed = rdap_ip_app.topic('collected_IP_data', key_type=bytes,
                                     value_type=RDAPDomainResult)
 
 
@@ -81,7 +84,7 @@ async def process_entries(stream):
                               data=rdap_data)
 
         # (this could probably be send_soon not to block the loop)
-        await topic_processed.send(key=dn_ip, value=result)
+        await topic_processed.send(key=serialize_ip_to_process(dn_ip), value=result)
 
     await ipv4_client.aio_close()
     await ipv6_client.aio_close()

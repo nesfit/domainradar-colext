@@ -1,8 +1,12 @@
 import os
 import ssl
 import tomllib
+from json import dumps
+
 import faust
 import logging
+
+from common.models import IPToProcess
 
 logger = logging.getLogger(__name__)
 
@@ -82,3 +86,23 @@ def make_app(name: str, config: dict) -> faust.App:
                      broker_credentials=ssl_context,
                      debug=component_config.get("debug", False),
                      **component_faust_config)
+
+
+def serialize_ip_to_process(ip_to_process: IPToProcess) -> bytes:
+    return dumps({"domainName": ip_to_process.domain_name,
+                  "ip": ip_to_process.ip}, separators=(',', ':'), indent=None).encode("utf-8")
+
+
+def get_safe(data: dict, path: str) -> dict | None:
+    """Gets a value from a nested dictionary, returning None if the path doesn't exist."""
+    if data is None:
+        return None
+
+    try:
+        for key in path.split("."):
+            if data is None:
+                return None
+            data = data[key]
+        return data
+    except (KeyError, TypeError):
+        return None
