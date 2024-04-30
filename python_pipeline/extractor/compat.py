@@ -125,8 +125,24 @@ class CompatibilityTransformation:
         return [{"name": x["value"], "priority": x["priority"]} for x in mx]
 
     @staticmethod
-    def _make_tls(data: dict) -> dict:
-        ...
+    def _make_tls(data: dict) -> dict | None:
+        def make_ext(ext_data: dict) -> dict:
+            ...  # TODO
+
+        def make_certificate(cert_data: dict) -> dict:
+            ...  # TODO
+
+        tls = get_safe(data, "dnsResult.tlsData")
+        if tls is None:
+            return None
+
+        certs = tls["certificates"]
+        return {
+            "cipher": tls["cipher"],
+            "protocol": tls["protocol"],
+            "count": len(certs),
+            "certificates": [make_certificate(x) for x in certs]
+        }
 
     @staticmethod
     def _parse_rdap_backup(rdap_data: dict):
