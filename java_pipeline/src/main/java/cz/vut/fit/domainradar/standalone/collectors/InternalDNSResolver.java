@@ -126,6 +126,8 @@ public class InternalDNSResolver {
 
                         return TTLTuple.of(result,
                                 result.getRecords().stream()
+                                        // Sanity check: you never know what the DNS returns
+                                        .filter(record -> record.getType() == Type.A)
                                         .map(record -> ((ARecord) record))
                                         .filter(record -> record.getName().equals(_name))
                                         .map(record -> record.getAddress().getHostAddress())
@@ -142,6 +144,8 @@ public class InternalDNSResolver {
                         }
 
                         return TTLTuple.of(result, result.getRecords().stream()
+                                // Sanity check: you never know what the DNS returns
+                                .filter(record -> record.getType() == Type.AAAA)
                                 .map(record -> (AAAARecord) record)
                                 .filter(record -> record.getName().equals(_name))
                                 .map(record -> record.getAddress().getHostAddress())
@@ -156,7 +160,16 @@ public class InternalDNSResolver {
                             return CompletableFuture.completedFuture(TTLTuple.ofNull());
                         }
 
-                        var record = (CNAMERecord) result.getRecords().getFirst();
+                        // A CNAME response may also contain the A records for the target
+                        final var record = (CNAMERecord) result.getRecords().stream()
+                                .filter(resultRecord -> resultRecord.getType() == Type.CNAME)
+                                .findFirst()
+                                .orElse(null);
+
+                        if (record == null) {
+                            return CompletableFuture.completedFuture(TTLTuple.ofNull());
+                        }
+
                         var resolveIpsStage = InternalDNSResolver.this.resolveIpsAsync(record.getTarget());
 
                         return resolveIpsStage.thenApply(ips -> TTLTuple.of(result, new DNSData.CNAMERecord(
@@ -174,6 +187,8 @@ public class InternalDNSResolver {
                         }
 
                         var records = result.getRecords().stream()
+                                // Sanity check: you never know what the DNS returns
+                                .filter(record -> record.getType() == Type.MX)
                                 .map(record -> (MXRecord) record)
                                 .toList();
 
@@ -209,6 +224,8 @@ public class InternalDNSResolver {
                         }
 
                         var records = result.getRecords().stream()
+                                // Sanity check: you never know what the DNS returns
+                                .filter(record -> record.getType() == Type.NS)
                                 .map(record -> (NSRecord) record)
                                 .toList();
 
@@ -242,6 +259,7 @@ public class InternalDNSResolver {
                         }
 
                         return TTLTuple.of(result, result.getRecords().stream()
+                                .filter(record -> record.getType() == Type.TXT)
                                 .flatMap(record -> ((TXTRecord) record).getStrings().stream())
                                 .collect(Collectors.toList()));
                     });
