@@ -22,14 +22,14 @@ from .transformations.tls import TLSTransformation
 # The list of all transformations. The order in this dictionary determines the order in which the transformations
 # will be applied to the data. The keys are used in the configuration to enable or disable specific transformations.
 _all_transformations = OrderedDict([
-    ("dns", DNSTransformation()),
-    ("ip", IPTransformation()),
-    ("geo", GeoTransformation()),
-    ("tls", TLSTransformation()),
-    ("lexical", LexicalTransformation()),
-    ("rdap_dn", RDAPDomainTransformation()),
-    ("rdap_ip", RDAPAddressTransformation()),
-    ("drop", DropColumnsTransformation())
+    ("dns", DNSTransformation),
+    ("ip", IPTransformation),
+    ("geo", GeoTransformation),
+    ("tls", TLSTransformation),
+    ("lexical", LexicalTransformation),
+    ("rdap_dn", RDAPDomainTransformation),
+    ("rdap_ip", RDAPAddressTransformation),
+    ("drop", DropColumnsTransformation)
 ])
 
 _enabled_transformations: list[Transformation] = []
@@ -47,12 +47,12 @@ def init_transformations(config: dict):
     enabled_transformation_ids: Iterable[str] | None = config.get("enabled_transformations", None)
 
     if enabled_transformation_ids is None:
-        _enabled_transformations = list(_all_transformations.values())
+        _enabled_transformations = [trans(config) for trans in _all_transformations.values()]
     else:
         _enabled_transformations.clear()
         for tid, transformation in _all_transformations.items():
             if tid in enabled_transformation_ids:
-                _enabled_transformations.append(transformation)
+                _enabled_transformations.append(transformation(config))
 
 
 def extract_features(raw_data: Iterable[dict]) -> Iterable[dict]:
