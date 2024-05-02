@@ -1,6 +1,6 @@
 from common.util import ensure_data_dir
-from .app import app
+from .app import extractor_app
 
 if __name__ == '__main__':
     ensure_data_dir()
-    app.main()
+    extractor_app.main()
