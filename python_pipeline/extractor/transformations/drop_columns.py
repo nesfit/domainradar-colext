@@ -1,3 +1,7 @@
+"""drop_columns.py: A transformation that drops columns from the DataFrame that should not be
+a part of the feature vector."""
+__author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
+
 from pandas import DataFrame
 
 from extractor.transformations.base_transformation import Transformation
