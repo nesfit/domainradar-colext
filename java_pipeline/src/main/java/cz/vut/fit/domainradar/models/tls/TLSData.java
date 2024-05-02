@@ -11,19 +11,9 @@ public record TLSData(@NotNull DNSResult.IPFromRecord fromIp,
                       @NotNull String protocol,
                       @NotNull String cipher,
                       @NotNull List<Certificate> certificates) {
-    public record CertificateExtension(boolean critical,
-                                       @NotNull String oid,
-                                       @NotNull String valueEncoded) {
-    }
 
-    public record Certificate(@NotNull String commonName,
-                              @Nullable String country,
-                              boolean isRoot,
-                              @Nullable String organization,
-                              @NotNull Integer validLen,
-                              @NotNull Instant validityEnd,
-                              @NotNull Instant validityStart,
-                              @Nullable List<CertificateExtension> extensions) {
+    public record Certificate(@NotNull String dn,
+                              byte[] derData) {
     }
 
 }

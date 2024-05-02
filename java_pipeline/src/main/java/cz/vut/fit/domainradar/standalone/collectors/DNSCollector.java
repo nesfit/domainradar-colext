@@ -27,6 +27,7 @@ import java.net.UnknownHostException;
 import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.Certificate;
+import java.security.cert.CertificateEncodingException;
 import java.security.cert.X509Certificate;
 import java.time.Instant;
 import java.util.*;
@@ -199,42 +200,14 @@ public class DNSCollector extends BiProducerStandaloneCollector<String, DNSProce
     }
 
     public static TLSData.Certificate parseCertificate(X509Certificate cert) {
-        String commonName = "", country = "", organization = "";
-        boolean isRoot = cert.getBasicConstraints() != -1; // A simple check for root CA
-        Instant validityStart = cert.getNotBefore().toInstant();
-        Instant validityEnd = cert.getNotAfter().toInstant();
-        long validLen = validityEnd.getEpochSecond() - validityStart.getEpochSecond();
-
-        // Parsing the subject DN for CN, O, and C
         X500Principal subject = cert.getSubjectX500Principal();
         String subjectDN = subject.getName(X500Principal.RFC1779);
-        String[] subjectParts = subjectDN.split(",");
-        for (String part : subjectParts) {
-            part = part.trim();
-            if (part.startsWith("CN=")) {
-                commonName = part.substring(3);
-            } else if (part.startsWith("O=")) {
-                organization = part.substring(2);
-            } else if (part.startsWith("C=")) {
-                country = part.substring(2);
-            }
-        }
 
-        // Extracting extensions
-        List<TLSData.CertificateExtension> extensions = new ArrayList<>();
-        var encoder = Base64.getEncoder();
-        for (var extensionOID : cert.getCriticalExtensionOIDs()) {
-            extensions.add(new TLSData.CertificateExtension(true, extensionOID, encoder.encodeToString(
-                    cert.getExtensionValue(extensionOID))));
+        try {
+            return new TLSData.Certificate(subjectDN, cert.getEncoded());
+        } catch (CertificateEncodingException e) {
+            return new TLSData.Certificate(subjectDN, new byte[0]);
         }
-
-        for (var extensionOID : cert.getNonCriticalExtensionOIDs()) {
-            extensions.add(new TLSData.CertificateExtension(false, extensionOID, encoder.encodeToString(
-                    cert.getExtensionValue(extensionOID))));
-        }
-
-        return new TLSData.Certificate(commonName, country, isRoot, organization,
-                (int) validLen, validityEnd, validityStart, extensions);
     }
 
     private static <T> Stream<T> streamIfNotNull(Collection<T> collection) {
