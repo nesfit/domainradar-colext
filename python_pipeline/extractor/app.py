@@ -1,3 +1,6 @@
+"""app.py: The main module for the feature extractor component. Defines the Faust application."""
+__author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
+
 from typing import Sequence
 
 from faust import EventT

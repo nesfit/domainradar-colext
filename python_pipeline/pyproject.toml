@@ -23,6 +23,7 @@ tldextract = "^5.1.2"
 pandas = "^2.2.2"
 whoisit = "^2.7.6"
 cryptography = "^42.0.5"
+python-dateutil = "^2.9.0.post0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0.0"

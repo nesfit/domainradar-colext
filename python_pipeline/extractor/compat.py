@@ -2,20 +2,30 @@
 into a format that can be used by the "legacy" transformations."""
 __author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
 
+import base64
+import datetime
+
+import cryptography.x509
 from whoisit import Bootstrap
 from whoisit.errors import ParseError
 from whoisit.parser import ParseIPNetwork, ParseDomain
 
+from cryptography.x509 import Certificate
 from common.util import get_safe
 
 
 # omitted:
 # - label, category
-# - dns_dnssec, dns_has_dnskey, dns_zone_dnskey_selfsign_ok, dns_has_dnskey (DNSSEC not collected)
+# - dns_dnssec, dns_has_dnskey, dns_zone_dnskey_selfsign_ok (DNSSEC not collected)
 # - tls_evaluated_on (== dns_evaluated_on)
 # added: ip_data.nerd_rep
 # ip_data.geo.country -> country_code
+# ip_data.remarks.average_rtt -> ip_data.average_rtt
+# ip_data.rdap.network is an IPvXNetwork object
+# rdap dates are always UTC
+# flattened geo data lists present already (previously done in a transformation)
 # only one of SOA and zone_SOA is always present
+# certificates are represented directly as cryptography's Certificate; or str (parse errors)
 
 class CompatibilityTransformation:
     def __init__(self):
@@ -31,12 +41,17 @@ class CompatibilityTransformation:
             return data
 
         dns_data = get_safe(data, "dnsResult.dnsData") or {}
-        rdap_data = get_safe(data, "rdapDomainResult.rdapData") or {}
-        rdap_entities = get_safe(data, "rdapDomainResult.entities")
-        whois_parsed = get_safe(data, "rdapDomainResult.whoisParsed")
+        rdap_result = data.get("rdapDomainResult", {})
+
+        rdap_data: dict | None = rdap_result.get("rdapData")
+        rdap_entities: list | None = rdap_result.get("entities")
+        whois_parsed: dict | None = rdap_result.get("whoisParsed")
+        whois_raw: str | None = rdap_result.get("whoisRaw")
 
         soa, zone_soa = self._make_soa(data)
-        rdap_parsed = self._parse_rdap_dn(data["domain_name"], rdap_data, rdap_entities, whois_parsed)
+        rdap_parsed = self._parse_rdap_dn(data["domain_name"], rdap_data, rdap_entities, whois_parsed, whois_raw)
+        ip_data = self._make_ip_data(data)
+        country_codes, latitudes, longitudes = self._flatten_ip_data(ip_data)
 
         res = {
             "domain_name": data["domain_name"],
@@ -54,15 +69,39 @@ class CompatibilityTransformation:
             "tls": self._make_tls(data),
             "dns_evaluated_on": get_safe(data, "dnsResult.lastAttempt"),
             "rdap_evaluated_on": get_safe(data, "rdapDomainResult.lastAttempt"),
-            "rdap_registration_date": rdap_parsed.get("registration_date"),
-            "rdap_expiration_date": rdap_parsed.get("expiration_date"),
-            "rdap_last_changed_date": rdap_parsed.get("last_changed_date"),
+            "rdap_registration_date": self._ensure_utc_datetime(rdap_parsed.get("registration_date")),
+            "rdap_expiration_date": self._ensure_utc_datetime(rdap_parsed.get("expiration_date")),
+            "rdap_last_changed_date": self._ensure_utc_datetime(rdap_parsed.get("last_changed_date")),
             "rdap_dnssec": self._make_rdap_dnssec(rdap_data),
             "rdap_entities": rdap_parsed.get("entities"),
-            "ip_data": self._make_ip_data(data)
+            "ip_data": ip_data,
+            "countries": country_codes,
+            "latitudes": latitudes,
+            "longitudes": longitudes
         }
 
         return res
+
+    @staticmethod
+    def _ensure_utc_datetime(dt: datetime.datetime | None) -> datetime.datetime:
+        if dt is None:
+            return None
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=datetime.timezone.utc)
+        return dt.astimezone(datetime.timezone.utc)
+
+    @staticmethod
+    def _flatten_ip_data(ip_data: list):
+        country_codes = []
+        latitudes = []
+        longitudes = []
+
+        for ip in ip_data:
+            country_codes.append(ip['geo']['country_code'])
+            latitudes.append(ip['geo']['latitude'])
+            longitudes.append(ip['geo']['longitude'])
+
+        return country_codes, latitudes, longitudes
 
     @staticmethod
     def _make_email_extras(data: dict) -> dict:
@@ -126,11 +165,21 @@ class CompatibilityTransformation:
 
     @staticmethod
     def _make_tls(data: dict) -> dict | None:
-        def make_ext(ext_data: dict) -> dict:
-            ...  # TODO
+        def make_certificate(cert_data: dict) -> Certificate | str:
+            data_b64: str = cert_data.get("derData", "")
+            dn: str = cert_data.get("dn", "")
 
-        def make_certificate(cert_data: dict) -> dict:
-            ...  # TODO
+            if len(data_b64) == 0:
+                return dn
+
+            # noinspection PyBroadException
+            try:
+                data_der = base64.b64decode(data_b64)
+                cert = cryptography.x509.load_der_x509_certificate(data_der)
+            except Exception:
+                return dn
+
+            return cert
 
         tls = get_safe(data, "dnsResult.tlsData")
         if tls is None:
@@ -149,7 +198,7 @@ class CompatibilityTransformation:
         return {}  # TODO
 
     @staticmethod
-    def _parse_whois_to_rdap_equivalent(whois_parsed: dict):
+    def _parse_whois_to_rdap_equivalent(whois_parsed: dict, whois_raw: str):
         # TODO
         return {
             "entities": [],
@@ -158,8 +207,8 @@ class CompatibilityTransformation:
             "last_changed_date": 0
         }
 
-    def _parse_rdap_dn(self, dn: str, rdap_data: dict | None, rdap_entities: dict | None,
-                       whois_parsed: dict | None) -> dict:
+    def _parse_rdap_dn(self, dn: str, rdap_data: dict | None, rdap_entities: list | None,
+                       whois_parsed: dict | None, whois_raw: str | None) -> dict:
         if rdap_data is not None:
             rdap_data["entities"] = rdap_entities or []
             rdap_parser = ParseDomain(self.whoisit_bootstrap, rdap_data, dn, True)
@@ -168,13 +217,16 @@ class CompatibilityTransformation:
             except ParseError:
                 return self._parse_rdap_backup(rdap_data)
         elif whois_parsed is not None:
-            return self._parse_whois_to_rdap_equivalent(whois_parsed)
+            return self._parse_whois_to_rdap_equivalent(whois_parsed, whois_raw or "")
         else:
             return {}
 
     @staticmethod
-    def _make_rdap_dnssec(rdap_data: dict) -> bool:
-        return rdap_data.get('secureDNS', {}).get('delegationSigned', None) or False
+    def _make_rdap_dnssec(rdap_data: dict | None) -> bool | None:
+        if rdap_data is None:
+            return None
+
+        return rdap_data.get('secureDNS', {}).get('delegationSigned', None)
 
     @staticmethod
     def _make_ip_average_rtt(results_for_ip: dict) -> float:
@@ -183,7 +235,7 @@ class CompatibilityTransformation:
         for collector, results in results_for_ip.items():
             if collector.startswith("rtt") and results["statusCode"] == 0:
                 data = results.get("data", {})
-                col_count = data.get("sent", 0)
+                col_count = data.get("received", 0)
                 count += col_count
                 total += data.get("avg", 0) * col_count
 

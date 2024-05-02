@@ -1,3 +1,6 @@
+"""base_transformation.py: Defines the base class for feature extraction transformations."""
+__author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
+
 import abc
 from pandas import DataFrame
 

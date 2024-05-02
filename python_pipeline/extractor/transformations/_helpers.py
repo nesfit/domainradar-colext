@@ -12,22 +12,21 @@ import datetime
 from typing import Optional
 from pandas import Series
 
-
 # Here lies a bunch of helper functions that are used in the transformers.
 # They are not meant to be used directly, but are imported by the transformers.
 # If you feel like you've created a helper function for your transformer
 # that you think could be useful for others, please extract it to here.
+
+DNS_TYPES = ["A", "AAAA", "CNAME", "MX", "NS", "TXT", "SOA"]
+
 
 # Returns the timestamp representing day of feature extraction
 def todays_midnight_timestamp():
     # Get today's date
     today = datetime.date.today()
 
-    # Create a datetime object for midnight of today
-    midnight = datetime.datetime.combine(today, datetime.time())
-
-    # Convert to timestamp
-    # midnight_timestamp = midnight.timestamp()
+    # Create a datetime object for midnight of today (in UTC)
+    midnight = datetime.datetime.combine(today, datetime.time(tzinfo=datetime.timezone.utc))
 
     # return midnight_timestamp
     return midnight
