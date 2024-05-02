@@ -6,6 +6,8 @@ __authors__ = [
     "Petr Pouč <xpoucp01@vut.cz>"
 ]
 
+import os
+
 from extractor.transformations.base_transformation import Transformation
 from pandas import DataFrame
 import json
@@ -411,21 +413,22 @@ def get_lengths_of_parts(dn: str):
 
 
 class LexicalTransformation(Transformation):
-    def __init__(self):
+    def __init__(self, config: dict):
         self._phishing_ngram_freq = dict()
         self._malware_ngram_freq = dict()
         self._dga_ngram_freq = dict()
 
+        data_path = config.get("data_path", "data")
         # N-grams
-        with open('data/ngram_freq_phishing.json') as f:
+        with open(os.path.join(data_path, 'ngram_freq_phishing.json')) as f:
             self._phishing_ngram_freq = json.load(f)
 
         # N-grams
-        with open('data/ngram_freq_malware.json') as f:
+        with open(os.path.join(data_path, 'ngram_freq_malware.json')) as f:
             self._malware_ngram_freq = json.load(f)
 
         # N-grams
-        with open('data/ngram_freq_dga.json') as f:
+        with open(os.path.join(data_path, 'ngram_freq_dga.json')) as f:
             self._dga_ngram_freq = json.load(f)
 
     def transform(self, df: DataFrame) -> DataFrame:

@@ -25,3 +25,7 @@ app_id = "domrad-rtt"
 debug = false
 ping_count = 5
 privileged_mode = false
+
+[extractor]
+app_id = "domrad-extractor"
+data_dir = "/path/to/data"
