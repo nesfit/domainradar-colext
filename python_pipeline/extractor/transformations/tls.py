@@ -5,6 +5,9 @@ __authors__ = [
     "Adam Horák <ihorak@fit.vut.cz>"
 ]
 
+from cryptography.x509 import Certificate, ExtensionNotFound, ObjectIdentifier
+from cryptography.x509.oid import ExtensionOID, NameOID
+
 from extractor.transformations.base_transformation import Transformation
 
 import datetime
@@ -13,128 +16,121 @@ from pandas import DataFrame, Series, concat
 from pandas.errors import OutOfBoundsDatetime
 from ._helpers import todays_midnight_timestamp, hash_md5
 
+_tls_version_ids = {
+    "TLSv1.0": 0,
+    "TLSv1.1": 1,
+    "TLSv1.2": 2,
+    "TLSv1.3": 3
+}
+
+_tls_cipher_ids = {
+    'ECDHE-RSA-AES128-GCM-SHA256': 0,
+    'TLS_AES_128_GCM_SHA256': 1,
+    'TLS_AES_256_GCM_SHA384': 2,
+    'ECDHE-ECDSA-CHACHA20-POLY1305': 3,
+    'ECDHE-RSA-AES128-SHA': 3,
+    'ECDHE-RSA-CHACHA20-POLY1305': 4,
+    'ECDHE-RSA-AES256-GCM-SHA384': 5,
+    'ECDHE-ECDSA-AES128-GCM-SHA256': 6,
+    'TLS_CHACHA20_POLY1305_SHA256': 7,
+    'ECDHE-ECDSA-AES256-GCM-SHA384': 8,
+    'ECDHE-RSA-AES256-SHA384': 9,
+    'AES128-SHA256': 10,
+    'DHE-RSA-AES256-GCM-SHA384': 11,
+    'AES256-SHA256': 12,
+    'AES128-SHA': 13,
+    'DHE-RSA-AES128-GCM-SHA256': 14
+}
+
 
 class TLSTransformation(Transformation):
     def transform(self, df: DataFrame) -> DataFrame:
-        tls_columns = df.apply(self.run_analyzer, axis=1)
+        tls_columns = df['tls'].apply(self.run_analyzer, axis=1)
         df.drop(columns=['tls'], inplace=True)
-        df = concat([df, tls_columns], axis=1)
+        df = concat([df, tls_columns], axis=1, copy=False)
         return df
 
-    tls_version_ids = {
-        "TLSv1.0": 0,
-        "TLSv1.1": 1,
-        "TLSv1.2": 2,
-        "TLSv1.3": 3
-    }
-
-    tls_cipher_ids = {
-        'ECDHE-RSA-AES128-GCM-SHA256': 0,
-        'TLS_AES_128_GCM_SHA256': 1,
-        'TLS_AES_256_GCM_SHA384': 2,
-        'ECDHE-ECDSA-CHACHA20-POLY1305': 3,
-        'ECDHE-RSA-AES128-SHA': 3,
-        'ECDHE-RSA-CHACHA20-POLY1305': 4,
-        'ECDHE-RSA-AES256-GCM-SHA384': 5,
-        'ECDHE-ECDSA-AES128-GCM-SHA256': 6,
-        'TLS_CHACHA20_POLY1305_SHA256': 7,
-        'ECDHE-ECDSA-AES256-GCM-SHA384': 8,
-        'ECDHE-RSA-AES256-SHA384': 9,
-        'AES128-SHA256': 10,
-        'DHE-RSA-AES256-GCM-SHA384': 11,
-        'AES256-SHA256': 12,
-        'AES128-SHA': 13,
-        'DHE-RSA-AES128-GCM-SHA256': 14
-    }
-
     @classmethod
-    def run_analyzer(cls, row: Series) -> Series:
-        """
-        Run all analyzers on the row.
-        """
-        tls = row["tls"]
-        # date = row["tls_evaluated_on"]
+    def run_analyzer(cls, tls_data: dict) -> Series:
         date = todays_midnight_timestamp()
-        analysis_result = cls.analyze_tls(tls, date)
-        return Series(analysis_result['features'])
+        analysis_result = cls._make_tls_features(tls_data, date)
+        return Series(analysis_result)
 
     @classmethod
-    def cert_is_self_signed(cls, certificate):
-        authority_key_identifier = None
-        subject_key_identifier = None
+    def cert_is_self_signed(cls, certificate: Certificate):
+        try:
+            authority_key_identifier = certificate.extensions.get_extension_for_oid(
+                ExtensionOID.AUTHORITY_KEY_IDENTIFIER)
+            subject_key_identifier = certificate.extensions.get_extension_for_oid(
+                ExtensionOID.SUBJECT_KEY_IDENTIFIER)
+        except ExtensionNotFound:
+            return False
 
-        for extension in certificate['extensions']:
-            if extension['name'] == 'authorityKeyIdentifier':
-                authority_key_identifier = extension['value']
-            elif extension['name'] == 'subjectKeyIdentifier':
-                subject_key_identifier = extension['value']
-
-        # A certificate is self-signed if both identifiers are present and equal
         return authority_key_identifier == subject_key_identifier
 
     @classmethod
-    def encodePolicy(cls, oid):
+    def encodePolicy(cls, oid: ObjectIdentifier):
         if not oid:
             return 0
-        encoded = int(oid.replace('.', ''))
+        encoded = int(oid.dotted_string.replace('.', ''))
         return encoded % 2147483647
 
     @classmethod
-    def analyze_tls(cls, item: dict, collection_date: datetime.datetime) -> dict:
+    def _make_tls_features(cls, tls_data: dict, collection_date: datetime.datetime) -> dict:
         """
-        @param item: one tls field from database
+        @param tls_data: one tls field from database
         @param collection_date: date when the collection was made
-        @return: return {"success": True/False, "features": dict/None}
+        @return: a dictionary of features
         """
-        # We don't hane tls data for this domain
-        if item is None:
-            features = {
-                "tls_has_tls": False,  # Has TLS
-                "tls_chain_len": None,  # Length of certificate chain
-                "tls_is_self_signed": None,  # Is self-signed
-                "tls_root_authority_hash": None,  # Hash of root certificate authority
-                "tls_leaf_authority_hash": None,  # Hash of leaf certificate authority
-                "tls_negotiated_version_id": None,  # Evaluated TLS version
-                "tls_negotiated_cipher_id": None,  # Evaluated cipher
-                "tls_root_cert_validity_len": None,  # Total validity time of root certificate
-                # "tls_root_cert_lifetime": None,                 # How long was the root certificate valid at the time of collection
-                # NOTUSED# "tls_root_cert_validity_remaining": None, # Time to expire of root certificate from time of collection
-                "tls_leaf_cert_validity_len": None,  # Total validity time of leaf certificate
-                # "tls_leaf_cert_lifetime": None,                 # How long was the leaf certificate valid at the time of collection
-                # NOTUSED# "tls_leaf_cert_validity_remaining": None,  # Time to expire of leaf certificate from time of collection
-                # NOTUSED# "tls_mean_certs_validity_len": None,       # Mean validity time of all certificates in chain including root
-                "tls_broken_chain": None,  # Chain was never valid,
-                "tls_expired_chain": None,  # Chain already expired at time of collection
-                "tls_total_extension_count": None,  # Total number of extensions in certificate
-                "tls_critical_extensions": None,  # Total number of critical extensions in certificate
-                "tls_with_policies_crt_count": None,  # Number of certificates enforcing specific encryption policy
-                "tls_percentage_crt_with_policies": None,
-                # Percentage of certificates enforcing specific encryption policy
-                "tls_x509_anypolicy_crt_count": None,  # Number of certificates enforcing X509 - ANY policy
-                "tls_iso_policy_crt_count": None,
-                # Number of certificates supporting Joint ISO-ITU-T policy (OID root is 1)
-                "tls_joint_isoitu_policy_crt_count": None,
-                # Number of certificates supporting Joint ISO-ITU-T policy (OID root is 2)
-                # NOTUSED# "tls_iso_policy_oid": None,           # OID of ISO policy (if any or 0)
-                # NOTUSED# "tls_isoitu_policy_oid": None,        # OID of ISOITU policy (if any or 0)
-                # NOTUSED# "tls_unknown_policy_crt_count": None, # How many cerificates uses unknown (not X509v3, not version 1, not version 2) policy
-                "tls_subject_count": None,
-                # How many subjects can be found in SAN extension (can be linked to phishing)
-                "tls_server_auth_crt_count": None,
-                # How many certificates are used for server authentication (can be simultanously used for client authentication)
-                "tls_client_auth_crt_count": None,  # How many certificates are used for client authentication
-                # NOTUSED# "CA_certs_in_chain_count": None,      # Count of certificates that are also CA (can sign other certificates)
-                "tls_CA_certs_in_chain_ratio": None,  # Ration of CA certificates in chain
-                "tls_unique_SLD_count": None,  # Number of unique SLDs in SAN extension
-                # NOTUSED# "tls_common_names": None,             # List of common names in certificate chain (CATEGORICAL!)
-                "tls_common_name_count": None,  # Number of common names in certificate chain
-            }
 
-            return {"success": False, "features": features}
+        features = {
+            "tls_has_tls": False,  # Has TLS
+            "tls_chain_len": None,  # Length of certificate chain
+            "tls_is_self_signed": None,  # Is self-signed
+            "tls_root_authority_hash": None,  # Hash of root certificate authority
+            "tls_leaf_authority_hash": None,  # Hash of leaf certificate authority
+            "tls_negotiated_version_id": None,  # Evaluated TLS version
+            "tls_negotiated_cipher_id": None,  # Evaluated cipher
+            "tls_root_cert_validity_len": None,  # Total validity time of root certificate
+            # "tls_root_cert_lifetime": None,  # How long was the root certificate valid at the time of collection
+            # NOTUSED # "tls_root_cert_validity_remaining": None, # Time to expire of root certificate from time of collection
+            "tls_leaf_cert_validity_len": None,  # Total validity time of leaf certificate
+            # "tls_leaf_cert_lifetime": None,  # How long was the leaf certificate valid at the time of collection
+            # NOTUSED # "tls_leaf_cert_validity_remaining": None,  # Time to expire of leaf certificate from time of collection
+            # NOTUSED # "tls_mean_certs_validity_len": None,  # Mean validity time of all certificates in chain including root
+            "tls_broken_chain": None,  # Chain was never valid,
+            "tls_expired_chain": None,  # Chain already expired at time of collection
+            "tls_total_extension_count": None,  # Total number of extensions in certificate
+            "tls_critical_extensions": None,  # Total number of critical extensions in certificate
+            "tls_with_policies_crt_count": None,  # Number of certificates enforcing specific encryption policy
+            "tls_percentage_crt_with_policies": None,
+            # Percentage of certificates enforcing specific encryption policy
+            "tls_x509_anypolicy_crt_count": None,  # Number of certificates enforcing X509 - ANY policy
+            "tls_iso_policy_crt_count": None,
+            # Number of certificates supporting Joint ISO-ITU-T policy (OID root is 1)
+            "tls_joint_isoitu_policy_crt_count": None,
+            # Number of certificates supporting Joint ISO-ITU-T policy (OID root is 2)
+            # NOTUSED # "tls_iso_policy_oid": None,  # OID of ISO policy (if any or 0)
+            # NOTUSED # "tls_isoitu_policy_oid": None,  # OID of ISO/ITU policy (if any or 0)
+            # NOTUSED # "tls_unknown_policy_crt_count": None, # How many certificates uses unknown (not X509v3, not version 1, not version 2) policy
+            "tls_subject_count": None,
+            # How many subjects can be found in SAN extension (can be linked to phishing)
+            "tls_server_auth_crt_count": None,
+            # How many certificates are used for server authentication (can be simultaneously used for client authentication)
+            "tls_client_auth_crt_count": None,  # How many certificates are used for client authentication
+            # NOTUSED # "CA_certs_in_chain_count": None, # Count of certificates that are also CA (can sign other certificates)
+            "tls_CA_certs_in_chain_ratio": None,  # Ration of CA certificates in chain
+            "tls_unique_SLD_count": None,  # Number of unique SLDs in SAN extension
+            # NOTUSED # "tls_common_names": None,  # List of common names in certificate chain (CATEGORICAL!)
+            "tls_common_name_count": None,  # Number of common names in certificate chain
+        }
+
+        if tls_data is None:
+            return features
 
         # FEATURES
-        tls_version_id = cls.tls_version_ids.get(item['protocol'], 0)
-        tls_cipher_id = cls.tls_cipher_ids.get(item['cipher'], 0)
+        tls_version_id = _tls_version_ids.get(tls_data['protocol'], 0)
+        tls_cipher_id = _tls_cipher_ids.get(tls_data['cipher'], 0)
 
         # Certificate features #
         common_names = []
@@ -180,32 +176,52 @@ class TLSTransformation(Transformation):
         SLD_cnt = 0
 
         # Procesing of certificates and root especialy #
-        if len(item['certificates']) == 0:
-            return {"success": False, "error": "No certificates"}
+        if len(tls_data['certificates']) == 0:
+            return features
+
         mean_len = 0
         cert_counter = 0
-        for certificate in item['certificates']:
+
+        cert: Certificate
+        for cert in tls_data['certificates']:
             cert_counter += 1
 
-            organization = certificate['organization'] if certificate['organization'] and certificate[
-                'organization'] is not None else ""
+            valid_from = cert.not_valid_before
+            valid_to = cert.not_valid_after
+            if valid_from is None or valid_to is None:
+                valid_from_str, valid_to_str, validity_len = None, None, None
+            else:
+                valid_from_str = valid_from.strftime("%Y%m%d%H%M%S")
+                valid_to_str = valid_to.strftime("%Y%m%d%H%M%S")
+                validity_len = int((valid_to - valid_from).total_seconds())
 
-            validity_len = round(int(certificate['valid_len']) / (60 * 60 * 24))
+            # Parse issuer info
+            issuer = cert.issuer
+            common_name, organization, country = None, None, None
+            for attr in issuer:
+                if attr.oid == NameOID.COMMON_NAME:
+                    common_name = attr.value
+                elif attr.oid == NameOID.ORGANIZATION_NAME:
+                    organization = attr.value
+                elif attr.oid == NameOID.COUNTRY_NAME:
+                    country = attr.value
+
+            validity_len = round(int(validity_len) / (60 * 60 * 24))
 
             if validity_len < 0:
                 broken_chain = 1
                 break
 
             try:
-                lifetime = round((collection_date - certificate['validity_start']).total_seconds() / (60 * 60 * 24))
+                lifetime = round((collection_date - valid_from).total_seconds() / (60 * 60 * 24))
             except OutOfBoundsDatetime:
-                print(certificate['validity_start'], collection_date)
+                # print(certificate['validity_start'], collection_date)
                 lifetime = -1
 
             try:
-                time_to_expire = round((certificate['validity_end'] - collection_date).total_seconds() / (60 * 60 * 24))
+                time_to_expire = round((valid_to - collection_date).total_seconds() / (60 * 60 * 24))
             except OutOfBoundsDatetime:
-                print(certificate['validity_end'], collection_date)
+                # print(certificate['validity_end'], collection_date)
                 time_to_expire = -1
 
             if time_to_expire < 0:
@@ -216,7 +232,7 @@ class TLSTransformation(Transformation):
                 leaf_cert_organization = organization
                 leaf_crt_validity_len = validity_len
                 leaf_crt_lifetime = lifetime
-                if cls.cert_is_self_signed(certificate):
+                if cls.cert_is_self_signed(cert):
                     is_self_signed = 1
 
                 # leaf_cert_time_to_live = time_to_expire
@@ -300,47 +316,29 @@ class TLSTransformation(Transformation):
         # percentage_of_policies = round(percentage_of_policies, 1)
 
         # Return dictionary with all features
-        features = {
-            "tls_has_tls": True,  # Has TLS
-            "tls_chain_len": item['count'],  # Length of certificate chain
-            "tls_is_self_signed": is_self_signed,  # Is self-signed
-            "tls_root_authority_hash": hash_md5(root_cert_organization),  # Hash of root certificate authority
-            "tls_leaf_authority_hash": hash_md5(leaf_cert_organization),  # Hash of leaf certificate authority
-            "tls_negotiated_version_id": tls_version_id,  # Evaluated TLS version
-            "tls_negotiated_cipher_id": tls_cipher_id,  # Evaluated cipher
-            "tls_root_cert_validity_len": root_crt_validity_len,  # Total validity time of root certificate
-            # NOGO!# "tls_root_cert_lifetime": root_crt_lifetime,         # How long was the root certificate valid at the time of collection
-            # NOTUSED# "tls_root_cert_validity_remaining": root_crt_time_to_expire, # Time to expire of root certificate from time of collection
-            "tls_leaf_cert_validity_len": leaf_crt_validity_len,  # Total validity time of leaf certificate
-            # NOGO!# "tls_leaf_cert_lifetime": leaf_crt_lifetime,         # How long was the leaf certificate valid at the time of collection
-            # NOTUSED# "tls_leaf_cert_validity_remaining": leaf_cert_time_to_live,  # Time to expire of leaf certificate from time of collection
-            # NOTUSED# "tls_mean_certs_validity_len": mean_cert_len,      # Mean validity time of all certificates in chain including root
-            "tls_broken_chain": broken_chain,  # Chain was never valid,
-            "tls_expired_chain": expired_chain,  # Chain already expired at time of collection
-            "tls_total_extension_count": total_extension_count,  # Total number of extensions in certificate
-            "tls_critical_extensions": critical_extensions,  # Total number of critical extensions in certificate
-            "tls_with_policies_crt_count": any_policy_cnt,
-            # Number of certificates enforcing specific encryption policy
-            "tls_percentage_crt_with_policies": percentage_of_policies,
-            # Percentage of certificates enforcing specific encryption policy
-            "tls_x509_anypolicy_crt_count": X_509_used_cnt,  # Number of certificates enforcing X509 - ANY policy
-            "tls_iso_policy_crt_count": iso_policy_used_cnt,
-            # Number of certificates supporting Joint ISO-ITU-T policy (OID root is 1)
-            "tls_joint_isoitu_policy_crt_count": isoitu_policy_used_cnt,
-            # Number of certificates supporting Joint ISO-ITU-T policy (OID root is 2)
-            # NOTUSED# "tls_iso_policy_oid": encodePolicy(iso_policy_oid),          # OID of ISO policy (if any or 0)
-            # NOTUSED# "tls_isoitu_policy_oid": encodePolicy(isoitu_policy_oid),    # OID of ISOITU policy (if any or 0)
-            # NOTUSED# "tls_unknown_policy_crt_count": unknown_policy_cnt,# How many cerificates uses unknown (not X509v3, not version 1, not version 2) policy
-            "tls_subject_count": subject_count,
-            # How many subjects can be found in SAN extension (can be linked to phishing)
-            "tls_server_auth_crt_count": server_auth,
-            # How many certificates are used for server authentication (can be simultanously used for client authentication)
-            "tls_client_auth_crt_count": client_auth,  # How many certificates are used for client authentication
-            # NOTUSED# "CA_certs_in_chain_count": CA_count,               # Count of certificates that are also CA (can sign other certificates)
-            "tls_CA_certs_in_chain_ratio": CA_ratio,  # Ration of CA certificates in chain
-            "tls_unique_SLD_count": SLD_cnt,  # Number of unique SLDs in SAN extension
-            # NOTUSED# "tls_common_names": common_names,                  # List of common names in certificate chain (CATEGORICAL!)
-            "tls_common_name_count": len(common_names),  # Number of common names in certificate chain
-        }
+        features["tls_has_tls"] = True
+        features["tls_chain_len"] = tls_data['count']
+        features["tls_is_self_signed"] = is_self_signed
+        features["tls_root_authority_hash"] = hash_md5(root_cert_organization)
+        features["tls_leaf_authority_hash"] = hash_md5(leaf_cert_organization)
+        features["tls_negotiated_version_id"] = tls_version_id
+        features["tls_negotiated_cipher_id"] = tls_cipher_id
+        features["tls_root_cert_validity_len"] = root_crt_validity_len
+        features["tls_leaf_cert_validity_len"] = leaf_crt_validity_len
+        features["tls_broken_chain"] = broken_chain
+        features["tls_expired_chain"] = expired_chain
+        features["tls_total_extension_count"] = total_extension_count
+        features["tls_critical_extensions"] = critical_extensions
+        features["tls_with_policies_crt_count"] = any_policy_cnt
+        features["tls_percentage_crt_with_policies"] = percentage_of_policies
+        features["tls_x509_anypolicy_crt_count"] = X_509_used_cnt
+        features["tls_iso_policy_crt_count"] = iso_policy_used_cnt
+        features["tls_joint_isoitu_policy_crt_count"] = isoitu_policy_used_cnt
+        features["tls_subject_count"] = subject_count
+        features["tls_server_auth_crt_count"] = server_auth
+        features["tls_client_auth_crt_count"] = client_auth
+        features["tls_CA_certs_in_chain_ratio"] = CA_ratio
+        features["tls_unique_SLD_count"] = SLD_cnt
+        features["tls_common_name_count"] = len(common_names)
 
-        return {"success": True, "features": features}
+        return features
