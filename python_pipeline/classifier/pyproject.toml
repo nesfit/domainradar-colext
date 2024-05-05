@@ -15,6 +15,7 @@ packages = [
 [tool.poetry.dependencies]
 python = "^3.11"
 faust-streaming = { extras = ["rocksdict"], version = "^0.11.0" }
+pandas = "^2.2.2"
 classifiers = { git = "git@github.com:nesfit/domainradar-clf.git", branch = "main" }
 
 [tool.poetry.group.dev.dependencies]

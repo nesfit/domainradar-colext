@@ -14,6 +14,9 @@ domrad-python-classifier-unit = { path = "./classifier/", develop = true }
 domrad-python-collectors = { path = "./collector/", develop = true }
 domrad-python-extractor = { path = "./extractor/", develop = true }
 
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0.0"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
