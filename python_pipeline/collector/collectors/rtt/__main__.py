@@ -1,4 +1,4 @@
-from common.util import ensure_data_dir
+from common import ensure_data_dir
 from .rtt import rtt_app
 
 if __name__ == '__main__':

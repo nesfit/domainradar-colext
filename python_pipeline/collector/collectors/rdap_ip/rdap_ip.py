@@ -10,10 +10,10 @@ from whodap import IPv4Client, IPv6Client
 from whodap.response import IPv4Response, IPv6Response
 from whodap.errors import *
 
+from common import read_config, make_app, serialize_ip_to_process
+from common.models import IPToProcess, IPProcessRequest, RDAPIPResult, RDAPDomainResult
 import common.result_codes as rc
-from common.models import *
-from common.util import read_config, make_app, serialize_ip_to_process
-from collector.util import make_rdap_ssl_context, timestamp_now_millis, should_omit_ip
+from collectors.util import make_rdap_ssl_context, timestamp_now_millis, should_omit_ip
 
 COLLECTOR = "rdap_ip"
 

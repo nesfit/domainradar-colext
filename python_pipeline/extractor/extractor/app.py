@@ -2,17 +2,14 @@
 __author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
 
 import io
+from json import loads, JSONDecodeError
 from typing import Sequence
 
 import faust.events
 from faust import EventT
 from faust.serializers import codecs
 
-from common.custom_codecs import StringCodec
-from common.util import read_config, make_app
-
-from json import loads, dumps, JSONDecodeError
-
+from common import read_config, make_app, StringCodec
 from . import extractor
 
 codecs.register("str", StringCodec())

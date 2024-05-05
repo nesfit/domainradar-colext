@@ -1,0 +1,34 @@
+[tool.poetry]
+package-mode = true
+name = "domrad-python-extractor"
+version = "0.1.0"
+description = "DomainRadar Python pipeline – the feature extractor"
+authors = ["Ondřej Ondryáš <xondry02@stud.fit.vut.cz>"]
+license = "MIT"
+repository = "https://github.com/nesfit/domainradar-colext"
+readme = "../../README.md"
+packages = [
+    { include = "extractor" },
+    { include = "common", from = ".." }
+]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+faust-streaming = { extras = ["rocksdict"], version = "^0.11.0" }
+tldextract = "^5.1.2"
+pandas = "^2.2.2"
+whoisit = "^2.7.6"
+cryptography = "^42.0.5"
+python-dateutil = "^2.9.0.post0"
+feather-format = "^0.4.1"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0.0"
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+testpaths = ["tests"]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

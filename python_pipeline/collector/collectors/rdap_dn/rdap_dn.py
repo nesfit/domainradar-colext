@@ -13,11 +13,10 @@ from whodap import DNSClient
 from whodap.response import DomainResponse
 from whodap.errors import *
 
+from common import read_config, make_app, StringCodec
+from common.models import RDAPRequest, RDAPDomainResult
 import common.result_codes as rc
-from common.custom_codecs import StringCodec
-from common.models import *
-from common.util import read_config, make_app
-from collector.util import fetch_entities, extract_known_tld, make_rdap_ssl_context, timestamp_now_millis
+from collectors.util import fetch_entities, extract_known_tld, make_rdap_ssl_context, timestamp_now_millis
 
 codecs.register("str", StringCodec())
 

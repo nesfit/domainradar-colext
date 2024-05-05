@@ -11,7 +11,7 @@ from whoisit.errors import ParseError
 from whoisit.parser import ParseIPNetwork, ParseDomain
 
 from cryptography.x509 import Certificate
-from common.util import get_safe
+from common import get_safe
 
 
 # omitted:

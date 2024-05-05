@@ -1,10 +1,8 @@
-from json import dumps
-
 from icmplib import async_ping, ICMPSocketError, DestinationUnreachable, TimeExceeded
 
-from collector.util import timestamp_now_millis, should_omit_ip
-from common.util import read_config, make_app, serialize_ip_to_process
-from common.models import *
+from collectors.util import timestamp_now_millis, should_omit_ip
+from common import read_config, make_app, serialize_ip_to_process
+from common.models import IPToProcess, IPProcessRequest, RTTResult, RTTData
 import common.result_codes as rc
 
 COLLECTOR = "rtt"
