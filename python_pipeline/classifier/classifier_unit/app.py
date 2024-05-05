@@ -5,6 +5,7 @@ import io
 
 from faust.serializers import codecs
 import pandas as pd
+import pyarrow as pa
 from pandas import DataFrame
 
 from common import read_config, make_app, StringCodec
@@ -28,7 +29,8 @@ USE_BATCHING = BATCH_SIZE > 1 and BATCH_TIMEOUT != 0
 
 # The input and output topics
 topic_to_process = classifier_app.topic('feature_vectors', key_type=None,
-                                        value_type=bytes, allow_empty=False)
+                                        value_type=bytes, value_serializer='raw',
+                                        allow_empty=False)
 
 topic_processed = classifier_app.topic('classification_results', key_type=str,
                                        value_type=bytes)
@@ -37,16 +39,12 @@ topic_processed = classifier_app.topic('classification_results', key_type=str,
 # The main loop
 @classifier_app.agent(topic_to_process, concurrency=CONCURRENCY)
 async def process_entries(stream):
-    buf = io.BytesIO()
-    current_df = None
-
     if USE_BATCHING:
+        current_df = None
         async for values_seq in stream.take(BATCH_SIZE, within=BATCH_TIMEOUT):
             value: bytes
             for value in values_seq:
-                buf.seek(0)
-                buf.write(value)
-                df = pd.read_feather(buf)
+                df = pd.read_feather(pa.BufferReader(value))
                 if current_df is None:
                     current_df = df
                 else:
@@ -56,9 +54,7 @@ async def process_entries(stream):
     else:
         value: bytes
         async for value in stream:
-            buf.seek(0)
-            buf.write(value)
-            df = pd.read_feather(buf)
+            df = pd.read_feather(pa.BufferReader(value))
             await process_dataframe(df)
 
 

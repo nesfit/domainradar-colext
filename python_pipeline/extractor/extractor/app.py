@@ -33,7 +33,8 @@ BATCH_TIMEOUT = component_config.get("batch_timeout", 5)
 # The input and output topics
 # Let's deserialize the result into a dict manually
 topic_to_process = extractor_app.topic('all_collected_data', key_type=str,
-                                       value_type=bytes, allow_empty=True)
+                                       value_type=bytes, value_serializer='raw',
+                                       allow_empty=True)
 
 topic_processed = extractor_app.topic('feature_vectors', key_type=None,
                                       value_type=bytes)
