@@ -558,6 +558,8 @@ develop = true
 [package.dependencies]
 classifiers = {git = "git@github.com:nesfit/domainradar-clf.git", branch = "main"}
 faust-streaming = {version = "^0.11.0", extras = ["rocksdict"]}
+pandas = "^2.2.2"
+pyarrow = "^16.0.0"
 
 [package.source]
 type = "directory"
