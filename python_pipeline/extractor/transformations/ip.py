@@ -105,3 +105,9 @@ class IPTransformation(Transformation):
             *df["ip_data"].apply(make_asn_features))
 
         return df
+
+    def get_new_column_names(self) -> list[str]:
+        return [
+            "ip_count", "ip_mean_average_rtt", "ip_v4_ratio", "ip_a_aaaa_to_all_ratio", "ip_entropy",
+            "ip_as_address_entropy", "ip_asn_entropy", "ip_distinct_as_count"
+        ]

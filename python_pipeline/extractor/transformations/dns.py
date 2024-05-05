@@ -179,3 +179,15 @@ class DNSTransformation(Transformation):
             *df["dns_email_extras"].apply(lambda e: (int(e["spf"] or 0), int(e["dkim"] or 0), int(e["dmarc"] or 0))))
 
         return df
+
+    def get_new_column_names(self) -> list[str]:
+        return [
+            "dns_zone_level", "dns_zone_digit_count", "dns_zone_len", "dns_zone_entropy", "dns_resolved_record_types",
+            "dns_ttl_avg", "dns_ttl_stdev", "dns_ttl_low", "dns_ttl_mid", "dns_ttl_distinct_count", "dns_SOA_tmp",
+            "dns_soa_primary_ns_level", "dns_soa_primary_ns_digit_count", "dns_soa_primary_ns_len",
+            "dns_soa_primary_ns_entropy", "dns_soa_email_level", "dns_soa_email_digit_count", "dns_soa_email_len",
+            "dns_soa_email_entropy", "dns_soa_refresh", " dns_soa_retry", "dns_soa_expire", "dns_soa_min_ttl",
+            "dns_domain_name_in_mx", "dns_mx_avg_len", "dns_mx_avg_entropy", "dns_txt_avg_len", " dns_txt_avg_entropy",
+            "dns_txt_external_verification_score", "dns_txt_spf_exists", "dns_txt_dkim_exists", "dns_txt_dmarc_exists",
+            *[f'dns_{c}_count' for c in ['A', 'AAAA', 'MX', 'NS', 'TXT']]
+        ]

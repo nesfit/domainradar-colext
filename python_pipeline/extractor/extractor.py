@@ -4,8 +4,10 @@ Provides the extract_features function that takes raw data, passes it through th
 __author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
 
 from collections import OrderedDict
+from io import BytesIO
 from typing import Iterable
 
+import pandas as pd
 from pandas import DataFrame
 
 from .compat import CompatibilityTransformation
@@ -34,6 +36,7 @@ _all_transformations = OrderedDict([
 
 _enabled_transformations: list[Transformation] = []
 _compat_transformation = CompatibilityTransformation()
+_target_features: dict = {}
 
 
 def init_transformations(config: dict):
@@ -42,7 +45,7 @@ def init_transformations(config: dict):
     If the key is not present, all transformations are enabled.
     :param config: The configuration dictionary.
     """
-    global _enabled_transformations
+    global _enabled_transformations, _target_features
 
     enabled_transformation_ids: Iterable[str] | None = config.get("enabled_transformations", None)
 
@@ -54,20 +57,31 @@ def init_transformations(config: dict):
             if tid in enabled_transformation_ids:
                 _enabled_transformations.append(transformation(config))
 
+    target_features = []
+    for transformation in _enabled_transformations:
+        target_features = target_features + transformation.get_new_column_names()
+    _target_features = {col: None for col in target_features}
 
-def extract_features(raw_data: Iterable[dict]) -> Iterable[dict]:
+
+def extract_features(raw_data: Iterable[dict], out_buffer: BytesIO):
     """
     Extracts features from the raw data by passing it through the transformations enabled in the configuration.
     The `init_transformations` function must be called once before this function can be used.
     :param raw_data: An iterable of dictionaries, each representing one entry of raw data.
-    :return: An iterable of dictionaries, each representing one feature vector.
+    :param out_buffer: A byte buffer to serialize the resulting DataFrame into.
     """
     # Transform the raw data into a format compatible with the transformations
     raw_data_compatible = (_compat_transformation.transform(x) for x in raw_data)
     # Create a DataFrame where each row is one entry from the raw_data iterable
     data_frame = DataFrame(raw_data_compatible, copy=False)
+    # Create new columns
+    new_cols = DataFrame(columns=list(_target_features.keys()))
+    data_frame = pd.concat([data_frame, new_cols], axis=1)
+    if data_frame.columns.has_duplicates:
+        raise ValueError("Invalid input: after adding the features, the DataFrame contains duplicate columns.")
     # Apply the transformations
     for transformation in _enabled_transformations:
         data_frame = transformation.transform(data_frame)
-    # Return a list of dictionaries
-    return data_frame.to_dict(orient="records")
+    # Serialize the DataFrame in to the provided buffer
+    # noinspection PyTypeChecker
+    return data_frame.to_feather(out_buffer)

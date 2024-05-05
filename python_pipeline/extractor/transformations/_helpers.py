@@ -26,7 +26,7 @@ def todays_midnight_timestamp():
     today = datetime.date.today()
 
     # Create a datetime object for midnight of today (in UTC)
-    midnight = datetime.datetime.combine(today, datetime.time(tzinfo=datetime.timezone.utc))
+    midnight = datetime.datetime.combine(today, datetime.time(tzinfo=datetime.UTC))
 
     # return midnight_timestamp
     return midnight

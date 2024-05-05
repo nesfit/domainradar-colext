@@ -438,21 +438,18 @@ class LexicalTransformation(Transformation):
         Output: DF with lexical features derived from domain_name added
         """
 
-        # The dataframe tends to get fragmented here; this should defragment it
-        df = df.copy(True)
-
         df['lex_name_len'] = df['domain_name'].apply(len)
-        # NOTUSED# df['lex_dots_count'] = df['domain_name'].apply(lambda x: x.count('.'))   # (with www and TLD) :-> lex_sub_count used instead
-        # NOTUSED# df['lex_subdomain_len'] = df['domain_name'].apply(lambda x: sum([len(y) for y in x.split('.')]))  # without dots
-        # NOTUSED# df['lex_digit_count'] = df['domain_name'].apply(lambda x: sum([1 for y in x if y.isdigit()]))
+        # NOTUSED # df['lex_dots_count'] = df['domain_name'].apply(lambda x: x.count('.'))   # (with www and TLD) :-> lex_sub_count used instead
+        # NOTUSED # df['lex_subdomain_len'] = df['domain_name'].apply(lambda x: sum([len(y) for y in x.split('.')]))  # without dots
+        # NOTUSED # df['lex_digit_count'] = df['domain_name'].apply(lambda x: sum([1 for y in x if y.isdigit()]))
         df['lex_has_digit'] = df['domain_name'].apply(lambda x: 1 if sum([1 for y in x if y.isdigit()]) > 0 else 0)
         df['lex_phishing_keyword_count'] = df['domain_name'].apply(
             lambda x: sum(1 for w in phishing_keywords if w in x))
         df['lex_benign_keyword_count'] = df['domain_name'].apply(lambda x: sum(1 for w in benign_keywords if w in x))
-        # NOTUSED# df['lex_vowel_count'] = df['domain_name'].apply(lambda x: vowel_count(x))
-        # NOTUSED# df['lex_underscore_hyphen_count'] = df['domain_name'].apply(lambda x: total_underscores_and_hyphens(x))
+        # NOTUSED # df['lex_vowel_count'] = df['domain_name'].apply(lambda x: vowel_count(x))
+        # NOTUSED # df['lex_underscore_hyphen_count'] = df['domain_name'].apply(lambda x: total_underscores_and_hyphens(x))
         df['lex_consecutive_chars'] = df['domain_name'].apply(lambda x: consecutive_chars(x))
-        # NOTUSED# df['lex_norm_entropy'] = df['domain_name'].apply(get_normalized_entropy)              # Normalized entropy od the domain name
+        # NOTUSED # df['lex_norm_entropy'] = df['domain_name'].apply(get_normalized_entropy)              # Normalized entropy od the domain name
 
         # Save temporary domain name parts for lex feature calculation
         df['tmp_tld'] = df['domain_name'].apply(lambda x: tldextract.extract(x).suffix)
@@ -583,3 +580,24 @@ class LexicalTransformation(Transformation):
         # Drop temporary columns
         df.drop(columns=['tmp_tld', 'tmp_sld', 'tmp_stld', 'tmp_concat_subdomains', 'tmp_part_lengths'], inplace=True)
         return df
+
+    def get_new_column_names(self) -> list[str]:
+        return [
+            "tmp_tld", "tmp_sld", "tmp_stld", "tmp_concat_subdomains", "tmp_part_lengths",
+            "lex_name_len", "lex_has_digit", "lex_phishing_keyword_count", "lex_benign_keyword_count",
+            "lex_consecutive_chars", "lex_tld_len", "lex_tld_abuse_score", "lex_tld_hash", "lex_sld_len",
+            "lex_sld_norm_entropy", "lex_sld_digit_count", "lex_sld_digit_ratio", "lex_sld_phishing_keyword_count",
+            "lex_sld_vowel_count", "lex_sld_vowel_ratio", "lex_sld_consonant_count", "lex_sld_consonant_ratio",
+            "lex_sld_non_alphanum_count", "lex_sld_non_alphanum_ratio", "lex_sld_hex_count", "lex_sld_hex_ratio",
+            "lex_sub_count", "lex_stld_unique_char_count", "lex_begins_with_digit", "lex_www_flag",
+            "lex_sub_max_consonant_len", "lex_sub_norm_entropy", "lex_sub_digit_count", "lex_sub_digit_ratio",
+            "lex_sub_vowel_count", "lex_sub_vowel_ratio", "lex_sub_consonant_count", "lex_sub_consonant_ratio",
+            "lex_sub_non_alphanum_count", "lex_sub_non_alphanum_ratio", "lex_sub_hex_count", "lex_sub_hex_ratio",
+            "lex_phishing_bigram_matches", "lex_phishing_trigram_matches", "lex_phishing_tetragram_matches",
+            "lex_phishing_pentagram_matches", "lex_malware_bigram_matches", "lex_malware_trigram_matches",
+            "lex_malware_tetragram_matches", "lex_dga_bigram_matches", "lex_dga_trigram_matches",
+            "lex_dga_tetragram_matches", "lex_avg_part_len", "lex_stdev_part_lens", "lex_longest_part_len",
+            "lex_short_part_count", "lex_medium_part_count", "lex_long_part_count", "lex_superlong_part_count",
+            "lex_shortest_sub_len", "lex_ipv4_in_domain", "lex_has_trusted_suffix", "lex_has_wellknown_suffix",
+            "lex_has_cdn_suffix", "lex_has_vps_suffix", "lex_has_img_suffix", "lex_suffix_score"
+        ]

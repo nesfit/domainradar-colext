@@ -20,3 +20,7 @@ class Transformation(abc.ABC):
     @abc.abstractmethod
     def transform(self, df: DataFrame) -> DataFrame:
         raise NotImplementedError("transform method must be implemented in the subclass")
+
+    @abc.abstractmethod
+    def get_new_column_names(self) -> list[str]:
+        raise NotImplementedError("get_new_column_names method must be implemented in the subclass")

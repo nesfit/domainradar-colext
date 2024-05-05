@@ -203,3 +203,9 @@ class GeoTransformation(Transformation):
         df["geo_countries_hash"] = df["countries"].apply(hash_countries)
 
         return df
+
+    def get_new_column_names(self) -> list[str]:
+        return ['geo_countries_count', 'geo_continents_count', 'geo_malic_host_country', 'geo_lat_stdev',
+                'geo_lon_stdev', 'geo_mean_lat', 'geo_mean_lon', 'geo_min_lat', 'geo_max_lat', 'geo_min_lon',
+                'geo_max_lon', 'geo_lat_range', 'geo_lon_range', 'geo_centroid_lat', 'geo_centroid_lon',
+                'geo_estimated_area', 'geo_continent_hash', 'geo_countries_hash']

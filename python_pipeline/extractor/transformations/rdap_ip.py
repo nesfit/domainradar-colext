@@ -106,3 +106,12 @@ class RDAPAddressTransformation(Transformation):
             = zip(*df["ip_data"].apply(get_rdap_ip_features))
 
         return df
+
+    def get_new_column_names(self) -> list[str]:
+        return [
+            "rdap_ip_v4_count", "rdap_ip_v6_count",
+            "rdap_ip_shortest_v4_prefix_len", "rdap_ip_longest_v4_prefix_len",
+            "rdap_ip_shortest_v6_prefix_len", "rdap_ip_longest_v6_prefix_len",
+            "rdap_ip_avg_admin_name_len", "rdap_ip_avg_admin_name_entropy",
+            "rdap_ip_avg_admin_email_len", "rdap_ip_avg_admin_email_entropy"
+        ]

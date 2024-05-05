@@ -30,3 +30,6 @@ class DropColumnsTransformation(Transformation):
     def transform(self, df: DataFrame) -> DataFrame:
         df.drop(columns=_to_drop, errors='ignore', inplace=True)
         return df
+
+    def get_new_column_names(self) -> list[str]:
+        return []
