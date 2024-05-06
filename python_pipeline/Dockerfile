@@ -1,7 +1,7 @@
 ARG TARGET_UNIT="collector"
+ARG TARGET_MODULE="collectors.rtt"
 
 FROM python:3.11-slim-bookworm AS python-base
-
 ENV PYTHONUNBUFFERED=1 \
     # prevents python creating .pyc files
     PYTHONDONTWRITEBYTECODE=1 \
@@ -17,13 +17,11 @@ ENV PYTHONUNBUFFERED=1 \
     POETRY_CACHE_DIR="/tmp/poetry_cache" \
     PYSETUP_PATH="/opt/pysetup" \
     VENV_PATH="/opt/pysetup/.venv"
-
 ENV PATH="$POETRY_HOME/bin:$VENV_PATH/bin:$PATH"
 
-FROM python-base AS builder
-# Consume the build argument
-ARG TARGET_UNIT
+FROM python-base AS poetry-base
 
+# Install packages
 RUN apt-get update && \
     apt-get install --no-install-recommends -y \
     # deps for installing poetry
@@ -38,6 +36,9 @@ RUN apt-get update && \
 RUN --mount=type=cache,target=$POETRY_CACHE_DIR \
     curl -sSL https://install.python-poetry.org | python3 -
 
+FROM poetry-base AS builder
+ARG TARGET_UNIT
+
 # Copy project requirement files here to ensure they will be cached
 WORKDIR $PYSETUP_PATH
 COPY ${TARGET_UNIT}/pyproject.toml ./
@@ -49,11 +50,15 @@ RUN --mount=type=cache,target=$POETRY_CACHE_DIR \
 FROM python-base AS production
 # Consume the build argument
 ARG TARGET_UNIT
+ARG TARGET_MODULE
+ENV TARGET_MODULE=${TARGET_MODULE}
+ENV APP_DATADIR=/app/faust_data
 
 COPY --from=builder $PYSETUP_PATH $PYSETUP_PATH
-COPY ./${TARGET_UNIT} /app/${TARGET_UNIT}
+COPY ./${TARGET_UNIT} /app
 COPY ./common /app/common
 COPY ./docker_entrypoint.sh /app/docker_entrypoint.sh
+RUN mkdir /app/faust_data
 
 WORKDIR /app
-ENTRYPOINT ["/bin/bash", "docker_entrypoint.sh"]
+ENTRYPOINT ./docker_entrypoint.sh $TARGET_MODULE
