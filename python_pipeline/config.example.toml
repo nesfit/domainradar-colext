@@ -29,3 +29,6 @@ privileged_mode = false
 [extractor]
 app_id = "domrad-extractor"
 data_dir = "/path/to/data"
+
+[classifier-unit]
+app_id = "domrad-classifier-unit"
