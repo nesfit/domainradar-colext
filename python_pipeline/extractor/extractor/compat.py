@@ -3,7 +3,7 @@ into a format that can be used by the "legacy" transformations."""
 __author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
 
 import base64
-import datetime
+from datetime import datetime, UTC
 
 import cryptography.x509
 from whoisit import Bootstrap
@@ -83,12 +83,12 @@ class CompatibilityTransformation:
         return res
 
     @staticmethod
-    def _ensure_utc_datetime(dt: datetime.datetime | None) -> datetime.datetime:
+    def _ensure_utc_datetime(dt: datetime | None) -> datetime | None:
         if dt is None:
             return None
         if dt.tzinfo is None:
-            return dt.replace(tzinfo=datetime.timezone.utc)
-        return dt.astimezone(datetime.timezone.utc)
+            return dt.replace(tzinfo=UTC)
+        return dt.astimezone(UTC)
 
     @staticmethod
     def _flatten_ip_data(ip_data: list):
@@ -202,9 +202,9 @@ class CompatibilityTransformation:
         # TODO
         return {
             "entities": [],
-            "registration_date": 0,
-            "expiration_date": 0,
-            "last_changed_date": 0
+            "registration_date": datetime.fromtimestamp(0, UTC),
+            "expiration_date": datetime.fromtimestamp(0, UTC),
+            "last_changed_date": datetime.fromtimestamp(0, UTC)
         }
 
     def _parse_rdap_dn(self, dn: str, rdap_data: dict | None, rdap_entities: list | None,
@@ -252,9 +252,9 @@ class CompatibilityTransformation:
             ip = ip_obj["ip"]
             collectors_results = ip_results.get(ip, {})
             geo_asn = collectors_results.get("geo_asn", {}).get("data", {})
-            rdap = collectors_results.get("rdap_ip").get("data", {})
+            rdap = collectors_results.get("rdap_ip", {}).get("data", {})
             rdap_parsed = {}
-            if rdap is not None:
+            if len(rdap) != 0:
                 rdap_parser = ParseIPNetwork(self.whoisit_bootstrap, rdap, ip, True)
                 try:
                     rdap_parsed = rdap_parser.parse()
@@ -276,14 +276,14 @@ class CompatibilityTransformation:
                 },
                 "rdap": {
                     "ip_version": t_ip_ver(rdap.get("ipVersion", None)),
-                    "entities": rdap_parsed.get("entities"),
-                    "network": rdap_parsed.get("network")
-                },
+                    "entities": rdap_parsed.get("entities", None),
+                    "network": rdap_parsed.get("network", None)
+                } if ("ipVersion" in rdap) or ("entities" in rdap_parsed) else None,
                 "geo": {
                     "country_code": geo_asn.get("countryCode", None),
                     "latitude": geo_asn.get("latitude", None),
                     "longitude": geo_asn.get("longitude", None)
-                },
+                } if "countryCode" in geo_asn else None,
                 "average_rtt": self._make_ip_average_rtt(collectors_results),
                 "nerd_rep": get_safe(collectors_results, "nerd.data.reputation") or -1
             }
