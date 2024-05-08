@@ -40,6 +40,7 @@ import java.util.stream.Stream;
 
 public class DNSCollector extends BiProducerStandaloneCollector<String, DNSProcessRequest, String, DNSResult,
         IPToProcess, Void> {
+    public static String NAME = "dns-tls";
     private static final org.slf4j.Logger Logger = LoggerFactory.getLogger(DNSCollector.class);
 
     private final ExecutorService _executor;
@@ -243,7 +244,7 @@ public class DNSCollector extends BiProducerStandaloneCollector<String, DNSProce
 
     @Override
     public @NotNull String getName() {
-        return "dns-tls";
+        return NAME;
     }
 
     @Override

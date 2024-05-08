@@ -27,7 +27,7 @@ import java.util.ArrayList;
 import java.util.Properties;
 
 public class GeoIPCollector implements CommonResultIPCollector<GeoIPData> {
-    public final String NAME = "geo_asn";
+    public static final String NAME = "geo_asn";
 
     private final ObjectMapper _jsonMapper;
     private final TypeReference<CommonIPResult<GeoIPData>> _resultTypeRef = new TypeReference<>() {

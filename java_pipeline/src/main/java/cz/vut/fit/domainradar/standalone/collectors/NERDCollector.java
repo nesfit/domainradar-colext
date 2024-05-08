@@ -30,7 +30,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class NERDCollector extends IPStandaloneCollector<NERDData> {
-    public final String NAME = "nerd";
+    public static final String NAME = "nerd";
     private static final String NERD_BASE = "https://nerd.cesnet.cz/nerd/api/v1/";
 
     private final Duration _httpTimeout;

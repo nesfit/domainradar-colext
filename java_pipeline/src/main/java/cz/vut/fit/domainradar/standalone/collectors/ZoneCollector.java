@@ -24,6 +24,7 @@ import java.util.concurrent.Executors;
 
 public class ZoneCollector extends TriProducerStandaloneCollector<String, ZoneProcessRequest, String, ZoneResult,
         String, DNSProcessRequest, String, RDAPDomainProcessRequest> {
+    public static final String NAME = "zone";
     private final ExecutorService _executor;
     private final InternalDNSResolver _dns;
 
@@ -85,7 +86,7 @@ public class ZoneCollector extends TriProducerStandaloneCollector<String, ZonePr
 
     @Override
     public @NotNull String getName() {
-        return "zone";
+        return NAME;
     }
 
     @Override
