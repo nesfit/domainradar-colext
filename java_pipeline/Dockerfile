@@ -13,10 +13,14 @@ WORKDIR /src
 COPY pom.xml ./
 RUN --mount=type=cache,target=/root/.m2/ mvn clean && mvn dependency:resolve
 
-# Copy the project and build
+# Copy the source files
 COPY ./ .
-RUN --mount=type=cache,target=/root/.m2/ mvn package && \
-    mv "$(echo 'target/${project.artifactId}-${project.version}-jar-with-dependencies.jar' | mvn -N -q -DforceStdout help:evaluate)" target.jar
+
+# Build the JAR with dependencies
+RUN --mount=type=cache,target=/root/.m2/ --mount=type=cache,target=/src/target mvn package && \
+    OUTPUT_JAR="$(echo '${project.artifactId}-${project.version}-jar-with-dependencies.jar' | mvn -N -q -DforceStdout help:evaluate)" && \
+    echo "$OUTPUT_JAR" > artifact_name.txt && \
+    mv "target/$OUTPUT_JAR" target.jar
 
 FROM eclipse-temurin:21-jre AS runtime
 WORKDIR /app
