@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import cz.vut.fit.domainradar.CollectorConfig;
+import cz.vut.fit.domainradar.Common;
 import cz.vut.fit.domainradar.standalone.collectors.DNSCollector;
 import cz.vut.fit.domainradar.standalone.collectors.NERDCollector;
 import cz.vut.fit.domainradar.standalone.collectors.TestCollector;
@@ -35,13 +36,7 @@ public class StandaloneCollectorRunner {
         cmd = parseCommandLine(args, options, false);
         if (cmd == null) return;
 
-        final ObjectMapper jsonMapper = JsonMapper.builder()
-                .addModule(new JavaTimeModule())
-                .configure(JsonParser.Feature.INCLUDE_SOURCE_IN_LOCATION, true)
-                .configure(SerializationFeature.WRITE_DATE_TIMESTAMPS_AS_NANOSECONDS, false)
-                .configure(DeserializationFeature.READ_DATE_TIMESTAMPS_AS_NANOSECONDS, false)
-                .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
-                .build();
+        final ObjectMapper jsonMapper = Common.makeMapper().build();
         final Properties properties = initProperties(cmd);
 
         if (cmd.hasOption("mc")) {
