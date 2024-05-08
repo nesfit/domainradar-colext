@@ -7,10 +7,7 @@ import cz.vut.fit.domainradar.Topics;
 import cz.vut.fit.domainradar.standalone.collectors.DNSCollector;
 import cz.vut.fit.domainradar.standalone.collectors.ZoneCollector;
 import org.apache.kafka.common.header.Headers;
-import org.apache.kafka.connect.data.Schema;
-import org.apache.kafka.connect.data.SchemaAndValue;
-import org.apache.kafka.connect.data.SchemaBuilder;
-import org.apache.kafka.connect.data.Struct;
+import org.apache.kafka.connect.data.*;
 import org.apache.kafka.connect.errors.DataException;
 import org.apache.kafka.connect.storage.Converter;
 import org.jetbrains.annotations.NotNull;
@@ -40,7 +37,7 @@ public class CommonResultConverter implements Converter {
                 .name("cz.vut.fit.domainradar.CommonResult")
                 .field("status_code", Schema.INT16_SCHEMA)
                 .field("error", Schema.OPTIONAL_STRING_SCHEMA)
-                .field("last_attempt", Schema.INT64_SCHEMA)
+                .field("last_attempt", Timestamp.SCHEMA)
                 .field("collector", Schema.OPTIONAL_STRING_SCHEMA)
                 .build();
 
@@ -67,9 +64,9 @@ public class CommonResultConverter implements Converter {
                 throw new DataException("Cannot determine collector name");
 
             var resultStruct = new Struct(SCHEMA.schema());
-            resultStruct.put("status_code", result.statusCode());
+            resultStruct.put("status_code", (short) result.statusCode());
             resultStruct.put("error", result.error());
-            resultStruct.put("last_attempt", result.lastAttempt().toEpochMilli());
+            resultStruct.put("last_attempt", java.util.Date.from(result.lastAttempt()));
             resultStruct.put("collector", (result.collector != null) ? result.collector : collectorId);
             return new SchemaAndValue(SCHEMA.schema(), resultStruct);
         } catch (IOException e) {
