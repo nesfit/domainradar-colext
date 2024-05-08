@@ -89,8 +89,12 @@ def make_app(name: str, config: dict) -> faust.App:
 
 
 def serialize_ip_to_process(ip_to_process: IPToProcess) -> bytes:
-    return dumps({"domainName": ip_to_process.domain_name,
-                  "ip": ip_to_process.ip}, separators=(',', ':'), indent=None).encode("utf-8")
+    try:
+        return dumps({"domainName": ip_to_process.domain_name,
+                      "ip": ip_to_process.ip}, separators=(',', ':'), indent=None).encode("utf-8")
+    except Exception as e:
+        logger.error("Error serializing IP to process", exc_info=e)
+        return b"{\"domainName\":\"ERROR\",\"ip\":\"255.255.255.255\"}"
 
 
 def get_safe(data: dict, path: str) -> dict | None:

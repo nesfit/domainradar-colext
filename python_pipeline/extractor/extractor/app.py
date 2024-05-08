@@ -10,6 +10,7 @@ from faust import EventT
 from faust.serializers import codecs
 
 from common import read_config, make_app, StringCodec
+from common.audit import log_unhandled_error
 from . import extractor
 
 codecs.register("str", StringCodec())
@@ -20,15 +21,15 @@ EXTRACTOR = "extractor"
 config = read_config()
 component_config = config.get(EXTRACTOR, {})
 
+CONCURRENCY = component_config.get("concurrency", 4)
+BATCH_SIZE = component_config.get("batch_size", 50)
+BATCH_TIMEOUT = component_config.get("batch_timeout", 5)
+
 # Init the list of transformations
 extractor.init_transformations(component_config)
 
 # The Faust application
 extractor_app = make_app(EXTRACTOR, config)
-
-CONCURRENCY = component_config.get("concurrency", 4)
-BATCH_SIZE = component_config.get("batch_size", 50)
-BATCH_TIMEOUT = component_config.get("batch_timeout", 5)
 
 # The input and output topics
 # Let's deserialize the result into a dict manually
@@ -58,14 +59,18 @@ async def process_entries(stream):
 
     # Main message processing loop
     async for events_seq in stream.take_events(BATCH_SIZE, within=BATCH_TIMEOUT):  # type: Sequence[EventT]
-        events_parsed = (parse_event(e) for e in events_seq)
-        # We'll send the output into the partition of the first event in the batch
-        partition = events_seq[0].message.partition
-        # Reset the output buffer position
-        buffer.seek(0)
-        # Extract features and serialize the dataframe into a memory buffer
-        extractor.extract_features(events_parsed, buffer)
-        # Get the result bytes
-        result_bytes = buffer.getbuffer()[0:buffer.tell()].tobytes()
-        # Send the result
-        await topic_processed.send(key=None, value=result_bytes, partition=partition)
+        try:
+            events_parsed = (parse_event(e) for e in events_seq)
+            # We'll send the output into the partition of the first event in the batch
+            partition = events_seq[0].message.partition
+            # Reset the output buffer position
+            buffer.seek(0)
+            # Extract features and serialize the dataframe into a memory buffer
+            extractor.extract_features(events_parsed, buffer)
+            # Get the result bytes
+            result_bytes = buffer.getbuffer()[0:buffer.tell()].tobytes()
+            # Send the result
+            await topic_processed.send(key=None, value=result_bytes, partition=partition)
+        except Exception as e:
+            keys = [e.key for e in events_seq] if events_seq is not None else None
+            log_unhandled_error(e, EXTRACTOR, None, all_keys=keys)

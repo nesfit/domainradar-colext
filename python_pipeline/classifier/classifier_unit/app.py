@@ -18,14 +18,13 @@ CLASSIFIER = "classifier-unit"
 config = read_config()
 component_config = config.get(CLASSIFIER, {})
 
-# The Faust application
-classifier_app = make_app(CLASSIFIER, config)
-
 CONCURRENCY = component_config.get("concurrency", 4)
 BATCH_SIZE = component_config.get("batch_size", 1)
 BATCH_TIMEOUT = component_config.get("batch_timeout", 0)
-
 USE_BATCHING = BATCH_SIZE > 1 and BATCH_TIMEOUT != 0
+
+# The Faust application
+classifier_app = make_app(CLASSIFIER, config)
 
 # The input and output topics
 topic_to_process = classifier_app.topic('feature_vectors', key_type=None,

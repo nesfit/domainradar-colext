@@ -11,9 +11,11 @@ from whodap.response import IPv4Response, IPv6Response
 from whodap.errors import *
 
 from common import read_config, make_app, serialize_ip_to_process
+from common.audit import log_unhandled_error
 from common.models import IPToProcess, IPProcessRequest, RDAPIPResult, RDAPDomainResult
 import common.result_codes as rc
-from collectors.util import make_rdap_ssl_context, timestamp_now_millis, should_omit_ip
+from collectors.util import make_rdap_ssl_context, timestamp_now_millis, should_omit_ip, handle_top_level_collector_exception, \
+    get_ip_safe
 
 COLLECTOR = "rdap_ip"
 
@@ -57,6 +59,21 @@ async def fetch_ip(address, client_v4: IPv4Client, client_v6: IPv6Client) \
         return None, rc.INTERNAL_ERROR, str(e)
 
 
+async def process_entry(dn_ip, ipv4_client, ipv6_client):
+    # TODO: implement a per-endpoint local rate limiter (see aiolimiter)
+    rdap_data, err_code, err_msg = await fetch_ip(dn_ip.ip, ipv4_client, ipv6_client)
+    if rdap_data is not None:
+        rdap_data = rdap_data.to_dict()
+
+    result = RDAPIPResult(status_code=err_code, error=err_msg,
+                          last_attempt=timestamp_now_millis(),
+                          collector=COLLECTOR,
+                          data=rdap_data)
+
+    # (this could probably be send_soon not to block the loop)
+    await topic_processed.send(key=serialize_ip_to_process(dn_ip), value=result)
+
+
 # The RDAP-IP processor
 @rdap_ip_app.agent(topic_to_process, concurrency=4)
 async def process_entries(stream):
@@ -76,22 +93,17 @@ async def process_entries(stream):
     # Main message processing loop
     # dn is the domain name / IP address pair
     async for dn_ip, process_request in stream.items():
-        # Omit the DN if the collector is not in the list of collectors to process
-        if should_omit_ip(process_request, COLLECTOR):
-            continue
+        try:
+            # Omit the DN if the collector is not in the list of collectors to process
+            if should_omit_ip(process_request, COLLECTOR):
+                continue
 
-        # TODO: implement a per-endpoint local rate limiter (see aiolimiter)
-        rdap_data, err_code, err_msg = await fetch_ip(dn_ip.ip, ipv4_client, ipv6_client)
-        if rdap_data is not None:
-            rdap_data = rdap_data.to_dict()
-
-        result = RDAPIPResult(status_code=err_code, error=err_msg,
-                              last_attempt=timestamp_now_millis(),
-                              collector=COLLECTOR,
-                              data=rdap_data)
-
-        # (this could probably be send_soon not to block the loop)
-        await topic_processed.send(key=serialize_ip_to_process(dn_ip), value=result)
+            await process_entry(dn_ip, ipv4_client, ipv6_client)
+        except Exception as e:
+            ip = get_ip_safe(dn_ip)
+            log_unhandled_error(e, COLLECTOR, ip, dn_ip=dn_ip)
+            await handle_top_level_collector_exception(e, COLLECTOR, RDAPIPResult, serialize_ip_to_process(dn_ip),
+                                                       topic_processed)
 
     await ipv4_client.aio_close()
     await ipv6_client.aio_close()

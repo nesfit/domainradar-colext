@@ -20,6 +20,7 @@ whodap = "^0.1.12"
 icmplib = "^3.0.4"
 tldextract = "^5.1.2"
 whoisit = "^2.7.6"
+aiolimiter = "^1.1.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0.0"
