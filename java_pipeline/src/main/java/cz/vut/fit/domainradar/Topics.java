@@ -1,5 +1,11 @@
 package cz.vut.fit.domainradar;
 
+import cz.vut.fit.domainradar.standalone.collectors.DNSCollector;
+import cz.vut.fit.domainradar.standalone.collectors.ZoneCollector;
+
+import java.util.HashMap;
+import java.util.Map;
+
 public final class Topics {
     public static final String IN_ZONE = "to_process_zone";
     public static final String IN_DNS = "to_process_DNS";
@@ -13,4 +19,13 @@ public final class Topics {
 
     public static final String OUT_MERGE_DNS_IP = "merged_DNS_IP";
     public static final String OUT_MERGE_ALL = "all_collected_data";
+
+
+    public static final Map<String, String> TOPICS_TO_COLLECTOR_ID = new HashMap<>();
+
+    static {
+        TOPICS_TO_COLLECTOR_ID.put(OUT_DNS, DNSCollector.NAME);
+        TOPICS_TO_COLLECTOR_ID.put(OUT_ZONE, ZoneCollector.NAME);
+        TOPICS_TO_COLLECTOR_ID.put(OUT_RDAP_DN, "rdap-dn");
+    }
 }

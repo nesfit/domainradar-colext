@@ -3,9 +3,6 @@ package cz.vut.fit.domainradar.connect;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import cz.vut.fit.domainradar.Common;
-import cz.vut.fit.domainradar.Topics;
-import cz.vut.fit.domainradar.standalone.collectors.DNSCollector;
-import cz.vut.fit.domainradar.standalone.collectors.ZoneCollector;
 import org.apache.kafka.common.header.Headers;
 import org.apache.kafka.connect.data.*;
 import org.apache.kafka.connect.errors.DataException;
@@ -15,8 +12,9 @@ import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
 import java.time.Instant;
-import java.util.HashMap;
 import java.util.Map;
+
+import static cz.vut.fit.domainradar.Topics.TOPICS_TO_COLLECTOR_ID;
 
 public class CommonResultConverter implements Converter {
     public record CommonResult(
@@ -29,24 +27,13 @@ public class CommonResultConverter implements Converter {
 
 
     private final ObjectMapper _objectMapper;
-    public static final Schema SCHEMA;
-    private static final Map<String, String> TOPICS_TO_COLLECTOR_ID = new HashMap<>();
-
-    static {
-        SCHEMA = SchemaBuilder.struct()
-                .name("cz.vut.fit.domainradar.CommonResult")
-                .field("status_code", Schema.INT16_SCHEMA)
-                .field("error", Schema.OPTIONAL_STRING_SCHEMA)
-                .field("last_attempt", Timestamp.SCHEMA)
-                .field("collector", Schema.OPTIONAL_STRING_SCHEMA)
-                .build();
-
-        // TODO: Make configurable.
-        TOPICS_TO_COLLECTOR_ID.put(Topics.OUT_DNS, DNSCollector.NAME);
-        TOPICS_TO_COLLECTOR_ID.put(Topics.OUT_ZONE, ZoneCollector.NAME);
-        TOPICS_TO_COLLECTOR_ID.put(Topics.OUT_RDAP_DN, "rdap-dn");
-    }
-
+    public static final Schema SCHEMA = SchemaBuilder.struct()
+            .name("cz.vut.fit.domainradar.CommonResult")
+            .field("status_code", Schema.INT16_SCHEMA)
+            .field("error", Schema.OPTIONAL_STRING_SCHEMA)
+            .field("last_attempt", Timestamp.SCHEMA)
+            .field("collector", Schema.OPTIONAL_STRING_SCHEMA)
+            .build();
 
     public CommonResultConverter() {
         _objectMapper = Common.makeMapper()
