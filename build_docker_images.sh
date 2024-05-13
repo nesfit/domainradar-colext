@@ -15,6 +15,7 @@ py_tags=("rdap-ip" "rdap-dn" "rtt" "extractor" "classifier")
 
 STREAMS_TAG="java-streams"
 PARCON_TAG="java-standalone"
+CONNECT_TAG="kafka-connect"
 
 OUT_BUILD=/dev/stdout
 OUT_MSG=/dev/stdout
@@ -26,12 +27,18 @@ build_java() {
   echo "  > Building Kafka Streams components <  "
   echo "    > Tag: '$TAG_PREFIX/$STREAMS_TAG' < "
 
-  docker build --target streams -t "$TAG_PREFIX/$STREAMS_TAG" "$@" . 2>"$OUT_BUILD"
+  docker build -f components.Dockerfile --build-arg TARGET_PKG=streams-components --target runtime-streams -t "$TAG_PREFIX/$STREAMS_TAG" "$@" . 2>"$OUT_BUILD"
 
   echo "  > Building Parallel Consumer components <  " >"$OUT_MSG"
   echo "    > Tag: '$TAG_PREFIX/$PARCON_TAG' < " >"$OUT_MSG"
 
-  docker build --target standalone -t "$TAG_PREFIX/$PARCON_TAG" "$@" . 2>"$OUT_BUILD"
+  docker build -f components.Dockerfile --build-arg TARGET_PKG=standalone-collectors --target runtime-standalone -t "$TAG_PREFIX/$PARCON_TAG" "$@" . 2>"$OUT_BUILD"
+
+  echo "  > Building Kafka Connect base image <  " >"$OUT_MSG"
+  echo "    > Tag: '$TAG_PREFIX/$CONNECT_TAG' < " >"$OUT_MSG"
+
+  docker build -f connect.Dockerfile --target runtime-connect -t "$TAG_PREFIX/$CONNECT_TAG" "$@" . 2>"$OUT_BUILD"
+
   cd ..
 }
 
