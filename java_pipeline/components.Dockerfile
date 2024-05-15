@@ -45,7 +45,7 @@ COPY --from=build_component /src/target.jar ./domainradar-collector.jar
 ENTRYPOINT ["java", "-cp", "/app/domainradar-collector.jar"]
 
 FROM runtime AS runtime-streams
-CMD ["cz.vut.fit.domainradar.streams.StreamsPipelineRunner"]
+ENTRYPOINT ["java", "-cp", "/app/domainradar-collector.jar", "cz.vut.fit.domainradar.streams.StreamsPipelineRunner"]
 
 FROM runtime AS runtime-standalone
-CMD ["cz.vut.fit.domainradar.standalone.StandaloneCollectorRunner"]
+ENTRYPOINT ["java", "-cp", "/app/domainradar-collector.jar", "cz.vut.fit.domainradar.standalone.StandaloneCollectorRunner"]
