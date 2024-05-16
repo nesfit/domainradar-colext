@@ -3,8 +3,7 @@ package cz.vut.fit.domainradar.streams;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import cz.vut.fit.domainradar.Common;
 import cz.vut.fit.domainradar.streams.collectors.GeoIPCollector;
-import cz.vut.fit.domainradar.streams.mergers.AllDataMergerComponent;
-import cz.vut.fit.domainradar.streams.mergers.IPDataMergerComponent;
+import cz.vut.fit.domainradar.streams.mergers.CollectedDataMergerComponent;
 import org.apache.commons.cli.*;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.KafkaStreams;
@@ -135,14 +134,8 @@ public class StreamsPipelineRunner {
             components.add(geoIpCollector);
         }
 
-        if (cmd.hasOption("ip-merger") || useAll) {
-            var merger = new IPDataMergerComponent(jsonMapper);
-            merger.use(builder);
-            components.add(merger);
-        }
-
-        if (cmd.hasOption("domain-merger") || useAll) {
-            var merger = new AllDataMergerComponent(jsonMapper);
+        if (cmd.hasOption("merger") || useAll) {
+            var merger = new CollectedDataMergerComponent(jsonMapper);
             merger.use(builder);
             components.add(merger);
         }
@@ -181,8 +174,7 @@ public class StreamsPipelineRunner {
         options.addOption("ac", "all-collectors", false, "Use all collectors");
 
         options.addOption(null, "col-geoip", false, "Use the GeoIP collector");
-        options.addOption(null, "ip-merger", false, "Use the DNS/IP merger");
-        options.addOption(null, "domain-merger", false, "Use the all domain data merger");
+        options.addOption(null, "merger", false, "Use the collected data merger");
         options.addOption(Option.builder("threads")
                 .option("t")
                 .longOpt("threads")

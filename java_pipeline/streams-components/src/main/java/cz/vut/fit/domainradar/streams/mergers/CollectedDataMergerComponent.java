@@ -6,9 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import cz.vut.fit.domainradar.Topics;
 import cz.vut.fit.domainradar.models.IPToProcess;
 import cz.vut.fit.domainradar.models.ResultCodes;
-import cz.vut.fit.domainradar.models.results.CommonIPResult;
-import cz.vut.fit.domainradar.models.results.DNSResult;
-import cz.vut.fit.domainradar.models.results.ExtendedDNSResult;
+import cz.vut.fit.domainradar.models.results.*;
 import cz.vut.fit.domainradar.serialization.JsonSerde;
 import cz.vut.fit.domainradar.streams.PipelineComponent;
 import org.apache.kafka.common.serialization.Serdes;
@@ -23,14 +21,14 @@ import org.slf4j.LoggerFactory;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class IPDataMergerComponent implements PipelineComponent {
+public class CollectedDataMergerComponent implements PipelineComponent {
     public record IPDataPair(String ip, Map<String, CommonIPResult<JsonNode>> ipData) {
     }
 
-    private static final org.slf4j.Logger Logger = LoggerFactory.getLogger(IPDataMergerComponent.class);
+    private static final org.slf4j.Logger Logger = LoggerFactory.getLogger(CollectedDataMergerComponent.class);
     private final ObjectMapper _jsonMapper;
 
-    public IPDataMergerComponent(ObjectMapper jsonMapper) {
+    public CollectedDataMergerComponent(ObjectMapper jsonMapper) {
         _jsonMapper = jsonMapper;
     }
 
@@ -50,8 +48,11 @@ public class IPDataMergerComponent implements PipelineComponent {
         final var ipDataPairSerde = JsonSerde.of(_jsonMapper, IPDataPair.class);
         final var dnsResultSerde = JsonSerde.of(_jsonMapper, DNSResult.class);
         final var extendedDnsResultSerde = JsonSerde.of(_jsonMapper, ExtendedDNSResult.class);
+        final var rdapDnSerde = JsonSerde.of(_jsonMapper, RDAPDomainResult.class);
+        final var zoneResultSerde = JsonSerde.of(_jsonMapper, ZoneResult.class);
+        final var finalResultSerde = JsonSerde.of(_jsonMapper, FinalResult.class);
 
-        // These two sub-topologies combines the results from the IP collectors per a domain name.
+        // These two sub-topologies combine the results from the IP collectors per a domain name.
 
         // allIPDataForDomain is a table of {Domain Name} -> Map<IP, Map<Collector ID, { success, error, JSON data }>>
         var allIPDataForDomain = builder
@@ -91,8 +92,7 @@ public class IPDataMergerComponent implements PipelineComponent {
                 // The resulting entry (aggregate type) is a Map<IP address, Map<Collector, Data>>
                 .aggregate(ConcurrentHashMap::new, (dn, ipDataMap, aggregate) -> {
                             // Create the map of maps by putting all IPs from the group to a concurrent hashmap.
-                            // I think that newer records should always come last but this should be further looked into
-                            // TODO
+                            // TODO: I think that newer records should always come last but this should be further looked into
                             aggregate.put(ipDataMap.ip, ipDataMap.ipData);
                             return aggregate;
                         }, (dn, ipDataMap, aggregate) -> {
@@ -109,26 +109,35 @@ public class IPDataMergerComponent implements PipelineComponent {
         // merged DNS/IP data object.
         var processedDnsTable = builder.table(Topics.OUT_DNS,
                 Consumed.with(Serdes.String(), dnsResultSerde));
-
-        processedDnsTable
-                .filter((domain, dns) -> dns != null && dns.ips() != null && !dns.ips().isEmpty(),
-                        namedOp("filter_out_DNS_records_without_IPs"))
-                .join(allIPDataForDomain, ExtendedDNSResult::new,
+        var mergedDnsIpTable = processedDnsTable
+                .leftJoin(allIPDataForDomain, ExtendedDNSResult::new, // TODO: what about domains with no IP data?
                         namedOp("join_aggregated_IP_data_with_DNS_data"),
-                        Materialized.with(Serdes.String(), extendedDnsResultSerde))
-                .toStream(namedOp("joined_IP_and_DNS_data_to_stream"))
-                .to("merged_DNS_IP", Produced.with(Serdes.String(), extendedDnsResultSerde));
+                        Materialized.with(Serdes.String(), extendedDnsResultSerde));
 
-        // This topology ensures that DNS records with no IPs are also present in the final collection.
-        processedDnsTable
-                .filter((domain, dns) -> dns == null || dns.ips() == null || dns.ips().isEmpty())
-                .mapValues((v) -> new ExtendedDNSResult(v, null))
-                .toStream(namedOp("DNS_with_no_IPs_to_merged"))
-                .to(Topics.OUT_MERGE_DNS_IP, Produced.with(Serdes.String(), extendedDnsResultSerde));
+        // Now we want to join the DNS/IP data with the data from the other DN-based collectors,
+        // that is, zone and RDAP-DN.
+        var zoneTable = builder.table(Topics.OUT_ZONE,
+                Consumed.with(Serdes.String(), zoneResultSerde));
+        var rdapDnTable = builder.table(Topics.OUT_RDAP_DN,
+                Consumed.with(Serdes.String(), rdapDnSerde));
+
+        // We suppose that without DNS(+IP) data, the domain is not interesting at all, hence the left join.
+        var finalResultTable = mergedDnsIpTable
+                .join(zoneTable, (dns, zone) -> new FinalResult(dns, null, zone.zone()),
+                        namedOp("join_DNS_IP_ZONE"),
+                        Materialized.with(Serdes.String(), finalResultSerde))
+                .leftJoin(rdapDnTable, (intermRes, rdap) -> new FinalResult(intermRes.dnsResult(), rdap, intermRes.zone()),
+                        namedOp("join_DNS_IP_ZONE_RDAP"),
+                        Materialized.with(Serdes.String(), finalResultSerde));
+
+        // Output the final result to the output topic.
+        finalResultTable.toStream(namedOp("result_to_stream"))
+                .to(Topics.OUT_MERGE_ALL,
+                        Produced.with(Serdes.String(), finalResultSerde));
     }
 
     @Override
     public String getName() {
-        return "DNS_IP_MERGER";
+        return "COLLECTED_MERGER";
     }
 }
