@@ -97,6 +97,8 @@ class CompatibilityTransformation:
         longitudes = []
 
         for ip in ip_data:
+            if ip["geo"] is None:
+                continue
             country_codes.append(ip['geo']['country_code'])
             latitudes.append(ip['geo']['latitude'])
             longitudes.append(ip['geo']['longitude'])
