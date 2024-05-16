@@ -275,7 +275,7 @@ class CompatibilityTransformation:
                     "as_org": geo_asn.get("asnOrg", None),
                     "network_address": network_address,
                     "prefix_len": geo_asn.get("prefixLength", None)
-                },
+                } if "asn" in geo_asn else None,
                 "rdap": {
                     "ip_version": t_ip_ver(rdap.get("ipVersion", None)),
                     "entities": rdap_parsed.get("entities", None),
