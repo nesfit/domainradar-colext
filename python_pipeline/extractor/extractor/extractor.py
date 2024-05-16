@@ -63,12 +63,12 @@ def init_transformations(config: dict):
     _target_features = {col: None for col in target_features}
 
 
-def extract_features(raw_data: Iterable[dict], out_buffer: BytesIO):
+def extract_features(raw_data: Iterable[dict]) -> DataFrame:
     """
     Extracts features from the raw data by passing it through the transformations enabled in the configuration.
     The `init_transformations` function must be called once before this function can be used.
     :param raw_data: An iterable of dictionaries, each representing one entry of raw data.
-    :param out_buffer: A byte buffer to serialize the resulting DataFrame into.
+    :return: A DataFrame where each row represents one input entry and the columns are the extracted features.
     """
     # Transform the raw data into a format compatible with the transformations
     raw_data_compatible = (_compat_transformation.transform(x) for x in raw_data)
@@ -82,6 +82,5 @@ def extract_features(raw_data: Iterable[dict], out_buffer: BytesIO):
     # Apply the transformations
     for transformation in _enabled_transformations:
         data_frame = transformation.transform(data_frame)
-    # Serialize the DataFrame in to the provided buffer
-    # noinspection PyTypeChecker
-    return data_frame.to_feather(out_buffer)
+    # Return the final DataFrame
+    return data_frame

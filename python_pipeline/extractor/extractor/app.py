@@ -65,12 +65,15 @@ async def process_entries(stream):
             partition = events_seq[0].message.partition
             # Reset the output buffer position
             buffer.seek(0)
-            # Extract features and serialize the dataframe into a memory buffer
-            extractor.extract_features(events_parsed, buffer)
+            # Extract features
+            df = extractor.extract_features(events_parsed)
+            # Serialize the dataframe into a memory buffer
+            # noinspection PyTypeChecker
+            df.to_feather(buffer)
             # Get the result bytes
             result_bytes = buffer.getbuffer()[0:buffer.tell()].tobytes()
             # Send the result
             await topic_processed.send(key=None, value=result_bytes, partition=partition)
         except Exception as e:
             keys = [e.key for e in events_seq] if events_seq is not None else None
-            log_unhandled_error(e, EXTRACTOR, "-", all_keys=keys)
+            log_unhandled_error(e, EXTRACTOR, None, all_keys=keys)
