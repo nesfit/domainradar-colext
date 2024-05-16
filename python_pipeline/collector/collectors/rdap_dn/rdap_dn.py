@@ -16,10 +16,11 @@ from whodap.response import DomainResponse
 from whodap.errors import *
 
 from common import read_config, make_app, StringCodec
+from common.audit import log_unhandled_error
 from common.models import RDAPRequest, RDAPDomainResult
 import common.result_codes as rc
 from collectors.util import fetch_entities, extract_known_tld, make_rdap_ssl_context, timestamp_now_millis, \
-    handle_top_level_collector_exception
+    handle_top_level_component_exception
 
 codecs.register("str", StringCodec())
 
@@ -94,7 +95,7 @@ async def fetch_whois(domain_name, client: DomainClient) -> tuple[str | None, di
         return None, None, rc.OTHER_EXTERNAL_ERROR, str(e)
 
 
-async def process_entry(dn, req, httpx_client, whois_client):
+async def process_entry(dn, req, rdap_client, whois_client):
     # The default WHOIS results are empty and with a status code signalising that WHOIS was not used
     whois_raw, whois_parsed, whois_err_code, whois_err_msg = None, None, rc.WHOIS_NOT_PERFORMED, None
     zone = None
@@ -161,9 +162,10 @@ async def process_entries(stream):
     # dn is the domain name, req is the optional RDAPRequest object
     async for dn, req in stream.items():
         try:
-            await process_entry(dn, req, httpx_client, whois_client)
+            await process_entry(dn, req, rdap_client, whois_client)
         except Exception as e:
-            await handle_top_level_collector_exception(e, COLLECTOR, RDAPDomainResult, dn, topic_processed)
+            log_unhandled_error(e, COLLECTOR, dn)
+            await handle_top_level_component_exception(e, COLLECTOR, dn, RDAPDomainResult, topic_processed)
 
     await rdap_client.aio_close()
     await httpx_client.aclose()

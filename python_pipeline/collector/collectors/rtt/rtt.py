@@ -1,6 +1,7 @@
 from icmplib import async_ping, ICMPSocketError, DestinationUnreachable, TimeExceeded
 
-from collectors.util import timestamp_now_millis, should_omit_ip, get_ip_safe, handle_top_level_collector_exception
+from collectors.util import (timestamp_now_millis, should_omit_ip, get_ip_safe,
+                             handle_top_level_component_exception)
 from common import read_config, make_app, serialize_ip_to_process
 from common.audit import log_unhandled_error
 from common.models import IPToProcess, IPProcessRequest, RTTResult, RTTData
@@ -73,5 +74,5 @@ async def process_entries(stream):
         except Exception as e:
             ip = get_ip_safe(dn_ip)
             log_unhandled_error(e, COLLECTOR, str(ip), dn_ip=dn_ip)
-            await handle_top_level_collector_exception(e, COLLECTOR, RTTResult, serialize_ip_to_process(dn_ip),
-                                                       topic_processed)
+            await handle_top_level_component_exception(e, COLLECTOR, serialize_ip_to_process(dn_ip),
+                                                       RTTResult, topic_processed)

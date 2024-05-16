@@ -73,4 +73,4 @@ async def process_entries(stream):
             await topic_processed.send(key=None, value=result_bytes, partition=partition)
         except Exception as e:
             keys = [e.key for e in events_seq] if events_seq is not None else None
-            log_unhandled_error(e, EXTRACTOR, None, all_keys=keys)
+            log_unhandled_error(e, EXTRACTOR, "-", all_keys=keys)

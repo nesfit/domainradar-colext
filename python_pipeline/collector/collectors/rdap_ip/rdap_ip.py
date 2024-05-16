@@ -14,8 +14,8 @@ from common import read_config, make_app, serialize_ip_to_process
 from common.audit import log_unhandled_error
 from common.models import IPToProcess, IPProcessRequest, RDAPIPResult, RDAPDomainResult
 import common.result_codes as rc
-from collectors.util import make_rdap_ssl_context, timestamp_now_millis, should_omit_ip, handle_top_level_collector_exception, \
-    get_ip_safe
+from collectors.util import (make_rdap_ssl_context, timestamp_now_millis, should_omit_ip,
+                             handle_top_level_component_exception, get_ip_safe)
 
 COLLECTOR = "rdap_ip"
 
@@ -32,7 +32,7 @@ topic_to_process = rdap_ip_app.topic('to_process_IP', key_type=IPToProcess,
 
 # The key is explicitly serialized to avoid Faust injecting its metadata in the output object
 topic_processed = rdap_ip_app.topic('collected_IP_data', key_type=bytes,
-                                    value_type=RDAPDomainResult)
+                                    value_type=RDAPIPResult)
 
 
 async def fetch_ip(address, client_v4: IPv4Client, client_v6: IPv6Client) \
@@ -102,8 +102,8 @@ async def process_entries(stream):
         except Exception as e:
             ip = get_ip_safe(dn_ip)
             log_unhandled_error(e, COLLECTOR, ip, dn_ip=dn_ip)
-            await handle_top_level_collector_exception(e, COLLECTOR, RDAPIPResult, serialize_ip_to_process(dn_ip),
-                                                       topic_processed)
+            await handle_top_level_component_exception(e, COLLECTOR, serialize_ip_to_process(dn_ip),
+                                                       RDAPIPResult, topic_processed)
 
     await ipv4_client.aio_close()
     await ipv6_client.aio_close()

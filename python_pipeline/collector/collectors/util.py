@@ -1,14 +1,14 @@
-import logging
 import ssl
 from datetime import datetime
 from typing import List, Optional
 
+from faust.models import FieldDescriptor
 from whodap import DNSClient
 from whodap.response import DomainResponse, RDAPResponse
 from whodap.client import RDAPClient
 
 from common.audit import log_unhandled_error
-from common.models import IPProcessRequest
+from common.models import IPProcessRequest, Result
 from common import result_codes as rc
 
 
@@ -94,11 +94,37 @@ def get_ip_safe(dn_ip):
     return str(dn_ip.ip) if dn_ip is not None and hasattr(dn_ip, "ip") else None
 
 
-async def handle_top_level_collector_exception(exc_info, component_id, result_type, key, topic):
-    try:
-        result = result_type(status_code=rc.INTERNAL_ERROR, error=str(exc_info),
-                             last_attempt=timestamp_now_millis())
+async def handle_top_level_component_exception(exc_info, component_id, key, result_class, topic):
+    def make_error_result_instance(error):
+        # noinspection PyBroadException
+        try:
+            attributes = result_class.__dict__
+            kwargs = {
+                "status_code": rc.INTERNAL_ERROR,
+                "error": error,
+                "last_attempt": timestamp_now_millis()
+            }
 
+            for attr_name in result_class.__dict__:
+                if attr_name.startswith("_") or attr_name in kwargs:
+                    continue
+                attr = attributes[attr_name]
+                if not isinstance(attr, FieldDescriptor):
+                    continue
+                if attr_name == "collector":
+                    kwargs[attr_name] = component_id
+                    continue
+                try:
+                    kwargs[attr_name] = attr.default if not attr.required else attr.type()
+                except TypeError:
+                    kwargs[attr_name] = None
+
+            return result_class(**kwargs)
+        except Exception:
+            return Result(status_code=rc.INTERNAL_ERROR, error=error, last_attempt=timestamp_now_millis())
+
+    try:
+        result = make_error_result_instance(str(exc_info))
         await topic.send(key=key, value=result)
     except Exception as exc_info:
-        log_unhandled_error(exc_info, component_id, key, msg="Error sending the error message to the output topic")
+        log_unhandled_error(exc_info, component_id, key, desc="Error sending the error message to the output topic")

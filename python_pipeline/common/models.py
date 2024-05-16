@@ -13,7 +13,7 @@ class IPProcessRequest(Record, coerce=True, serializer='json'):
     collectors: Optional[list[str]] = FieldDescriptor[list[str]](field="collectors", required=False)
 
 
-class Result(Record, abstract=True, coerce=True, serializer='json'):
+class Result(Record, abstract=False, coerce=True, serializer='json'):
     status_code: int = IntegerField(field="statusCode", required=True)
     error: Optional[str] = StringField(required=False)
     last_attempt: int = IntegerField(field="lastAttempt")
