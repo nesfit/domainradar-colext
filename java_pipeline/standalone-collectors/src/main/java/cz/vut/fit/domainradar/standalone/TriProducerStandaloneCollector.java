@@ -9,6 +9,7 @@ import org.apache.kafka.common.serialization.Serializer;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.IOException;
 import java.util.Properties;
 
 public abstract class TriProducerStandaloneCollector<KIn, VIn, KOut1, VOut1 extends Result, KOut2, VOut2, KOut3, VOut3>
@@ -43,7 +44,7 @@ public abstract class TriProducerStandaloneCollector<KIn, VIn, KOut1, VOut1 exte
     }
 
     @Override
-    public void close() {
+    public void close() throws IOException {
         super.close();
         _producer3.close(_closeTimeout);
     }

@@ -112,7 +112,8 @@ public class InternalDNSResolver {
                                 cnameRes.value(),
                                 mxRes.value(),
                                 nsRes.value(),
-                                txtRes.value()
+                                txtRes.value(),
+                                null
                         );
                     });
         }

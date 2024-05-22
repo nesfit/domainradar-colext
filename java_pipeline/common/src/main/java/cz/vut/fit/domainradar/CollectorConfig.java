@@ -45,6 +45,9 @@ public class CollectorConfig {
     public static final String DNS_MAIN_RESOLVER_RETRIES_DOC = "The number of attempts to query a single DNS server until the next one is used.";
     public static final String DNS_MAIN_RESOLVER_RETRIES_DEFAULT = "1";
 
+    public static final String DNS_WORKERS_CONFIG = "collectors.dns.workers";
+    public static final String DNS_WORKERS_DOC = "The number of workers used to query the DNS for individual records.";
+    public static final String DNS_WORKERS_DEFAULT = "128";
 
     public static final String DNS_PER_DOMAIN_RESOLVER_TIMEOUT_SEC_CONFIG = "collectors.dns.per.domain.resolver.timeout";
     public static final String DNS_PER_DOMAIN_RESOLVER_TIMEOUT_SEC_DOC = "The timeout for a DNS query (seconds).";
@@ -67,4 +70,7 @@ public class CollectorConfig {
     public static final String COMMIT_INTERVAL_MS_DOC = "The interval at which to commit the offsets.";
     public static final String COMMIT_INTERVAL_MS_DEFAULT = "100";
 
+    public static final String DNS_STALLED_TIMEOUT_MS_CONFIG = "collectors.dns.stalled.timeout";
+    public static final String DNS_STALLED_TIMEOUT_MS_DOC = "The time after which a domain scan request is considered stalled (milliseconds).";
+    public static final String DNS_STALLED_TIMEOUT_MS_DEFAULT = "60000";
 }

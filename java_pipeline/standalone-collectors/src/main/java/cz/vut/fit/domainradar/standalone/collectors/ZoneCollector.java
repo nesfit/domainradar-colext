@@ -16,6 +16,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import pl.tlinkowski.unij.api.UniLists;
 
+import java.io.IOException;
 import java.net.UnknownHostException;
 import java.time.Instant;
 import java.util.Properties;
@@ -90,7 +91,7 @@ public class ZoneCollector extends TriProducerStandaloneCollector<String, ZonePr
     }
 
     @Override
-    public void close() {
+    public void close() throws IOException {
         super.close();
         _executor.close();
     }

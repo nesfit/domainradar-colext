@@ -16,6 +16,8 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import org.jetbrains.annotations.NotNull;
 import pl.tlinkowski.unij.api.UniLists;
 
+import java.io.IOException;
+import java.io.InvalidObjectException;
 import java.net.Inet4Address;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -139,7 +141,7 @@ public class NERDCollector extends IPStandaloneCollector<NERDData> {
     }
 
     @Override
-    public void close() {
+    public void close() throws IOException {
         super.close();
 
         if (_parallelProcessor != null) {

@@ -1,62 +1,88 @@
 package cz.vut.fit.domainradar.standalone.collectors.dns;
 
+import cz.vut.fit.domainradar.Topics;
 import cz.vut.fit.domainradar.models.IPToProcess;
 import cz.vut.fit.domainradar.models.dns.DNSData;
 import cz.vut.fit.domainradar.models.results.DNSResult;
 import org.apache.kafka.clients.producer.KafkaProducer;
-import org.jetbrains.annotations.Nullable;
+import org.apache.kafka.clients.producer.ProducerRecord;
+import org.slf4j.LoggerFactory;
 
-import java.util.List;
-import java.util.Set;
+import java.time.Instant;
+import java.util.*;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
-public class ResultDispatcher implements Runnable {
-    private static class DNSDataContainer {
-        @Nullable Set<String> A;
-        @Nullable Set<String> AAAA;
-        @Nullable DNSData.CNAMERecord CNAME;
-        @Nullable List<DNSData.MXRecord> MX;
-        @Nullable List<DNSData.NSRecord> NS;
-        @Nullable List<String> TXT;
-        long ttlA, ttlAAAA, ttlCNAME, ttlMX, ttlNS, ttlTXT;
-        byte missing = 0b111111;
-    }
+class ResultDispatcher implements Runnable {
+    private static final org.slf4j.Logger Logger = LoggerFactory.getLogger(ResultDispatcher.class);
 
     private final BlockingQueue<ProcessedItem> _processedItems;
     private final KafkaProducer<String, DNSResult> _resultProducer;
-    private final KafkaProducer<String, IPToProcess> _ipResultProducer;
-
-    private final ConcurrentHashMap<String, DNSDataContainer> _data;
+    private final KafkaProducer<IPToProcess, Void> _ipResultProducer;
+    private final ConcurrentHashMap<String, DNSDataContainer> _inFlight;
 
     public ResultDispatcher(BlockingQueue<ProcessedItem> processedItems,
                             KafkaProducer<String, DNSResult> resultProducer,
-                            KafkaProducer<String, IPToProcess> ipResultProducer) {
+                            KafkaProducer<IPToProcess, Void> ipResultProducer,
+                            ConcurrentHashMap<String, DNSDataContainer> inFlight) {
 
         _processedItems = processedItems;
         _resultProducer = resultProducer;
         _ipResultProducer = ipResultProducer;
-        _data = new ConcurrentHashMap<>();
+        _inFlight = inFlight;
     }
 
     @Override
     public void run() {
+        Logger.debug("ResultDispatcher started.");
+
         while (true) {
             try {
                 // Wait for the next item
                 ProcessedItem item = _processedItems.take();
+
                 // Process the item
-                handleItem(item);
+                Logger.trace("Handling processed {} from {}", item.recordType(), item.domainName());
+                var result = handleItem(item);
+
+                // If all wanted data has been collected (all bits are 0), dispatch the result
+                if (result == 0) {
+                    Logger.trace("Collected all record types for {}", item.domainName());
+
+                    // All data is present
+                    var container = _inFlight.remove(item.domainName());
+                    if (container == null) {
+                        Logger.warn("Received a result for a domain that is not in flight: {}", item.domainName());
+                        continue;
+                    }
+
+                    if (container.clearStalledTask != null) {
+                        container.clearStalledTask.cancel();
+                    }
+
+                    this.sendResult(item.domainName(), container);
+
+                    Logger.trace("Finished {}", item.domainName());
+                }
             } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
                 break;
             }
         }
+
+        Logger.debug("ResultDispatcher stopped.");
+        Thread.currentThread().interrupt();
     }
 
     @SuppressWarnings("unchecked")
-    private void handleItem(ProcessedItem item) {
-        var container = _data.computeIfAbsent(item.domainName(), unused -> new DNSDataContainer());
+    private int handleItem(ProcessedItem item) {
+        var container = _inFlight.get(item.domainName());
+        if (container == null) {
+            Logger.warn("Received a result for a domain that is not in flight: {}", item.domainName());
+            return -1;
+        }
+
         switch (item.recordType()) {
             case "A" -> {
                 container.A = (Set<String>) item.value();
@@ -89,6 +115,62 @@ public class ResultDispatcher implements Runnable {
                 container.missing &= 0b111110;
             }
         }
+
+        if (item.error() != null) {
+            container.recordCollectionErrors.put(item.recordType(), item.error());
+        }
+
+        return container.missing;
     }
 
+    private static <T> Stream<T> streamIfNotNull(Collection<T> collection) {
+        return collection == null ? Stream.empty() : collection.stream();
+    }
+
+    private Set<DNSResult.IPFromRecord> getIPsToProcess(DNSDataContainer data) {
+        if (data.typesToProcessIPsFrom == null || data.typesToProcessIPsFrom.isEmpty())
+            return Set.of();
+
+        var ret = new HashSet<DNSResult.IPFromRecord>();
+        for (var type : data.typesToProcessIPsFrom) {
+            var ips = switch (type) {
+                case "A" -> streamIfNotNull(data.A);
+                case "AAAA" -> streamIfNotNull(data.AAAA);
+                case "CNAME" -> data.CNAME == null
+                        ? Stream.<String>empty()
+                        : streamIfNotNull(data.CNAME.relatedIps());
+                case "MX" -> data.MX == null
+                        ? Stream.<String>empty()
+                        : data.MX.stream().flatMap(x -> streamIfNotNull(x.relatedIps()));
+                case "NS" -> data.NS == null
+                        ? Stream.<String>empty()
+                        : data.NS.stream().flatMap(x -> streamIfNotNull(x.relatedIps()));
+                default -> Stream.<String>empty();
+            };
+
+            ret.addAll(ips.map(ip -> new DNSResult.IPFromRecord(ip, type)).collect(Collectors.toSet()));
+        }
+
+        return ret;
+    }
+
+    private void sendResult(String domainName, DNSDataContainer container) {
+        var ttlValues = Map.of("A", container.ttlA, "AAAA", container.ttlAAAA, "CNAME", container.ttlCNAME,
+                "MX", container.ttlMX, "NS", container.ttlNS, "TXT", container.ttlTXT);
+
+        var dnsData = new DNSData(ttlValues, container.A, container.AAAA, container.CNAME,
+                container.MX, container.NS, container.TXT, container.recordCollectionErrors.isEmpty() ? null : container.recordCollectionErrors);
+
+        var ips = getIPsToProcess(container);
+        var result = new DNSResult(0, null, Instant.now(),
+                dnsData, null, ips);
+
+        Logger.trace("Producing DNS result");
+        _resultProducer.send(new ProducerRecord<>(Topics.OUT_DNS, domainName, result));
+
+        Logger.trace("Producing IP results");
+        for (var ip : ips) {
+            _ipResultProducer.send(new ProducerRecord<>(Topics.IN_IP, new IPToProcess(domainName, ip.ip()), null));
+        }
+    }
 }

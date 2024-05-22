@@ -41,7 +41,7 @@ class CompatibilityTransformation:
             return data
 
         dns_data = get_safe(data, "dnsResult.dnsData") or {}
-        rdap_result = data.get("rdapDomainResult", {})
+        rdap_result = data.get("rdapDomainResult", {}) or {}
 
         rdap_data: dict | None = rdap_result.get("rdapData")
         rdap_entities: list | None = rdap_result.get("entities")

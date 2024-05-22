@@ -20,6 +20,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.Closeable;
+import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -104,7 +105,7 @@ public abstract class BaseStandaloneCollector<KIn, VIn, KOut, VOut extends Resul
         var properties = new Properties();
         properties.putAll(_properties);
         properties.setProperty(ProducerConfig.CLIENT_ID_CONFIG, "producer-" + getName() + "-A");
-        
+
         return new KafkaProducer<>(properties, keySerializer, valueSerializer);
     }
 
@@ -112,7 +113,7 @@ public abstract class BaseStandaloneCollector<KIn, VIn, KOut, VOut extends Resul
     }
 
     @Override
-    public void close() {
+    public void close() throws IOException {
         if (_parallelProcessor != null) {
             _parallelProcessor.close(_closeTimeout, DrainingCloseable.DrainingMode.DRAIN);
         }

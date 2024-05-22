@@ -1,17 +1,9 @@
 package cz.vut.fit.domainradar.standalone;
 
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.databind.json.JsonMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import cz.vut.fit.domainradar.CollectorConfig;
 import cz.vut.fit.domainradar.Common;
-import cz.vut.fit.domainradar.standalone.collectors.DNSCollector;
-import cz.vut.fit.domainradar.standalone.collectors.NERDCollector;
-import cz.vut.fit.domainradar.standalone.collectors.TestCollector;
-import cz.vut.fit.domainradar.standalone.collectors.ZoneCollector;
+import cz.vut.fit.domainradar.standalone.collectors.*;
 import org.apache.commons.cli.*;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.jetbrains.annotations.NotNull;
@@ -87,7 +79,7 @@ public class StandaloneCollectorRunner {
 
         try {
             if (useAll || cmd.hasOption("col-dns")) {
-                components.add(new DNSCollector(mapper, appId, properties));
+                components.add(new NewDNSCollector(mapper, appId, properties));
             }
 
             if (useAll || cmd.hasOption("col-zone")) {

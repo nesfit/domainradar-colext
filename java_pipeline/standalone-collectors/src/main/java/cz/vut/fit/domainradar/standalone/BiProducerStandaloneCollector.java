@@ -9,6 +9,7 @@ import org.apache.kafka.common.serialization.Serializer;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.IOException;
 import java.util.Properties;
 
 public abstract class BiProducerStandaloneCollector<KIn, VIn, KOut1, VOut1 extends Result, KOut2, VOut2>
@@ -40,7 +41,7 @@ public abstract class BiProducerStandaloneCollector<KIn, VIn, KOut1, VOut1 exten
     }
 
     @Override
-    public void close() {
+    public void close() throws IOException {
         super.close();
         _producer2.close(_closeTimeout);
     }

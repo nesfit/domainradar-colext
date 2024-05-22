@@ -11,6 +11,7 @@ import cz.vut.fit.domainradar.models.results.DNSResult;
 import cz.vut.fit.domainradar.models.tls.TLSData;
 import cz.vut.fit.domainradar.serialization.JsonSerde;
 import cz.vut.fit.domainradar.standalone.BiProducerStandaloneCollector;
+import cz.vut.fit.domainradar.standalone.collectors.dns.RecordFetchHandler;
 import org.apache.commons.cli.CommandLine;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.Serdes;
@@ -44,12 +45,11 @@ public class NewDNSCollector extends BiProducerStandaloneCollector<String, DNSPr
     private static final org.slf4j.Logger Logger = LoggerFactory.getLogger(NewDNSCollector.class);
 
     private final ExecutorService _executor;
-    private final List<String> _toCollect, _typesToProcessIPsFrom;
-
+    private final RecordFetchHandler _fetchHandler;
 
     public NewDNSCollector(@NotNull ObjectMapper jsonMapper,
                            @NotNull String appName,
-                           @Nullable Properties properties) throws UnknownHostException {
+                           @NotNull Properties properties) {
         super(jsonMapper, appName, properties,
                 Serdes.String(),
                 Serdes.String(),
@@ -59,11 +59,7 @@ public class NewDNSCollector extends BiProducerStandaloneCollector<String, DNSPr
                 Serdes.Void());
 
         _executor = Executors.newVirtualThreadPerTaskExecutor();
-
-        _toCollect = this.parseConfig(CollectorConfig.DNS_DEFAULT_RECORD_TYPES_TO_COLLECT_CONFIG,
-                CollectorConfig.DNS_DEFAULT_RECORD_TYPES_TO_COLLECT_DEFAULT);
-        _typesToProcessIPsFrom = this.parseConfig(CollectorConfig.DNS_DEFAULT_TYPES_TO_COLLECT_IPS_FROM_CONFIG,
-                CollectorConfig.DNS_DEFAULT_TYPES_TO_COLLECT_IPS_FROM_DEFAULT);
+        _fetchHandler = new RecordFetchHandler(properties, _producer, _producer2);
     }
 
     private List<String> parseConfig(String configKey, String defaultValue) {
@@ -77,13 +73,15 @@ public class NewDNSCollector extends BiProducerStandaloneCollector<String, DNSPr
 
     @Override
     public void run(CommandLine cmd) {
+        // Batching would be possible here but I don't think it would be beneficial.
+        // TODO: Examine this.
         buildProcessor(0);
 
         _parallelProcessor.subscribe(UniLists.of(Topics.IN_DNS));
         _parallelProcessor.poll(ctx -> {
             final var dn = ctx.key();
             final var request = ctx.value();
-
+            _fetchHandler.submit(dn, request);
         });
     }
 
@@ -94,8 +92,9 @@ public class NewDNSCollector extends BiProducerStandaloneCollector<String, DNSPr
     }
 
     @Override
-    public void close() {
+    public void close() throws IOException {
         super.close();
+        _fetchHandler.close();
         _executor.close();
     }
 

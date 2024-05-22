@@ -248,7 +248,7 @@ public class DNSCollector extends BiProducerStandaloneCollector<String, DNSProce
     }
 
     @Override
-    public void close() {
+    public void close() throws IOException {
         super.close();
         _executor.close();
     }
