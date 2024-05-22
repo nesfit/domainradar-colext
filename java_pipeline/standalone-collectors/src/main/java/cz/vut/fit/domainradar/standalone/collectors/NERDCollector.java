@@ -17,7 +17,6 @@ import org.jetbrains.annotations.NotNull;
 import pl.tlinkowski.unij.api.UniLists;
 
 import java.io.IOException;
-import java.io.InvalidObjectException;
 import java.net.Inet4Address;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -132,7 +131,7 @@ public class NERDCollector extends IPStandaloneCollector<NERDData> {
     }
 
     private void sendAboutAll(List<IPToProcess> entries, CommonIPResult<NERDData> result) {
-        sendAboutAll(Topics.OUT_IP, entries, result);
+        sendAboutAll(_producer, Topics.OUT_IP, entries, result);
     }
 
     @Override

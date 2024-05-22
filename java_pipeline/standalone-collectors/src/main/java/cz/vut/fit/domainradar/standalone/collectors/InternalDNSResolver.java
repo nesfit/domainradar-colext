@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import org.xbill.DNS.*;
 import org.xbill.DNS.lookup.LookupResult;
 import org.xbill.DNS.lookup.LookupSession;
+import org.xbill.DNS.lookup.NoSuchDomainException;
 
 import java.io.IOException;
 import java.net.*;
@@ -681,18 +682,13 @@ public class InternalDNSResolver {
                         .stream().map(record -> ((NSRecord) record).getTarget())
                         .collect(Collectors.toSet()))
                 .exceptionally(e -> {
-                    Logger.warn("Failed to resolve A records for {}", domainName, e);
+                    if (e.getCause() instanceof NoSuchDomainException) {
+                        Logger.debug("No NS records found for {} (no such domain)", domainName);
+                    } else {
+                        Logger.warn("Failed to resolve NS records for {}", domainName, e);
+                    }
                     return Collections.emptySet();
                 });
-    }
-
-    public CompletionStage<Set<InetAddress>> resolveIpsAsync(String domainName) {
-        try {
-            return resolveIpsAsync(Name.fromString(domainName));
-        } catch (TextParseException e) {
-            Logger.warn("Invalid domain name {}", domainName, e);
-            return CompletableFuture.completedFuture(Collections.emptySet());
-        }
     }
 
     public CompletionStage<Set<InetAddress>> resolveIpsAsync(Name domainName) {
@@ -702,7 +698,11 @@ public class InternalDNSResolver {
                 .thenApply(ans -> ans.getRecords()
                         .stream().map(record -> ((ARecord) record).getAddress()))
                 .exceptionally(e -> {
-                    Logger.warn("Failed to resolve A records for {}", domainName, e);
+                    if (e.getCause() instanceof NoSuchDomainException) {
+                        Logger.debug("No A records found for {} (no such domain)", domainName);
+                    } else {
+                        Logger.warn("Failed to resolve A records for {}", domainName, e);
+                    }
                     return Stream.empty();
                 });
 
@@ -710,7 +710,11 @@ public class InternalDNSResolver {
                 .thenApply(ans -> ans.getRecords()
                         .stream().map(record -> ((AAAARecord) record).getAddress()))
                 .exceptionally(e -> {
-                    Logger.warn("Failed to resolve AAAA records for {}", domainName, e);
+                    if (e.getCause() instanceof NoSuchDomainException) {
+                        Logger.debug("No AAAA records found for {} (no such domain)", domainName);
+                    } else {
+                        Logger.warn("Failed to resolve AAAA records for {}", domainName, e);
+                    }
                     return Stream.empty();
                 });
 

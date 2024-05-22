@@ -7,7 +7,7 @@ import org.jetbrains.annotations.Nullable;
 import java.time.Instant;
 import java.util.List;
 
-public record TLSData(@NotNull DNSResult.IPFromRecord fromIp,
+public record TLSData(@NotNull String fromIp,
                       @NotNull String protocol,
                       @NotNull String cipher,
                       @NotNull List<Certificate> certificates) {

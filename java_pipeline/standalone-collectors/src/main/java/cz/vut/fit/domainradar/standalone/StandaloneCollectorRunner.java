@@ -71,15 +71,19 @@ public class StandaloneCollectorRunner {
         }
     }
 
-    private static List<BaseStandaloneCollector<?, ?, ?, ?>> initCollectors(CommandLine cmd, ObjectMapper mapper,
-                                                                            Properties properties) {
+    private static List<BaseStandaloneCollector<?, ?>> initCollectors(CommandLine cmd, ObjectMapper mapper,
+                                                                      Properties properties) {
         var appId = cmd.getOptionValue("id");
         var useAll = cmd.hasOption("a");
-        var components = new ArrayList<BaseStandaloneCollector<?, ?, ?, ?>>();
+        var components = new ArrayList<BaseStandaloneCollector<?, ?>>();
 
         try {
             if (useAll || cmd.hasOption("col-dns")) {
-                components.add(new NewDNSCollector(mapper, appId, properties));
+                components.add(new DNSCollector(mapper, appId, properties));
+            }
+
+            if (useAll || cmd.hasOption("col-tls")) {
+                components.add(new TLSCollector(mapper, appId, properties));
             }
 
             if (useAll || cmd.hasOption("col-zone")) {
@@ -88,10 +92,6 @@ public class StandaloneCollectorRunner {
 
             if (useAll || cmd.hasOption("col-nerd")) {
                 components.add(new NERDCollector(mapper, appId, properties));
-            }
-
-            if (cmd.hasOption("col-test")) {
-                components.add(new TestCollector(mapper, appId, properties));
             }
         } catch (Exception e) {
             Logger.error("Failed to initialize a collector", e);
@@ -132,12 +132,10 @@ public class StandaloneCollectorRunner {
         options.addOption("h", "help", false, "Print this help message");
         options.addOption("a", "all", false, "Use all collectors");
 
-        options.addOption(null, "col-dns", false, "Use the DNS+TLS collector");
+        options.addOption(null, "col-dns", false, "Use the DNS collector");
+        options.addOption(null, "col-tls", false, "Use the DNS collector");
         options.addOption(null, "col-zone", false, "Use the zone collector");
         options.addOption(null, "col-nerd", false, "Use the NERD collector");
-
-        options.addOption(null, "col-test", false, "Use the TEST collector");
-
 
         options.addOption(Option.builder("id")
                 .longOpt("app-id")

@@ -26,7 +26,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Properties;
 
-public abstract class BaseStandaloneCollector<KIn, VIn, KOut, VOut extends Result> implements Closeable {
+public abstract class BaseStandaloneCollector<KIn, VIn> implements Closeable {
 
     protected final Properties _properties;
     protected final Duration _closeTimeout;
@@ -35,23 +35,19 @@ public abstract class BaseStandaloneCollector<KIn, VIn, KOut, VOut extends Resul
 
     protected final ObjectMapper _jsonMapper;
     protected final KafkaConsumer<KIn, VIn> _consumer;
-    protected final KafkaProducer<KOut, VOut> _producer;
     protected ParallelStreamProcessor<KIn, VIn> _parallelProcessor;
 
     public BaseStandaloneCollector(@NotNull ObjectMapper jsonMapper,
                                    @NotNull String appName,
-                                   @Nullable Properties properties,
+                                   @NotNull Properties properties,
                                    @NotNull Serde<KIn> keyInSerde,
-                                   @NotNull Serde<KOut> keyOutSerde,
-                                   @NotNull Serde<VIn> valueInSerde,
-                                   @NotNull Serde<VOut> valueOutSerde) {
+                                   @NotNull Serde<VIn> valueInSerde) {
         _jsonMapper = jsonMapper;
 
         var groupId = appName + "-" + getName();
 
         _properties = new Properties();
-        if (properties != null)
-            _properties.putAll(properties);
+        _properties.putAll(properties);
 
         _properties.setProperty(ConsumerConfig.GROUP_ID_CONFIG, groupId);
         _properties.setProperty(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
@@ -65,21 +61,18 @@ public abstract class BaseStandaloneCollector<KIn, VIn, KOut, VOut extends Resul
                 CollectorConfig.COMMIT_INTERVAL_MS_CONFIG, CollectorConfig.COMMIT_INTERVAL_MS_DEFAULT)));
 
         _consumer = createConsumer(keyInSerde.deserializer(), valueInSerde.deserializer());
-        _producer = createProducer(keyOutSerde.serializer(), valueOutSerde.serializer());
     }
 
     public abstract void run(CommandLine cmd);
 
     public abstract @NotNull String getName();
 
-    protected void sendAboutAll(@NotNull String topic, @NotNull List<KOut> entries, @NotNull VOut result) {
+    protected static <KOut, VOut> void sendAboutAll(@NotNull KafkaProducer<KOut, VOut> producer,
+                                                    @NotNull String topic, @NotNull List<KOut> entries,
+                                                    @NotNull VOut result) {
         for (var entry : entries) {
-            _producer.send(new ProducerRecord<>(topic, entry, result));
+            producer.send(new ProducerRecord<>(topic, entry, result));
         }
-    }
-
-    protected void send(@NotNull String topic, KOut key, VOut value) {
-        _producer.send(new ProducerRecord<>(topic, key, value));
     }
 
     protected void buildProcessor(int batchSize) {
@@ -100,8 +93,8 @@ public abstract class BaseStandaloneCollector<KIn, VIn, KOut, VOut extends Resul
         return new KafkaConsumer<>(_properties, keyDeserializer, valueDeserializer);
     }
 
-    protected @NotNull KafkaProducer<KOut, VOut> createProducer(@NotNull Serializer<KOut> keySerializer,
-                                                                @NotNull Serializer<VOut> valueSerializer) {
+    protected @NotNull <KOut, VOut> KafkaProducer<KOut, VOut> createProducer(@NotNull Serializer<KOut> keySerializer,
+                                                                             @NotNull Serializer<VOut> valueSerializer) {
         var properties = new Properties();
         properties.putAll(_properties);
         properties.setProperty(ProducerConfig.CLIENT_ID_CONFIG, "producer-" + getName() + "-A");
@@ -119,25 +112,5 @@ public abstract class BaseStandaloneCollector<KIn, VIn, KOut, VOut extends Resul
         }
 
         _consumer.close(_closeTimeout);
-        _producer.close(_closeTimeout);
-    }
-
-    protected VOut errorResult(int code, @NotNull String message, @NotNull Class<?> clz, Object[]... args) {
-        try {
-            final var constructor = clz.getDeclaredConstructors()[0];
-            Object[] parValues = new Object[constructor.getParameterCount()];
-
-            parValues[0] = code;
-            parValues[1] = message;
-            parValues[2] = Instant.now();
-            if (args != null && args.length > 0 && args.length <= parValues.length - 3) {
-                System.arraycopy(args, 0, parValues, 3, args.length);
-            }
-
-            //noinspection unchecked
-            return (VOut) constructor.newInstance(parValues);
-        } catch (Exception constructorException) {
-            throw new RuntimeException(constructorException);
-        }
     }
 }

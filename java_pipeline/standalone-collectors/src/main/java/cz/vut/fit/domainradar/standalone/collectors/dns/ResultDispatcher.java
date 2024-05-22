@@ -2,10 +2,12 @@ package cz.vut.fit.domainradar.standalone.collectors.dns;
 
 import cz.vut.fit.domainradar.Topics;
 import cz.vut.fit.domainradar.models.IPToProcess;
+import cz.vut.fit.domainradar.models.ResultCodes;
 import cz.vut.fit.domainradar.models.dns.DNSData;
 import cz.vut.fit.domainradar.models.results.DNSResult;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
@@ -21,16 +23,19 @@ class ResultDispatcher implements Runnable {
     private final BlockingQueue<ProcessedItem> _processedItems;
     private final KafkaProducer<String, DNSResult> _resultProducer;
     private final KafkaProducer<IPToProcess, Void> _ipResultProducer;
+    private final KafkaProducer<String, String> _tlsRequestProducer;
     private final ConcurrentHashMap<String, DNSDataContainer> _inFlight;
 
     public ResultDispatcher(BlockingQueue<ProcessedItem> processedItems,
                             KafkaProducer<String, DNSResult> resultProducer,
-                            KafkaProducer<IPToProcess, Void> ipResultProducer,
+                            KafkaProducer<IPToProcess, Void> ipRequestProducer,
+                            KafkaProducer<String, String> tlsRequestProducer,
                             ConcurrentHashMap<String, DNSDataContainer> inFlight) {
 
         _processedItems = processedItems;
         _resultProducer = resultProducer;
-        _ipResultProducer = ipResultProducer;
+        _ipResultProducer = ipRequestProducer;
+        _tlsRequestProducer = tlsRequestProducer;
         _inFlight = inFlight;
     }
 
@@ -73,6 +78,18 @@ class ResultDispatcher implements Runnable {
 
         Logger.debug("ResultDispatcher stopped.");
         Thread.currentThread().interrupt();
+    }
+
+    private static DNSResult errorResult(int code, @NotNull String message) {
+        return new DNSResult(code, message, Instant.now(), null, null);
+    }
+
+    public void dispatchOnTimeout(String domainName) {
+        // TODO: Send if something has been collected
+        _inFlight.remove(domainName);
+        _resultProducer.send(new ProducerRecord<>(Topics.OUT_DNS, domainName,
+                errorResult(ResultCodes.CANNOT_FETCH,
+                        "DNS scan took too long")));
     }
 
     @SuppressWarnings("unchecked")
@@ -162,15 +179,40 @@ class ResultDispatcher implements Runnable {
                 container.MX, container.NS, container.TXT, container.recordCollectionErrors.isEmpty() ? null : container.recordCollectionErrors);
 
         var ips = getIPsToProcess(container);
-        var result = new DNSResult(0, null, Instant.now(),
-                dnsData, null, ips);
+        var ipForTLS = getIPForTLS(dnsData);
+
+        var result = new DNSResult(0, null, Instant.now(), dnsData, ips);
 
         Logger.trace("Producing DNS result");
         _resultProducer.send(new ProducerRecord<>(Topics.OUT_DNS, domainName, result));
 
-        Logger.trace("Producing IP results");
+        if (ipForTLS != null) {
+            Logger.trace("Producing TLS request");
+            _tlsRequestProducer.send(new ProducerRecord<>(Topics.IN_TLS, domainName, ipForTLS));
+        } else {
+            Logger.trace("No IP found for a TLS request");
+        }
+
+        Logger.trace("Producing IP requests");
         for (var ip : ips) {
             _ipResultProducer.send(new ProducerRecord<>(Topics.IN_IP, new IPToProcess(domainName, ip.ip()), null));
         }
+    }
+
+    private String getIPForTLS(DNSData dnsData) {
+        String targetIp;
+
+        // TODO: handle empty sets
+        if (dnsData.CNAME() != null && dnsData.CNAME().relatedIps() != null && !dnsData.CNAME().relatedIps().isEmpty()) {
+            targetIp = dnsData.CNAME().relatedIps().getFirst();
+        } else if (dnsData.A() != null) {
+            targetIp = dnsData.A().iterator().next();
+        } else if (dnsData.AAAA() != null) {
+            targetIp = dnsData.AAAA().iterator().next();
+        } else {
+            targetIp = null;
+        }
+
+        return targetIp;
     }
 }

@@ -7,6 +7,8 @@ import cz.vut.fit.domainradar.models.ResultCodes;
 import cz.vut.fit.domainradar.models.requests.IPProcessRequest;
 import cz.vut.fit.domainradar.models.results.CommonIPResult;
 import cz.vut.fit.domainradar.serialization.JsonSerde;
+import cz.vut.fit.domainradar.serialization.JsonSerializer;
+import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.common.serialization.Serdes;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -14,17 +16,20 @@ import org.jetbrains.annotations.Nullable;
 import java.time.Instant;
 import java.util.Properties;
 
-public abstract class IPStandaloneCollector<TData> extends BaseStandaloneCollector<IPToProcess, IPProcessRequest,
-        IPToProcess, CommonIPResult<TData>> {
+public abstract class IPStandaloneCollector<TData> extends BaseStandaloneCollector<IPToProcess, IPProcessRequest> {
+
+    protected KafkaProducer<IPToProcess, CommonIPResult<TData>> _producer;
+
     public IPStandaloneCollector(@NotNull ObjectMapper jsonMapper,
                                  @NotNull String appName,
                                  @Nullable Properties properties) {
         super(jsonMapper, appName, properties,
                 JsonSerde.of(jsonMapper, IPToProcess.class),
-                JsonSerde.of(jsonMapper, IPToProcess.class),
-                JsonSerde.of(jsonMapper, IPProcessRequest.class),
-                JsonSerde.of(jsonMapper, new TypeReference<>() {
-                }));
+                JsonSerde.of(jsonMapper, IPProcessRequest.class));
+
+        _producer = super.createProducer(JsonSerde.of(jsonMapper, IPToProcess.class).serializer(),
+                JsonSerde.of(jsonMapper, new TypeReference<CommonIPResult<TData>>() {
+                }).serializer());
     }
 
     protected CommonIPResult<TData> errorResult(int code, String message) {

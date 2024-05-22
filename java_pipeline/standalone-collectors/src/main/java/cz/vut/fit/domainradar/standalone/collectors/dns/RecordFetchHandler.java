@@ -8,6 +8,7 @@ import cz.vut.fit.domainradar.models.requests.DNSProcessRequest;
 import cz.vut.fit.domainradar.models.results.DNSResult;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
@@ -29,6 +30,7 @@ public class RecordFetchHandler implements Closeable {
             = new ConcurrentHashMap<>();
 
     private final ExecutorService _executorService;
+    private final ResultDispatcher _resultDispatcher;
     private final Thread[] _workers;
     private final Timer _clearStalledTimer;
     private final Properties _properties;
@@ -38,8 +40,10 @@ public class RecordFetchHandler implements Closeable {
 
     private final List<String> _typesToCollect, _typesToProcessIPsFrom;
 
-    public RecordFetchHandler(Properties properties, KafkaProducer<String, DNSResult> resultProducer,
-                              KafkaProducer<IPToProcess, Void> ipResultProducer) {
+    public RecordFetchHandler(Properties properties,
+                              KafkaProducer<String, DNSResult> resultProducer,
+                              KafkaProducer<IPToProcess, Void> ipResultProducer,
+                              KafkaProducer<String, String> tlsRequestProducer) {
         _resultProducer = resultProducer;
         _properties = properties;
 
@@ -69,7 +73,10 @@ public class RecordFetchHandler implements Closeable {
             _workers[i].start();
         }
 
-        _workers[workers] = new Thread(new ResultDispatcher(_processed, resultProducer, ipResultProducer, _inFlight));
+        _resultDispatcher = new ResultDispatcher(_processed, resultProducer, ipResultProducer,
+                tlsRequestProducer, _inFlight);
+
+        _workers[workers] = new Thread(_resultDispatcher);
         _workers[workers].setName("DNS-ResultDispatcher");
         _workers[workers].start();
 
@@ -123,11 +130,7 @@ public class RecordFetchHandler implements Closeable {
         @Override
         public void run() {
             Logger.debug("Removing stalled {}", _domainName);
-            _inFlight.remove(_domainName);
-            _resultProducer.send(new ProducerRecord<>(Topics.OUT_DNS,
-                    _domainName, new DNSResult(ResultCodes.CANNOT_FETCH,
-                    "DNS scan took more than " + _stalledTimeout + " ms",
-                    Instant.now(), null, null, null)));
+            _resultDispatcher.dispatchOnTimeout(_domainName);
         }
     }
 

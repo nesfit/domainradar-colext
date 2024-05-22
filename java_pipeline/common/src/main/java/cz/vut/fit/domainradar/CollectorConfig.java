@@ -57,7 +57,6 @@ public class CollectorConfig {
     public static final String DNS_PER_DOMAIN_RESOLVER_RETRIES_DOC = "The number of attempts to query a single DNS server until the next one is used.";
     public static final String DNS_PER_DOMAIN_RESOLVER_RETRIES_DEFAULT = "1";
 
-
     public static final String CLOSE_TIMEOUT_SEC_CONFIG = "collectors.kafka.close.timeout";
     public static final String CLOSE_TIMEOUT_SEC_DOC = "The time to wait for a standalone collector producer/consumer to close (seconds).";
     public static final String CLOSE_TIMEOUT_SEC_DEFAULT = "5";
@@ -73,4 +72,12 @@ public class CollectorConfig {
     public static final String DNS_STALLED_TIMEOUT_MS_CONFIG = "collectors.dns.stalled.timeout";
     public static final String DNS_STALLED_TIMEOUT_MS_DOC = "The time after which a domain scan request is considered stalled (milliseconds).";
     public static final String DNS_STALLED_TIMEOUT_MS_DEFAULT = "60000";
+
+    public static final String ZONE_RESOLUTION_TIMEOUT_MS_CONFIG = "collectors.zone.resolution.timeout";
+    public static final String ZONE_RESOLUTION_TIMEOUT_MS_DOC = "The time after which a zone resolution request is considered stalled (milliseconds).";
+    public static final String ZONE_RESOLUTION_TIMEOUT_MS_DEFAULT = "30000";
+
+    public static final String TLS_TIMEOUT_MS_CONFIG = "collectors.tls.timeout";
+    public static final String TLS_TIMEOUT_MS_DOC = "The time after which a TLS request is considered stalled (milliseconds).";
+    public static final String TLS_TIMEOUT_MS_DEFAULT = "10000";
 }
