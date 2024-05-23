@@ -35,19 +35,14 @@ public class RecordCollectorWorker implements Runnable {
 
     @Override
     public void run() {
-        Logger.debug("RecordCollectorWorker started.");
+        Logger.debug("RecordCollectorWorker started");
 
         while (true) {
             try {
                 // Wait for the next item
                 ToProcessItem item = _toProcess.take();
-
                 // Process the item
-                Logger.trace("Processing {} from {}", item.recordType(), item.domainName());
                 var processedItem = processItem(item);
-                Logger.trace("Processed {} from {}, error: {}", item.recordType(), item.domainName(),
-                        processedItem.error());
-
                 // Add the processed item to the queue
                 _processed.offer(processedItem);
             } catch (InterruptedException e) {
@@ -55,20 +50,26 @@ public class RecordCollectorWorker implements Runnable {
             }
         }
 
-        Logger.debug("RecordCollectorWorker stopped.");
+        Logger.debug("RecordCollectorWorker stopped");
         Thread.currentThread().interrupt();
     }
 
     private ProcessedItem processItem(ToProcessItem item) {
+        final String dn = item.domainName();
+        final String recordType = item.recordType();
+
+        Logger.trace("{} / {}: Collection started", dn, recordType);
+
         InternalDNSResolver.DNSScanner scanner;
         try {
-            scanner = _dnsResolver.makeScanner(item.domainName(), item.zoneInfo());
+            scanner = _dnsResolver.makeScanner(dn, item.zoneInfo());
         } catch (TextParseException e) {
-            return new ProcessedItem(item.domainName(), item.recordType(), null, -1, e.getMessage());
+            Logger.trace("{} / {}: TextParseException", dn, recordType);
+            return new ProcessedItem(dn, recordType, null, -1, e.getMessage());
         }
 
         CompletionStage<?> resolveStage;
-        switch (item.recordType()) {
+        switch (recordType) {
             case "A":
                 resolveStage = scanner.resolveA();
                 break;
@@ -88,17 +89,28 @@ public class RecordCollectorWorker implements Runnable {
                 resolveStage = scanner.resolveTXT();
                 break;
             default:
-                return new ProcessedItem(item.domainName(), item.recordType(), null, -1, "Invalid record type.");
+                return new ProcessedItem(dn, recordType, null, -1, "Invalid record type.");
         }
 
+        var x = System.nanoTime();
         try {
-            var result = (InternalDNSResolver.TTLTuple<?>) resolveStage.toCompletableFuture().join();
-            if (result == null)
-                return new ProcessedItem(item.domainName(), item.recordType(), null, -1, "No data found.");
+            var result = (InternalDNSResolver.TTLTuple<?>) resolveStage.toCompletableFuture()
+                    .orTimeout(_maxTimePerRecord, TimeUnit.MILLISECONDS).join();
+
+            Logger.trace("{} / {}: Resolution finished in {} ms", dn, recordType, (System.nanoTime() - x) / 1_000_000);
 
             return new ProcessedItem(item.domainName(), item.recordType(), result.value(), result.ttl(), null);
         } catch (CompletionException e) {
-            return new ProcessedItem(item.domainName(), item.recordType(), null, -1, e.getCause().getMessage());
+            Logger.trace("{} / {}: Resolution exception in {} ms", dn, recordType, (System.nanoTime() - x) / 1_000_000);
+
+            if (e.getCause() instanceof TimeoutException) {
+                Logger.trace("{} / {}: Timeout", dn, recordType);
+                return new ProcessedItem(dn, recordType, null, -1, "Timeout");
+            } else {
+                Logger.trace("{} / {}: Error", dn, recordType, e.getCause());
+                return new ProcessedItem(dn, recordType, null, -1,
+                        e.getCause().getClass().getName() + ": " + e.getCause().getMessage());
+            }
         }
     }
 }

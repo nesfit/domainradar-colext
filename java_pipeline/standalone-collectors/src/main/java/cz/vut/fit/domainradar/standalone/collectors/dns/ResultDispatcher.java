@@ -41,7 +41,7 @@ class ResultDispatcher implements Runnable {
 
     @Override
     public void run() {
-        Logger.debug("ResultDispatcher started.");
+        Logger.debug("ResultDispatcher started");
 
         while (true) {
             try {
@@ -49,17 +49,17 @@ class ResultDispatcher implements Runnable {
                 ProcessedItem item = _processedItems.take();
 
                 // Process the item
-                Logger.trace("Handling processed {} from {}", item.recordType(), item.domainName());
+                Logger.trace("{}: Handling processed {}", item.domainName(), item.recordType());
                 var result = handleItem(item);
 
                 // If all wanted data has been collected (all bits are 0), dispatch the result
                 if (result == 0) {
-                    Logger.trace("Collected all record types for {}", item.domainName());
+                    Logger.trace("{}: Collected all records", item.domainName());
 
                     // All data is present
                     var container = _inFlight.remove(item.domainName());
                     if (container == null) {
-                        Logger.warn("Received a result for a domain that is not in flight: {}", item.domainName());
+                        Logger.warn("{}: Received a result for a domain that is not in flight", item.domainName());
                         continue;
                     }
 
@@ -69,14 +69,14 @@ class ResultDispatcher implements Runnable {
 
                     this.sendResult(item.domainName(), container);
 
-                    Logger.trace("Finished {}", item.domainName());
+                    Logger.trace("{}: Finished", item.domainName());
                 }
             } catch (InterruptedException e) {
                 break;
             }
         }
 
-        Logger.debug("ResultDispatcher stopped.");
+        Logger.debug("ResultDispatcher stopped");
         Thread.currentThread().interrupt();
     }
 
@@ -87,7 +87,7 @@ class ResultDispatcher implements Runnable {
     public void dispatchOnTimeout(String domainName) {
         var container = _inFlight.remove(domainName);
         if (container == null) {
-            Logger.warn("Received a timeout for a domain that is not in flight: {}", domainName);
+            Logger.warn("{}: Received a timeout for a domain that is not in flight", domainName);
             return;
         }
 
@@ -107,7 +107,7 @@ class ResultDispatcher implements Runnable {
     private int handleItem(ProcessedItem item) {
         var container = _inFlight.get(item.domainName());
         if (container == null) {
-            Logger.warn("Received a result for a domain that is not in flight: {}", item.domainName());
+            Logger.warn("{}: Received a result for a domain that is not in flight", item.domainName());
             return -1;
         }
 
@@ -216,17 +216,17 @@ class ResultDispatcher implements Runnable {
 
         var result = new DNSResult(0, null, Instant.now(), dnsData, ips);
 
-        Logger.trace("Producing DNS result");
+        Logger.trace("{}: Producing DNS result", domainName);
         _resultProducer.send(new ProducerRecord<>(Topics.OUT_DNS, domainName, result));
 
         if (ipForTLS != null) {
-            Logger.trace("Producing TLS request");
+            Logger.trace("{}: Producing TLS request (target: {})", domainName, ipForTLS);
             _tlsRequestProducer.send(new ProducerRecord<>(Topics.IN_TLS, domainName, ipForTLS));
         } else {
-            Logger.trace("No IP found for a TLS request");
+            Logger.trace("{}: No IP found for a TLS request", domainName);
         }
 
-        Logger.trace("Producing IP requests");
+        Logger.trace("{}: Producing IP requests", domainName);
         for (var ip : ips) {
             _ipResultProducer.send(new ProducerRecord<>(Topics.IN_IP, new IPToProcess(domainName, ip.ip()), null));
         }

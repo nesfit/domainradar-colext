@@ -6,6 +6,7 @@ import cz.vut.fit.domainradar.models.requests.DNSProcessRequest;
 import cz.vut.fit.domainradar.models.results.DNSResult;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.slf4j.LoggerFactory;
+import org.slf4j.event.Level;
 
 import java.io.Closeable;
 import java.util.*;
@@ -75,6 +76,21 @@ public class RecordFetchHandler implements Closeable {
 
         _clearStalledTimer = new Timer("DNS-ClearStalledInFlightDomains", false);
 
+        if (Logger.isEnabledForLevel(Level.DEBUG)) {
+            _executorService.submit(() -> {
+                while (!Thread.interrupted()) {
+                    Logger.debug("In flight: {}, to process: {}, processed: {}",
+                            _inFlight.size(), _toProcess.size(), _processed.size());
+                    try {
+                        //noinspection BusyWait
+                        Thread.sleep(1000);
+                    } catch (InterruptedException e) {
+                        break;
+                    }
+                }
+            });
+        }
+
         Logger.info("DNS RecordFetchHandler started");
     }
 
@@ -93,7 +109,7 @@ public class RecordFetchHandler implements Closeable {
         // It is highly improbable that a name would be submitted twice in a short time, but in case it did,
         // this will create the record atomically.
         var inFlightEntry = _inFlight.computeIfAbsent(domainName, unused -> {
-            Logger.trace("Adding new DNS scan entry {}, to collect: {}", domainName, Integer.toHexString(mask));
+            Logger.trace("{}: Adding DNS scan entry, to collect: {}", domainName, Integer.toHexString(mask));
             return new DNSDataContainer(mask,
                     Objects.requireNonNullElse(processRequest.typesToProcessIPsFrom(), _typesToProcessIPsFrom));
         });
@@ -122,7 +138,7 @@ public class RecordFetchHandler implements Closeable {
 
         @Override
         public void run() {
-            Logger.debug("Removing stalled {}", _domainName);
+            Logger.debug("{}: Removing stalled entry", _domainName);
             _resultDispatcher.dispatchOnTimeout(_domainName);
         }
     }
@@ -168,18 +184,16 @@ public class RecordFetchHandler implements Closeable {
         Logger.info("Closing the RecordFetchHandler");
         for (var worker : _workers) {
             worker.interrupt();
-
-            // TODO
             try {
                 worker.join(500);
             } catch (InterruptedException e) {
                 // ignored
             }
         }
-        _executorService.close();
 
+        _executorService.close();
         for (var dn : _inFlight.keySet()) {
-            Logger.info("Not processed: {}", dn);
+            Logger.warn("{}: Not processed!", dn);
         }
     }
 }
