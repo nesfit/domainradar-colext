@@ -92,9 +92,15 @@ public abstract class BaseStandaloneCollector<KIn, VIn> implements Closeable {
 
     protected @NotNull <KOut, VOut> KafkaProducer<KOut, VOut> createProducer(@NotNull Serializer<KOut> keySerializer,
                                                                              @NotNull Serializer<VOut> valueSerializer) {
+        return createProducer(keySerializer, valueSerializer, "A");
+    }
+
+    protected @NotNull <KOut, VOut> KafkaProducer<KOut, VOut> createProducer(@NotNull Serializer<KOut> keySerializer,
+                                                                             @NotNull Serializer<VOut> valueSerializer,
+                                                                             String discriminator) {
         var properties = new Properties();
         properties.putAll(_properties);
-        properties.setProperty(ProducerConfig.CLIENT_ID_CONFIG, "producer-" + getName() + "-A");
+        properties.setProperty(ProducerConfig.CLIENT_ID_CONFIG, "producer-" + getName() + "-" + discriminator);
 
         return new KafkaProducer<>(properties, keySerializer, valueSerializer);
     }

@@ -44,11 +44,11 @@ public class ZoneCollector extends BaseStandaloneCollector<String, ZoneProcessRe
                 CollectorConfig.ZONE_RESOLUTION_TIMEOUT_MS_DEFAULT));
 
         _resultProducer = super.createProducer(new StringSerializer(),
-                JsonSerde.of(jsonMapper, ZoneResult.class).serializer());
+                JsonSerde.of(jsonMapper, ZoneResult.class).serializer(), "result");
         _dnsRequestProducer = super.createProducer(new StringSerializer(),
-                JsonSerde.of(jsonMapper, DNSProcessRequest.class).serializer());
+                JsonSerde.of(jsonMapper, DNSProcessRequest.class).serializer(), "dns-req");
         _rdapRequestProducer = super.createProducer(new StringSerializer(),
-                JsonSerde.of(jsonMapper, RDAPDomainProcessRequest.class).serializer());
+                JsonSerde.of(jsonMapper, RDAPDomainProcessRequest.class).serializer(), "rdap-req");
 
         _executor = Executors.newVirtualThreadPerTaskExecutor();
         _dns = new InternalDNSResolver(_executor, _properties);

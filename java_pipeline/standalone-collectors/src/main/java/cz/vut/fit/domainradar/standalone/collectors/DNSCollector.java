@@ -41,12 +41,12 @@ public class DNSCollector extends BaseStandaloneCollector<String, DNSProcessRequ
         _executor = Executors.newVirtualThreadPerTaskExecutor();
 
         _resultProducer = super.createProducer(new StringSerializer(),
-                JsonSerde.of(jsonMapper, DNSResult.class).serializer());
+                JsonSerde.of(jsonMapper, DNSResult.class).serializer(), "result");
         _ipResultProducer = super.createProducer(JsonSerde.of(jsonMapper, IPToProcess.class).serializer(),
-                new VoidSerializer());
-        _tlsRequestProducer = super.createProducer(new StringSerializer(), new StringSerializer());
+                new VoidSerializer(), "ip-req");
+        _tlsRequestProducer = super.createProducer(new StringSerializer(), new StringSerializer(), "tls-req");
 
-        _fetchHandler = new RecordFetchHandler(properties, _resultProducer, _ipResultProducer, _tlsRequestProducer);
+        _fetchHandler = new Processor(properties, _resultProducer, _ipResultProducer, _tlsRequestProducer);
     }
 
     @Override
