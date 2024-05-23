@@ -7,7 +7,7 @@ import cz.vut.fit.domainradar.models.requests.DNSProcessRequest;
 import cz.vut.fit.domainradar.models.results.DNSResult;
 import cz.vut.fit.domainradar.serialization.JsonSerde;
 import cz.vut.fit.domainradar.standalone.BaseStandaloneCollector;
-import cz.vut.fit.domainradar.standalone.collectors.dns.RecordFetchHandler;
+import cz.vut.fit.domainradar.standalone.collectors.dns.Processor;
 import org.apache.commons.cli.CommandLine;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.common.serialization.Serdes;
@@ -25,7 +25,7 @@ public class DNSCollector extends BaseStandaloneCollector<String, DNSProcessRequ
     public static String NAME = "dns";
 
     private final ExecutorService _executor;
-    private final RecordFetchHandler _fetchHandler;
+    private final Processor _fetchHandler;
 
     private final KafkaProducer<String, DNSResult> _resultProducer;
     private final KafkaProducer<IPToProcess, Void> _ipResultProducer;

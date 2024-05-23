@@ -15,8 +15,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 
-public class RecordFetchHandler implements Closeable {
-    private static final org.slf4j.Logger Logger = LoggerFactory.getLogger(RecordFetchHandler.class);
+public class Processor implements Closeable {
+    private static final org.slf4j.Logger Logger = LoggerFactory.getLogger(Processor.class);
 
     private final LinkedBlockingQueue<ToProcessItem> _toProcess
             = new LinkedBlockingQueue<>();
@@ -35,10 +35,10 @@ public class RecordFetchHandler implements Closeable {
 
     private final List<String> _typesToCollect, _typesToProcessIPsFrom;
 
-    public RecordFetchHandler(Properties properties,
-                              KafkaProducer<String, DNSResult> resultProducer,
-                              KafkaProducer<IPToProcess, Void> ipResultProducer,
-                              KafkaProducer<String, String> tlsRequestProducer) {
+    public Processor(Properties properties,
+                     KafkaProducer<String, DNSResult> resultProducer,
+                     KafkaProducer<IPToProcess, Void> ipResultProducer,
+                     KafkaProducer<String, String> tlsRequestProducer) {
         _properties = properties;
 
         _stalledTimeout = Long.parseLong(properties.getProperty(
