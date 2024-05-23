@@ -85,11 +85,22 @@ class ResultDispatcher implements Runnable {
     }
 
     public void dispatchOnTimeout(String domainName) {
-        // TODO: Send if something has been collected
-        _inFlight.remove(domainName);
-        _resultProducer.send(new ProducerRecord<>(Topics.OUT_DNS, domainName,
-                errorResult(ResultCodes.CANNOT_FETCH,
-                        "DNS scan took too long")));
+        var container = _inFlight.remove(domainName);
+        if (container == null) {
+            Logger.warn("Received a timeout for a domain that is not in flight: {}", domainName);
+            return;
+        }
+
+        if (container.initialMask == container.missingMask) {
+            // No records were fetched
+            _resultProducer.send(new ProducerRecord<>(Topics.OUT_DNS, domainName,
+                    errorResult(ResultCodes.CANNOT_FETCH,
+                            "DNS scan took too long, no data collected")));
+        } else {
+            // Some of the requested records were collected
+            fillMissingEntriesFromMasks(container);
+            sendResult(domainName, container);
+        }
     }
 
     @SuppressWarnings("unchecked")
@@ -104,32 +115,32 @@ class ResultDispatcher implements Runnable {
             case "A" -> {
                 container.A = (Set<String>) item.value();
                 container.ttlA = item.ttl();
-                container.missing &= 0b011111;
+                container.missingMask &= 0b011111;
             }
             case "AAAA" -> {
                 container.AAAA = (Set<String>) item.value();
                 container.ttlAAAA = item.ttl();
-                container.missing &= 0b101111;
+                container.missingMask &= 0b101111;
             }
             case "CNAME" -> {
                 container.CNAME = (DNSData.CNAMERecord) item.value();
                 container.ttlCNAME = item.ttl();
-                container.missing &= 0b110111;
+                container.missingMask &= 0b110111;
             }
             case "MX" -> {
                 container.MX = (List<DNSData.MXRecord>) item.value();
                 container.ttlMX = item.ttl();
-                container.missing &= 0b111011;
+                container.missingMask &= 0b111011;
             }
             case "NS" -> {
                 container.NS = (List<DNSData.NSRecord>) item.value();
                 container.ttlNS = item.ttl();
-                container.missing &= 0b111101;
+                container.missingMask &= 0b111101;
             }
             case "TXT" -> {
                 container.TXT = (List<String>) item.value();
                 container.ttlTXT = item.ttl();
-                container.missing &= 0b111110;
+                container.missingMask &= 0b111110;
             }
         }
 
@@ -137,7 +148,7 @@ class ResultDispatcher implements Runnable {
             container.recordCollectionErrors.put(item.recordType(), item.error());
         }
 
-        return container.missing;
+        return container.missingMask;
     }
 
     private static <T> Stream<T> streamIfNotNull(Collection<T> collection) {
@@ -169,6 +180,28 @@ class ResultDispatcher implements Runnable {
         }
 
         return ret;
+    }
+
+    private void fillMissingEntriesFromMasks(DNSDataContainer container) {
+        var notCollected = container.missingMask & container.initialMask;
+        if ((notCollected & 0b100000) != 0) {
+            container.recordCollectionErrors.put("A", "Timeout");
+        }
+        if ((notCollected & 0b010000) != 0) {
+            container.recordCollectionErrors.put("AAAA", "Timeout");
+        }
+        if ((notCollected & 0b001000) != 0) {
+            container.recordCollectionErrors.put("CNAME", "Timeout");
+        }
+        if ((notCollected & 0b000100) != 0) {
+            container.recordCollectionErrors.put("MX", "Timeout");
+        }
+        if ((notCollected & 0b000010) != 0) {
+            container.recordCollectionErrors.put("NS", "Timeout");
+        }
+        if ((notCollected & 0b000001) != 0) {
+            container.recordCollectionErrors.put("TXT", "Timeout");
+        }
     }
 
     private void sendResult(String domainName, DNSDataContainer container) {

@@ -75,5 +75,6 @@ public class DNSCollector extends BaseStandaloneCollector<String, DNSProcessRequ
         _executor.close();
         _resultProducer.close();
         _ipResultProducer.close();
+        _tlsRequestProducer.close();
     }
 }

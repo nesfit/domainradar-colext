@@ -7,7 +7,7 @@ import java.util.*;
 
 class DNSDataContainer {
     DNSDataContainer(int mask, List<String> typesToProcessIPsFrom) {
-        this.missing = mask;
+        this.missingMask = this.initialMask = mask;
         this.typesToProcessIPsFrom = typesToProcessIPsFrom;
         this.recordCollectionErrors = new HashMap<>();
     }
@@ -19,7 +19,7 @@ class DNSDataContainer {
     @Nullable List<DNSData.NSRecord> NS;
     @Nullable List<String> TXT;
     long ttlA = -1, ttlAAAA = -1, ttlCNAME = -1, ttlMX = -1, ttlNS = -1, ttlTXT = -1;
-    int missing;
+    int missingMask, initialMask;
     List<String> typesToProcessIPsFrom;
     Map<String, String> recordCollectionErrors;
     TimerTask clearStalledTask;
