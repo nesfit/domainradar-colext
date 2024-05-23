@@ -58,10 +58,11 @@ public class TLSCollector extends BaseStandaloneCollector<String, String> {
             final var dn = ctx.key();
             final var ip = ctx.value();
 
-            var resultFuture = runTLSResolve(dn, ip).toCompletableFuture();
+            var resultFuture = runTLSResolve(dn, ip).toCompletableFuture()
+                    .orTimeout(futureTimeout, TimeUnit.MILLISECONDS);
 
             try {
-                var result = resultFuture.orTimeout(futureTimeout, TimeUnit.MILLISECONDS).join();
+                var result = resultFuture.join();
                 _producer.send(new ProducerRecord<>(Topics.OUT_TLS, dn, result));
             } catch (CompletionException e) {
                 if (e.getCause() instanceof TimeoutException) {
