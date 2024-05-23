@@ -78,6 +78,6 @@ public class CollectorConfig {
     public static final String ZONE_RESOLUTION_TIMEOUT_MS_DEFAULT = "30000";
 
     public static final String TLS_TIMEOUT_MS_CONFIG = "collectors.tls.timeout";
-    public static final String TLS_TIMEOUT_MS_DOC = "The time after which a TLS request is considered stalled (milliseconds).";
+    public static final String TLS_TIMEOUT_MS_DOC = "The TLS socket timeout (milliseconds).";
     public static final String TLS_TIMEOUT_MS_DEFAULT = "10000";
 }

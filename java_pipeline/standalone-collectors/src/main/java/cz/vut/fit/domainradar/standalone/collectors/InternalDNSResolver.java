@@ -25,7 +25,6 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Function;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -71,52 +70,6 @@ public class InternalDNSResolver {
                 // Shouldn't happen
                 throw new RuntimeException(e);
             }
-        }
-
-        private static <T> CompletableFuture<TTLTuple<T>> resolveIfWanted(
-                List<String> toCollect, String record, Supplier<CompletionStage<TTLTuple<T>>> supplier) {
-            if (toCollect == null || toCollect.contains(record)) {
-                return supplier.get().toCompletableFuture();
-            } else {
-                return CompletableFuture.completedFuture(TTLTuple.ofNull());
-            }
-        }
-
-        public CompletionStage<DNSData> scan(List<String> toCollect) {
-            var a = resolveIfWanted(toCollect, "A", this::resolveA);
-            var aaaa = resolveIfWanted(toCollect, "AAAA", this::resolveAAAA);
-            var cname = resolveIfWanted(toCollect, "CNAME", this::resolveCNAME);
-            var mx = resolveIfWanted(toCollect, "MX", this::resolveMX);
-            var ns = resolveIfWanted(toCollect, "NS", this::resolveNS);
-            var txt = resolveIfWanted(toCollect, "TXT", this::resolveTXT);
-
-            return CompletableFuture.allOf(a, aaaa, cname, mx, ns, txt)
-                    .thenApply(unused -> {
-                        var aRes = a.join();
-                        var aaaaRes = aaaa.join();
-                        var cnameRes = cname.join();
-                        var mxRes = mx.join();
-                        var nsRes = ns.join();
-                        var txtRes = txt.join();
-
-                        return new DNSData(
-                                Map.of(
-                                        "A", aRes.ttl(),
-                                        "AAAA", aaaaRes.ttl(),
-                                        "CNAME", cnameRes.ttl(),
-                                        "MX", mxRes.ttl(),
-                                        "NS", nsRes.ttl(),
-                                        "TXT", txtRes.ttl()
-                                ),
-                                aRes.value(),
-                                aaaaRes.value(),
-                                cnameRes.value(),
-                                mxRes.value(),
-                                nsRes.value(),
-                                txtRes.value(),
-                                null
-                        );
-                    });
         }
 
         public CompletionStage<TTLTuple<Set<String>>> resolveA() {
@@ -664,15 +617,6 @@ public class InternalDNSResolver {
                                         secondaryIps)), _executor);
                     }, _executor);
                 });
-    }
-
-    public CompletionStage<Set<Name>> findNameserversAsync(String domainName) {
-        try {
-            return findNameserversAsync(Name.fromString(domainName));
-        } catch (TextParseException e) {
-            Logger.warn("Invalid domain name {}", domainName, e);
-            return CompletableFuture.completedFuture(Collections.emptySet());
-        }
     }
 
     public CompletionStage<Set<Name>> findNameserversAsync(Name domainName) {

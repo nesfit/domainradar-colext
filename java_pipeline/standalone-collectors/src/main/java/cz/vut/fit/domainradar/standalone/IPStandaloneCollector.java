@@ -22,7 +22,7 @@ public abstract class IPStandaloneCollector<TData> extends BaseStandaloneCollect
 
     public IPStandaloneCollector(@NotNull ObjectMapper jsonMapper,
                                  @NotNull String appName,
-                                 @Nullable Properties properties) {
+                                 @NotNull Properties properties) {
         super(jsonMapper, appName, properties,
                 JsonSerde.of(jsonMapper, IPToProcess.class),
                 JsonSerde.of(jsonMapper, IPProcessRequest.class));
