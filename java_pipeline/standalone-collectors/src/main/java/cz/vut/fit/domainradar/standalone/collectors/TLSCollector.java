@@ -4,10 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import cz.vut.fit.domainradar.CollectorConfig;
 import cz.vut.fit.domainradar.Topics;
 import cz.vut.fit.domainradar.models.ResultCodes;
-import cz.vut.fit.domainradar.models.dns.DNSData;
-import cz.vut.fit.domainradar.models.results.DNSResult;
 import cz.vut.fit.domainradar.models.results.TLSResult;
-import cz.vut.fit.domainradar.models.results.ZoneResult;
 import cz.vut.fit.domainradar.models.tls.TLSData;
 import cz.vut.fit.domainradar.serialization.JsonSerde;
 import cz.vut.fit.domainradar.standalone.BaseStandaloneCollector;
@@ -17,7 +14,6 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import pl.tlinkowski.unij.api.UniLists;
 
 import javax.net.ssl.*;
@@ -44,7 +40,8 @@ public class TLSCollector extends BaseStandaloneCollector<String, String> {
     public TLSCollector(@NotNull ObjectMapper jsonMapper, @NotNull String appName, @NotNull Properties properties) {
         super(jsonMapper, appName, properties,
                 Serdes.String(), Serdes.String());
-        _timeout = Long.parseLong(properties.getProperty(CollectorConfig.TLS_TIMEOUT_MS_CONFIG, CollectorConfig.TLS_TIMEOUT_MS_DEFAULT));
+        _timeout = Long.parseLong(properties.getProperty(CollectorConfig.TLS_TIMEOUT_MS_CONFIG,
+                CollectorConfig.TLS_TIMEOUT_MS_DEFAULT));
 
         _executor = Executors.newVirtualThreadPerTaskExecutor();
         _producer = super.createProducer(new StringSerializer(),
@@ -54,6 +51,7 @@ public class TLSCollector extends BaseStandaloneCollector<String, String> {
     @Override
     public void run(CommandLine cmd) {
         buildProcessor(0);
+        final long futureTimeout = (long) (_timeout * 1.1);
 
         _parallelProcessor.subscribe(UniLists.of(Topics.IN_DNS));
         _parallelProcessor.poll(ctx -> {
@@ -63,7 +61,7 @@ public class TLSCollector extends BaseStandaloneCollector<String, String> {
             var resultFuture = runTLSResolve(dn, ip).toCompletableFuture();
 
             try {
-                var result = resultFuture.orTimeout(_timeout, TimeUnit.MILLISECONDS).join();
+                var result = resultFuture.orTimeout(futureTimeout, TimeUnit.MILLISECONDS).join();
                 _producer.send(new ProducerRecord<>(Topics.OUT_TLS, dn, result));
             } catch (CompletionException e) {
                 if (e.getCause() instanceof TimeoutException) {
@@ -91,6 +89,9 @@ public class TLSCollector extends BaseStandaloneCollector<String, String> {
             SSLSocketFactory factory = context.getSocketFactory();
 
             try (SSLSocket socket = (SSLSocket) factory.createSocket(targetIp, 443)) {
+                // Enable timeouts
+                socket.setSoTimeout((int) _timeout);
+
                 // Enable SNI
                 SSLParameters sslParams = new SSLParameters();
                 sslParams.setServerNames(List.of(new SNIHostName(hostName)));
