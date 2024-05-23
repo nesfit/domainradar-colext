@@ -115,32 +115,32 @@ class ResultDispatcher implements Runnable {
             case "A" -> {
                 container.A = (Set<String>) item.value();
                 container.ttlA = item.ttl();
-                container.missingMask &= 0b011111;
+                container.missingMask &= RecordTypeFlags.A_CLEAR;
             }
             case "AAAA" -> {
                 container.AAAA = (Set<String>) item.value();
                 container.ttlAAAA = item.ttl();
-                container.missingMask &= 0b101111;
+                container.missingMask &= RecordTypeFlags.AAAA_CLEAR;
             }
             case "CNAME" -> {
                 container.CNAME = (DNSData.CNAMERecord) item.value();
                 container.ttlCNAME = item.ttl();
-                container.missingMask &= 0b110111;
+                container.missingMask &= RecordTypeFlags.CNAME_CLEAR;
             }
             case "MX" -> {
                 container.MX = (List<DNSData.MXRecord>) item.value();
                 container.ttlMX = item.ttl();
-                container.missingMask &= 0b111011;
+                container.missingMask &= RecordTypeFlags.MX_CLEAR;
             }
             case "NS" -> {
                 container.NS = (List<DNSData.NSRecord>) item.value();
                 container.ttlNS = item.ttl();
-                container.missingMask &= 0b111101;
+                container.missingMask &= RecordTypeFlags.NS_CLEAR;
             }
             case "TXT" -> {
                 container.TXT = (List<String>) item.value();
                 container.ttlTXT = item.ttl();
-                container.missingMask &= 0b111110;
+                container.missingMask &= RecordTypeFlags.TXT_CLEAR;
             }
         }
 
@@ -184,22 +184,22 @@ class ResultDispatcher implements Runnable {
 
     private void fillMissingEntriesFromMasks(DNSDataContainer container) {
         var notCollected = container.missingMask & container.initialMask;
-        if ((notCollected & 0b100000) != 0) {
+        if ((notCollected & RecordTypeFlags.A) != 0) {
             container.recordCollectionErrors.put("A", "Timeout");
         }
-        if ((notCollected & 0b010000) != 0) {
+        if ((notCollected & RecordTypeFlags.AAAA) != 0) {
             container.recordCollectionErrors.put("AAAA", "Timeout");
         }
-        if ((notCollected & 0b001000) != 0) {
+        if ((notCollected & RecordTypeFlags.CNAME) != 0) {
             container.recordCollectionErrors.put("CNAME", "Timeout");
         }
-        if ((notCollected & 0b000100) != 0) {
+        if ((notCollected & RecordTypeFlags.MX) != 0) {
             container.recordCollectionErrors.put("MX", "Timeout");
         }
-        if ((notCollected & 0b000010) != 0) {
+        if ((notCollected & RecordTypeFlags.NS) != 0) {
             container.recordCollectionErrors.put("NS", "Timeout");
         }
-        if ((notCollected & 0b000001) != 0) {
+        if ((notCollected & RecordTypeFlags.NS) != 0) {
             container.recordCollectionErrors.put("TXT", "Timeout");
         }
     }

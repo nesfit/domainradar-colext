@@ -132,22 +132,22 @@ public class RecordFetchHandler implements Closeable {
         for (var type : toProcess) {
             switch (type) {
                 case "A":
-                    mask |= 0b100000;
+                    mask |= RecordTypeFlags.A;
                     break;
                 case "AAAA":
-                    mask |= 0b010000;
+                    mask |= RecordTypeFlags.AAAA;
                     break;
                 case "CNAME":
-                    mask |= 0b001000;
+                    mask |= RecordTypeFlags.CNAME;
                     break;
                 case "NS":
-                    mask |= 0b000100;
+                    mask |= RecordTypeFlags.NS;
                     break;
                 case "MX":
-                    mask |= 0b000010;
+                    mask |= RecordTypeFlags.MX;
                     break;
                 case "TXT":
-                    mask |= 0b000001;
+                    mask |= RecordTypeFlags.TXT;
                     break;
             }
         }
