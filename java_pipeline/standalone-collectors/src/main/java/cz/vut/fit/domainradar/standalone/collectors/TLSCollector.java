@@ -53,7 +53,7 @@ public class TLSCollector extends BaseStandaloneCollector<String, String> {
         buildProcessor(0);
         final long futureTimeout = (long) (_timeout * 1.1);
 
-        _parallelProcessor.subscribe(UniLists.of(Topics.IN_DNS));
+        _parallelProcessor.subscribe(UniLists.of(Topics.IN_TLS));
         _parallelProcessor.poll(ctx -> {
             final var dn = ctx.key();
             final var ip = ctx.value();

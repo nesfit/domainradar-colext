@@ -16,14 +16,14 @@ public final class Topics {
     public static final String OUT_TLS = "processed_TLS";
     public static final String OUT_IP = "collected_IP_data";
 
-    public static final String OUT_MERGE_DNS_IP = "merged_DNS_IP";
     public static final String OUT_MERGE_ALL = "all_collected_data";
 
 
     public static final Map<String, String> TOPICS_TO_COLLECTOR_ID = new HashMap<>();
 
     static {
-        TOPICS_TO_COLLECTOR_ID.put(OUT_DNS, "dns-tls");
+        TOPICS_TO_COLLECTOR_ID.put(OUT_DNS, "dns");
+        TOPICS_TO_COLLECTOR_ID.put(OUT_TLS, "tls");
         TOPICS_TO_COLLECTOR_ID.put(OUT_ZONE, "zone");
         TOPICS_TO_COLLECTOR_ID.put(OUT_RDAP_DN, "rdap-dn");
     }
