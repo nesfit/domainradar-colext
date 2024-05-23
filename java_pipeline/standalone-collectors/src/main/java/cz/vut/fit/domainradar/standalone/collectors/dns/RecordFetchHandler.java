@@ -1,18 +1,13 @@
 package cz.vut.fit.domainradar.standalone.collectors.dns;
 
 import cz.vut.fit.domainradar.CollectorConfig;
-import cz.vut.fit.domainradar.Topics;
 import cz.vut.fit.domainradar.models.IPToProcess;
-import cz.vut.fit.domainradar.models.ResultCodes;
 import cz.vut.fit.domainradar.models.requests.DNSProcessRequest;
 import cz.vut.fit.domainradar.models.results.DNSResult;
 import org.apache.kafka.clients.producer.KafkaProducer;
-import org.apache.kafka.clients.producer.ProducerRecord;
-import org.jetbrains.annotations.NotNull;
 import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
-import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -36,7 +31,6 @@ public class RecordFetchHandler implements Closeable {
     private final Properties _properties;
     private final int _defaultMask;
     private final long _stalledTimeout;
-    private final KafkaProducer<String, DNSResult> _resultProducer;
 
     private final List<String> _typesToCollect, _typesToProcessIPsFrom;
 
@@ -44,7 +38,6 @@ public class RecordFetchHandler implements Closeable {
                               KafkaProducer<String, DNSResult> resultProducer,
                               KafkaProducer<IPToProcess, Void> ipResultProducer,
                               KafkaProducer<String, String> tlsRequestProducer) {
-        _resultProducer = resultProducer;
         _properties = properties;
 
         _stalledTimeout = Long.parseLong(properties.getProperty(

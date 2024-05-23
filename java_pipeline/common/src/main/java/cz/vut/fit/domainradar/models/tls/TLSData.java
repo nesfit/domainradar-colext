@@ -1,10 +1,7 @@
 package cz.vut.fit.domainradar.models.tls;
 
-import cz.vut.fit.domainradar.models.results.DNSResult;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
-import java.time.Instant;
 import java.util.List;
 
 public record TLSData(@NotNull String fromIp,

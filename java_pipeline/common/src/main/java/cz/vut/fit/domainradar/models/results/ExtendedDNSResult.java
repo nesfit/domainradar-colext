@@ -3,7 +3,6 @@ package cz.vut.fit.domainradar.models.results;
 import com.fasterxml.jackson.databind.JsonNode;
 import cz.vut.fit.domainradar.models.ResultCodes;
 import cz.vut.fit.domainradar.models.dns.DNSData;
-import cz.vut.fit.domainradar.models.tls.TLSData;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 

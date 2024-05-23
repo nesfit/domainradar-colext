@@ -482,7 +482,7 @@ public class InternalDNSResolver {
                         // An exception occurred when performing the DNS lookup
                         exc = exc.getCause();
                         // NoSuchDomain is fine, means it just doesn't exist
-                        if (exc instanceof org.xbill.DNS.lookup.NoSuchDomainException) {
+                        if (exc instanceof NoSuchDomainException) {
                             return CompletableFuture.completedFuture(previousResult);
                         }
                         // Others should be at least logged

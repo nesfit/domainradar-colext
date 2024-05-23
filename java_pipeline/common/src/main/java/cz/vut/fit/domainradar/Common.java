@@ -8,8 +8,6 @@ import com.fasterxml.jackson.databind.cfg.MapperBuilder;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
-import java.util.Map;
-
 public final class Common {
     public static MapperBuilder<? extends ObjectMapper, ?> makeMapper() {
         return JsonMapper.builder()
