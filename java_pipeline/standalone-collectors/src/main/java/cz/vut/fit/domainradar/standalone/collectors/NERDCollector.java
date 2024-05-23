@@ -10,10 +10,10 @@ import cz.vut.fit.domainradar.models.ip.NERDData;
 import cz.vut.fit.domainradar.models.results.CommonIPResult;
 import cz.vut.fit.domainradar.standalone.IPStandaloneCollector;
 import org.apache.commons.cli.CommandLine;
-import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.LoggerFactory;
 import pl.tlinkowski.unij.api.UniLists;
 
 import java.io.IOException;
@@ -27,43 +27,48 @@ import java.nio.ByteOrder;
 import java.time.Duration;
 import java.util.List;
 import java.util.Properties;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.*;
 
 public class NERDCollector extends IPStandaloneCollector<NERDData> {
+    private static final org.slf4j.Logger Logger = LoggerFactory.getLogger(ZoneCollector.class);
+
     public static final String NAME = "nerd";
     private static final String NERD_BASE = "https://nerd.cesnet.cz/nerd/api/v1/";
 
-    private final Duration _httpTimeout;
+    private final ExecutorService _executor;
     private final String _token;
-
     private HttpClient _client;
-    private ExecutorService _executor;
+
+    private final Duration _httpTimeout;
+    private final int _batchSize;
 
     public NERDCollector(ObjectMapper jsonMapper, String appName, Properties properties) {
         super(jsonMapper, appName, properties);
-
-        _properties.setProperty(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
         _httpTimeout = Duration.ofSeconds(Integer.parseInt(
                 properties.getProperty(CollectorConfig.NERD_HTTP_TIMEOUT_CONFIG,
                         CollectorConfig.NERD_HTTP_TIMEOUT_DEFAULT)));
         _token = properties.getProperty(CollectorConfig.NERD_TOKEN_CONFIG, CollectorConfig.NERD_TOKEN_DEFAULT);
+        _batchSize = Integer.parseInt(properties.getProperty(CollectorConfig.NERD_BATCH_SIZE_CONFIG,
+                CollectorConfig.NERD_BATCH_SIZE_DEFAULT));
 
         if (_token.isBlank())
             throw new IllegalArgumentException("NERD token is not set.");
+
+        _executor = Executors.newVirtualThreadPerTaskExecutor();
     }
 
     @Override
     public void run(CommandLine cmd) {
-        buildProcessor(20);
+        buildProcessor(_batchSize);
 
-        final var executor = _executor = Executors.newVirtualThreadPerTaskExecutor();
         _client = HttpClient.newBuilder()
                 .followRedirects(HttpClient.Redirect.NEVER)
                 .connectTimeout(_httpTimeout)
                 .version(HttpClient.Version.HTTP_1_1)
-                .executor(executor)
+                .executor(_executor)
                 .build();
+
+        final var processingTimeout = (long) (_httpTimeout.toMillis() * 1.1);
 
         _parallelProcessor.subscribe(UniLists.of(Topics.IN_IP));
         _parallelProcessor.poll(ctx -> {
@@ -75,11 +80,25 @@ public class NERDCollector extends IPStandaloneCollector<NERDData> {
                     })
                     .map(ConsumerRecord::key)
                     .toList();
-            this.processIps(entries);
+
+            final var batch = System.nanoTime() % 1000000;
+            Logger.trace("Processing batch {}: {}", batch, entries);
+            var processFuture = this.processIps(entries, batch)
+                    .orTimeout(processingTimeout, TimeUnit.MILLISECONDS);
+
+            try {
+                processFuture.join();
+            } catch (CompletionException e) {
+                if (e.getCause() instanceof TimeoutException) {
+                    sendAboutAll(entries, errorResult(ResultCodes.CANNOT_FETCH, "Timeout"));
+                } else {
+                    sendAboutAll(entries, errorResult(ResultCodes.INTERNAL_ERROR, e.getMessage()));
+                }
+            }
         });
     }
 
-    private void processIps(List<IPToProcess> entries) {
+    private CompletableFuture<Void> processIps(List<IPToProcess> entries, final long batch) {
         var ips = entries.stream().map(IPToProcess::ip).toList();
         var bytes = new byte[ips.size() * 4];
         var ptr = 0;
@@ -101,31 +120,36 @@ public class NERDCollector extends IPStandaloneCollector<NERDData> {
                 .POST(HttpRequest.BodyPublishers.ofByteArray(bytes))
                 .build();
 
-        _client.sendAsync(listRequest, HttpResponse.BodyHandlers.ofByteArray())
+        return _client.sendAsync(listRequest, HttpResponse.BodyHandlers.ofByteArray())
                 .thenAccept(response -> {
                     if (response.statusCode() == 200) {
                         var resultData = response.body();
                         if (resultData.length % 8 != 0 || resultData.length / 8 != ips.size()) {
+                            Logger.info("Invalid NERD response (batch {})", batch);
                             sendAboutAll(entries, errorResult(ResultCodes.INVALID_FORMAT, "Invalid NERD response (content length mismatch)"));
                             return;
                         }
 
-                        System.err.println("Processing " + ips.size() + " IPs from NERD");
+                        Logger.trace("Processing {} IPs (batch {})", ips.size(), batch);
                         var resultDataBuffer = ByteBuffer.wrap(resultData);
                         resultDataBuffer.order(ByteOrder.LITTLE_ENDIAN);
 
                         for (var i = 0; i < ips.size(); i++) {
                             var value = resultDataBuffer.getDouble(i);
+
+                            Logger.trace("DN/IP {} -> {}", entries.get(i), value);
                             _producer.send(new ProducerRecord<>(Topics.OUT_IP, entries.get(i),
                                     successResult(new NERDData(value))));
                         }
                     } else {
-                        sendAboutAll(entries, errorResult(ResultCodes.CANNOT_FETCH, "NERD response " + response.statusCode()));
-
+                        Logger.debug("NERD response {} (batch {})", response.statusCode(), batch);
+                        sendAboutAll(entries, errorResult(ResultCodes.CANNOT_FETCH,
+                                "NERD response " + response.statusCode()));
                     }
                 })
                 .exceptionally(e -> {
-                    sendAboutAll(entries, errorResult(ResultCodes.CANNOT_FETCH, "Cannot fetch NERD data: " + e.getMessage()));
+                    Logger.debug("Error processing response (batch {})", batch, e);
+                    sendAboutAll(entries, errorResult(ResultCodes.CANNOT_FETCH, e.getMessage()));
                     return null;
                 });
     }
@@ -145,7 +169,8 @@ public class NERDCollector extends IPStandaloneCollector<NERDData> {
 
         if (_parallelProcessor != null) {
             _client.close();
-            _executor.close();
         }
+
+        _executor.close();
     }
 }
