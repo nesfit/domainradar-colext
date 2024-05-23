@@ -320,9 +320,14 @@ public class InternalDNSResolver {
 
                 var resolver = new ExtendedResolver(nameserversToUse);
                 resolver.setRetries(_perDomainNSRetries);
-                resolver.setTimeout(_perDomainNSTimeout);
+                resolver.setTimeout(_perDomainNSTimeout.multipliedBy(
+                        (long) _perDomainNSRetries * nameserversToUse.length));
                 resolver.setLoadBalance(true);
                 resolver.setTCP(false);
+
+                for (var inResolver : resolver.getResolvers()) {
+                    inResolver.setTimeout(_perDomainNSTimeout);
+                }
 
                 return LookupSession.builder()
                         .executor(_executor)
@@ -337,15 +342,27 @@ public class InternalDNSResolver {
     public static ExtendedResolver makeMainResolver(Properties properties) throws UnknownHostException {
         var dnsServers = properties.getProperty(CollectorConfig.DNS_MAIN_RESOLVER_IPS_CONFIG,
                 CollectorConfig.DNS_MAIN_RESOLVER_IPS_DEFAULT).split(",");
+        var randomize = Boolean.parseBoolean(properties.getProperty(
+                CollectorConfig.DNS_MAIN_RESOLVER_RANDOMIZE_CONFIG, CollectorConfig.DNS_MAIN_RESOLVER_RANDOMIZE_DEFAULT));
+        var timeoutForEach = Duration.ofSeconds(Integer.parseInt(properties.getProperty(
+                CollectorConfig.DNS_MAIN_RESOLVER_TIMEOUT_PER_NS_MS_CONFIG, CollectorConfig.DNS_MAIN_RESOLVER_TIMEOUT_PER_NS_MS_DEFAULT)));
+        var retries = Integer.parseInt(properties.getProperty(
+                CollectorConfig.DNS_MAIN_RESOLVER_RETRIES_CONFIG, CollectorConfig.DNS_MAIN_RESOLVER_RETRIES_DEFAULT));
+
+        if (randomize) {
+            Collections.shuffle(Arrays.asList(dnsServers));
+        }
 
         var resolver = new ExtendedResolver(dnsServers);
 
-        resolver.setTimeout(Duration.ofSeconds(Integer.parseInt(properties.getProperty(
-                CollectorConfig.DNS_MAIN_RESOLVER_TIMEOUT_SEC_CONFIG, CollectorConfig.DNS_MAIN_RESOLVER_TIMEOUT_SEC_DEFAULT))));
+        for (var inResolver : resolver.getResolvers()) {
+            inResolver.setTimeout(timeoutForEach);
+        }
+
+        resolver.setRetries(retries);
+        resolver.setTimeout(timeoutForEach.multipliedBy((long) dnsServers.length * retries));
         resolver.setLoadBalance(Boolean.parseBoolean(properties.getProperty(
                 CollectorConfig.DNS_MAIN_RESOLVER_ROUND_ROBIN_CONFIG, CollectorConfig.DNS_MAIN_RESOLVER_ROUND_ROBIN_DEFAULT)));
-        resolver.setRetries(Integer.parseInt(properties.getProperty(
-                CollectorConfig.DNS_MAIN_RESOLVER_RETRIES_CONFIG, CollectorConfig.DNS_MAIN_RESOLVER_RETRIES_DEFAULT)));
 
         return resolver;
     }
@@ -377,11 +394,11 @@ public class InternalDNSResolver {
         _executor = executor;
 
         _perDomainNSRetries = Integer.parseInt(properties.getProperty(
-                CollectorConfig.DNS_PER_DOMAIN_RESOLVER_RETRIES_CONFIG,
-                CollectorConfig.DNS_PER_DOMAIN_RESOLVER_RETRIES_DEFAULT));
-        _perDomainNSTimeout = Duration.ofSeconds(Integer.parseInt(properties.getProperty(
-                CollectorConfig.DNS_PER_DOMAIN_RESOLVER_TIMEOUT_SEC_CONFIG,
-                CollectorConfig.DNS_PER_DOMAIN_RESOLVER_TIMEOUT_SEC_DEFAULT)));
+                CollectorConfig.DNS_RETRIES_PER_NS_CONFIG,
+                CollectorConfig.DNS_RETRIES_PER_NS_DEFAULT));
+        _perDomainNSTimeout = Duration.ofMillis(Integer.parseInt(properties.getProperty(
+                CollectorConfig.DNS_TIMEOUT_PER_NS_MS_CONFIG,
+                CollectorConfig.DNS_TIMEOUT_PER_NS_MS_DEFAULT)));
 
         boolean ipv6Enabled;
         try {

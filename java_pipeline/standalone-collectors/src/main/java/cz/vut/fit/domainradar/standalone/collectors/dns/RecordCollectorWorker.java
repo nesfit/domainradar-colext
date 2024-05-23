@@ -1,5 +1,6 @@
 package cz.vut.fit.domainradar.standalone.collectors.dns;
 
+import cz.vut.fit.domainradar.CollectorConfig;
 import cz.vut.fit.domainradar.standalone.collectors.InternalDNSResolver;
 import org.slf4j.LoggerFactory;
 import org.xbill.DNS.TextParseException;
@@ -7,10 +8,7 @@ import org.xbill.DNS.TextParseException;
 import java.net.UnknownHostException;
 import java.util.Properties;
 import java.util.Queue;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.CompletionException;
-import java.util.concurrent.CompletionStage;
-import java.util.concurrent.ExecutorService;
+import java.util.concurrent.*;
 
 public class RecordCollectorWorker implements Runnable {
     private static final org.slf4j.Logger Logger = LoggerFactory.getLogger(RecordCollectorWorker.class);
@@ -19,11 +17,15 @@ public class RecordCollectorWorker implements Runnable {
     private final Queue<ProcessedItem> _processed;
     private final InternalDNSResolver _dnsResolver;
 
+    private final long _maxTimePerRecord;
+
     public RecordCollectorWorker(BlockingQueue<ToProcessItem> toProcess,
                                  Queue<ProcessedItem> processed,
                                  ExecutorService executorService, Properties properties) {
         _toProcess = toProcess;
         _processed = processed;
+        _maxTimePerRecord = Long.parseLong(properties.getProperty(CollectorConfig.DNS_MAX_TIME_PER_RECORD_MS_CONFIG,
+                CollectorConfig.DNS_MAX_TIME_PER_RECORD_MS_DEFAULT));
 
         try {
             _dnsResolver = new InternalDNSResolver(executorService, properties);
@@ -99,7 +101,12 @@ public class RecordCollectorWorker implements Runnable {
 
             Logger.trace("{} / {}: Resolution finished in {} ms", dn, recordType, (System.nanoTime() - x) / 1_000_000);
 
-            return new ProcessedItem(item.domainName(), item.recordType(), result.value(), result.ttl(), null);
+            if (result == null) {
+                Logger.warn("{} / {}: Null result!", dn, recordType);
+                return new ProcessedItem(dn, recordType, null, -1, "Null result");
+            }
+
+            return new ProcessedItem(dn, recordType, result.value(), result.ttl(), null);
         } catch (CompletionException e) {
             Logger.trace("{} / {}: Resolution exception in {} ms", dn, recordType, (System.nanoTime() - x) / 1_000_000);
 

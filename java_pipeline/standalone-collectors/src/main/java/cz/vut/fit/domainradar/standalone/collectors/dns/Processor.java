@@ -42,7 +42,7 @@ public class Processor implements Closeable {
         _properties = properties;
 
         _stalledTimeout = Long.parseLong(properties.getProperty(
-                CollectorConfig.DNS_STALLED_TIMEOUT_MS_CONFIG, CollectorConfig.DNS_STALLED_TIMEOUT_MS_DEFAULT));
+                CollectorConfig.DNS_MAX_TIME_PER_DOMAIN_MS_CONFIG, CollectorConfig.DNS_MAX_TIME_PER_DOMAIN_MS_DEFAULT));
 
         _typesToCollect = this.parseConfig(CollectorConfig.DNS_DEFAULT_RECORD_TYPES_TO_COLLECT_CONFIG,
                 CollectorConfig.DNS_DEFAULT_RECORD_TYPES_TO_COLLECT_DEFAULT);
