@@ -16,22 +16,26 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.LoggerFactory;
 import pl.tlinkowski.unij.api.UniLists;
 
 import java.io.IOException;
 import java.net.UnknownHostException;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.concurrent.*;
 
 public class ZoneCollector extends BaseStandaloneCollector<String, ZoneProcessRequest> {
     public static final String NAME = "zone";
-    private final ExecutorService _executor;
-    private final InternalDNSResolver _dns;
+    private static final org.slf4j.Logger Logger = LoggerFactory.getLogger(ZoneCollector.class);
 
     private final KafkaProducer<String, ZoneResult> _resultProducer;
     private final KafkaProducer<String, DNSProcessRequest> _dnsRequestProducer;
     private final KafkaProducer<String, RDAPDomainProcessRequest> _rdapRequestProducer;
+
+    private final ExecutorService _executor;
+    private final InternalDNSResolver _dns;
 
     private final long _zoneResolutionTimeout;
 
@@ -63,52 +67,62 @@ public class ZoneCollector extends BaseStandaloneCollector<String, ZoneProcessRe
         _parallelProcessor.poll(ctx -> {
             var dn = ctx.key();
 
-            var requestFuture = _dns.getZoneInfo(dn)
-                    .exceptionally(e -> {
-                        // Shouldn't happen (error ought to be handled in the InternalDNSResolver)
-                        return new ZoneResult(ResultCodes.OTHER_DNS_ERROR, e.getMessage(), Instant.now(), null);
-                    }).thenAccept(result -> {
-                        if (result == null)
-                            // Shouldn't happen
-                            result = new ZoneResult(ResultCodes.OTHER_DNS_ERROR,
-                                    "Result null", Instant.now(), null);
-
-                        _resultProducer.send(new ProducerRecord<>(Topics.OUT_ZONE, dn, result));
-
-                        if (result.zone() != null) {
-                            var reqValue = ctx.value();
-                            if (reqValue == null)
-                                reqValue = defaultRequestValue;
-
-                            if (reqValue.collectDNS()) {
-                                _dnsRequestProducer.send(new ProducerRecord<>(Topics.IN_DNS, dn, new DNSProcessRequest(
-                                        reqValue.dnsTypesToCollect(), reqValue.dnsTypesToProcessIPsFrom(), result.zone())));
-                            }
-
-                            if (reqValue.collectRDAP()) {
-                                _rdapRequestProducer.send(new ProducerRecord<>(Topics.IN_RDAP_DN, dn,
-                                        new RDAPDomainProcessRequest(result.zone().zone())));
-                            }
-                        } else {
-                            _rdapRequestProducer.send(new ProducerRecord<>(Topics.IN_RDAP_DN, dn,
-                                    new RDAPDomainProcessRequest(null)));
-                        }
-                    }).toCompletableFuture();
+            Logger.trace("Processing request for {}", dn);
+            var requestFuture = processRequest(dn, ctx.value(), defaultRequestValue)
+                    .orTimeout(_zoneResolutionTimeout, TimeUnit.MILLISECONDS);
 
             try {
-                requestFuture.orTimeout(_zoneResolutionTimeout, TimeUnit.MILLISECONDS).join();
+                requestFuture.join();
             } catch (CompletionException e) {
                 if (e.getCause() instanceof TimeoutException) {
+                    Logger.debug("Timeout: {}", dn);
                     _resultProducer.send(new ProducerRecord<>(Topics.OUT_ZONE, dn,
                             new ZoneResult(ResultCodes.CANNOT_FETCH, "Zone resolution timeout",
                                     Instant.now(), null)));
                 } else {
+                    Logger.debug("Error for {}", dn, e.getCause());
                     _resultProducer.send(new ProducerRecord<>(Topics.OUT_ZONE, dn,
                             new ZoneResult(ResultCodes.INTERNAL_ERROR, e.getCause().getMessage(),
                                     Instant.now(), null)));
                 }
             }
         });
+    }
+
+    private CompletableFuture<Void> processRequest(final String dn, final ZoneProcessRequest reqValue,
+                                                   final ZoneProcessRequest defaultRequestValue) {
+        return _dns.getZoneInfo(dn)
+                .exceptionally(e -> {
+                    // Shouldn't happen (error ought to be handled in the InternalDNSResolver)
+                    Logger.warn("Unexpected exceptional completion of {}", dn, e);
+                    return new ZoneResult(ResultCodes.OTHER_DNS_ERROR, e.getMessage(), Instant.now(), null);
+                }).thenAccept(result -> {
+                    if (result == null) { // Shouldn't happen
+                        Logger.warn("Unexpected null response of {}", dn);
+                        result = new ZoneResult(ResultCodes.OTHER_DNS_ERROR,
+                                "Result null", Instant.now(), null);
+                    }
+
+                    Logger.trace("Processed {}", dn);
+                    _resultProducer.send(new ProducerRecord<>(Topics.OUT_ZONE, dn, result));
+
+                    if (result.zone() != null) {
+                        var request = Objects.requireNonNullElse(reqValue, defaultRequestValue);
+
+                        if (request.collectDNS()) {
+                            _dnsRequestProducer.send(new ProducerRecord<>(Topics.IN_DNS, dn, new DNSProcessRequest(
+                                    request.dnsTypesToCollect(), request.dnsTypesToProcessIPsFrom(), result.zone())));
+                        }
+
+                        if (request.collectRDAP()) {
+                            _rdapRequestProducer.send(new ProducerRecord<>(Topics.IN_RDAP_DN, dn,
+                                    new RDAPDomainProcessRequest(result.zone().zone())));
+                        }
+                    } else {
+                        _rdapRequestProducer.send(new ProducerRecord<>(Topics.IN_RDAP_DN, dn,
+                                new RDAPDomainProcessRequest(null)));
+                    }
+                }).toCompletableFuture();
     }
 
     @Override
