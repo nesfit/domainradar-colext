@@ -18,7 +18,6 @@ import java.util.Set;
  * @param error       An error message.
  * @param lastAttempt A timestamp of the DNS collection process end.
  * @param dnsData     A container of DNS results.
- * @param tlsData     A container of TLS results.
  * @param ips         A set of IP addresses coupled with the name of the DNS record type the address was extracted from.
  * @param ipResults   A map of [IP Address] -> (map of [Collector ID] -> [Result]).
  * @see Result
@@ -28,7 +27,6 @@ public record ExtendedDNSResult(int statusCode,
                                 @Nullable String error,
                                 @NotNull Instant lastAttempt,
                                 @Nullable DNSData dnsData,
-                                @Nullable TLSData tlsData,
                                 @Nullable Set<DNSResult.IPFromRecord> ips,
                                 @Nullable Map<String, Map<String, CommonIPResult<JsonNode>>> ipResults
 ) implements Result {
@@ -38,7 +36,6 @@ public record ExtendedDNSResult(int statusCode,
      * and stores a reference to the map, not a copy.
      */
     public ExtendedDNSResult(DNSResult result, @Nullable Map<String, Map<String, CommonIPResult<JsonNode>>> ips) {
-        this(result.statusCode(), result.error(), result.lastAttempt(), result.dnsData(), result.tlsData(),
-                result.ips(), ips);
+        this(result.statusCode(), result.error(), result.lastAttempt(), result.dnsData(), result.ips(), ips);
     }
 }

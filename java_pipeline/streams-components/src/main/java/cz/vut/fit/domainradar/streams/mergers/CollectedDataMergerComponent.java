@@ -50,6 +50,7 @@ public class CollectedDataMergerComponent implements PipelineComponent {
         final var extendedDnsResultSerde = JsonSerde.of(_jsonMapper, ExtendedDNSResult.class);
         final var rdapDnSerde = JsonSerde.of(_jsonMapper, RDAPDomainResult.class);
         final var zoneResultSerde = JsonSerde.of(_jsonMapper, ZoneResult.class);
+        final var tlsResultSerde = JsonSerde.of(_jsonMapper, TLSResult.class);
         final var finalResultSerde = JsonSerde.of(_jsonMapper, FinalResult.class);
 
         // These two sub-topologies combine the results from the IP collectors per a domain name.
@@ -108,26 +109,39 @@ public class CollectedDataMergerComponent implements PipelineComponent {
         // the last observed DNS data. Then it joins with the IP data per domain generated above to output a single
         // merged DNS/IP data object.
         var processedDnsTable = builder.table(Topics.OUT_DNS,
-                Consumed.with(Serdes.String(), dnsResultSerde));
+                Consumed.with(Serdes.String(), dnsResultSerde),
+                Materialized.with(Serdes.String(), dnsResultSerde));
         var mergedDnsIpTable = processedDnsTable
-                .leftJoin(allIPDataForDomain, ExtendedDNSResult::new, // TODO: what about domains with no IP data?
+                .leftJoin(allIPDataForDomain, ExtendedDNSResult::new,
                         namedOp("join_aggregated_IP_data_with_DNS_data"),
                         Materialized.with(Serdes.String(), extendedDnsResultSerde));
 
         // Now we want to join the DNS/IP data with the data from the other DN-based collectors,
         // that is, zone and RDAP-DN.
         var zoneTable = builder.table(Topics.OUT_ZONE,
-                Consumed.with(Serdes.String(), zoneResultSerde));
+                Consumed.with(Serdes.String(), zoneResultSerde),
+                Materialized.with(Serdes.String(), zoneResultSerde));
         var rdapDnTable = builder.table(Topics.OUT_RDAP_DN,
-                Consumed.with(Serdes.String(), rdapDnSerde));
+                Consumed.with(Serdes.String(), rdapDnSerde),
+                Materialized.with(Serdes.String(), rdapDnSerde));
+        var tlsTable = builder.table(Topics.OUT_TLS,
+                Consumed.with(Serdes.String(), tlsResultSerde),
+                Materialized.with(Serdes.String(), tlsResultSerde));
 
-        // We suppose that without DNS(+IP) data, the domain is not interesting at all, hence the left join.
+        // We suppose that without DNS(+IP) data, the domain is not interesting at all, hence the first inner join here
+        // and the left joins with the other tables.
         var finalResultTable = mergedDnsIpTable
-                .join(zoneTable, (dns, zone) -> new FinalResult(dns, null, zone.zone()),
-                        namedOp("join_DNS_IP_ZONE"),
+                .join(zoneTable, (dns, zone) -> new FinalResult(dns,
+                                null, null, zone.zone()),
+                        namedOp("join_ZONE"),
                         Materialized.with(Serdes.String(), finalResultSerde))
-                .leftJoin(rdapDnTable, (intermRes, rdap) -> new FinalResult(intermRes.dnsResult(), rdap, intermRes.zone()),
-                        namedOp("join_DNS_IP_ZONE_RDAP"),
+                .leftJoin(tlsTable, (intermRes, tls) -> new FinalResult(intermRes.dnsResult(), tls,
+                                null, intermRes.zone()),
+                        namedOp("join_TLS"),
+                        Materialized.with(Serdes.String(), finalResultSerde))
+                .leftJoin(rdapDnTable, (intermRes, rdap) -> new FinalResult(intermRes.dnsResult(),
+                                intermRes.tlsResult(), rdap, intermRes.zone()),
+                        namedOp("join_RDAP_DN"),
                         Materialized.with(Serdes.String(), finalResultSerde));
 
         // Output the final result to the output topic.
