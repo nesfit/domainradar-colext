@@ -77,6 +77,7 @@ public abstract class BaseStandaloneCollector<KIn, VIn> implements Closeable {
                 .ordering(ParallelConsumerOptions.ProcessingOrder.KEY)
                 .consumer(_consumer)
                 .maxConcurrency(_maxConcurrency)
+                .thresholdForTimeSpendInQueueWarning(Duration.ofSeconds(30)) // TODO
                 .commitInterval(_commitInterval);
 
         if (batchSize > 0)
