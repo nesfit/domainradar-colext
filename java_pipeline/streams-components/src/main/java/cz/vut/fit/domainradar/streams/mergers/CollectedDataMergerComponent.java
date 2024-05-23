@@ -119,14 +119,11 @@ public class CollectedDataMergerComponent implements PipelineComponent {
         // Now we want to join the DNS/IP data with the data from the other DN-based collectors,
         // that is, zone and RDAP-DN.
         var zoneTable = builder.table(Topics.OUT_ZONE,
-                Consumed.with(Serdes.String(), zoneResultSerde),
-                Materialized.with(Serdes.String(), zoneResultSerde));
+                Consumed.with(Serdes.String(), zoneResultSerde));
         var rdapDnTable = builder.table(Topics.OUT_RDAP_DN,
-                Consumed.with(Serdes.String(), rdapDnSerde),
-                Materialized.with(Serdes.String(), rdapDnSerde));
+                Consumed.with(Serdes.String(), rdapDnSerde));
         var tlsTable = builder.table(Topics.OUT_TLS,
-                Consumed.with(Serdes.String(), tlsResultSerde),
-                Materialized.with(Serdes.String(), tlsResultSerde));
+                Consumed.with(Serdes.String(), tlsResultSerde));
 
         // We suppose that without DNS(+IP) data, the domain is not interesting at all, hence the first inner join here
         // and the left joins with the other tables.
