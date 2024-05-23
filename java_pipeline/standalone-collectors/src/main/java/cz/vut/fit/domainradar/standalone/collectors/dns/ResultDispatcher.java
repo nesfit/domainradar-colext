@@ -233,17 +233,14 @@ class ResultDispatcher implements Runnable {
     }
 
     private String getIPForTLS(DNSData dnsData) {
-        String targetIp;
+        String targetIp = null;
 
-        // TODO: handle empty sets
         if (dnsData.CNAME() != null && dnsData.CNAME().relatedIps() != null && !dnsData.CNAME().relatedIps().isEmpty()) {
             targetIp = dnsData.CNAME().relatedIps().getFirst();
-        } else if (dnsData.A() != null) {
+        } else if (dnsData.A() != null && !dnsData.A().isEmpty()) {
             targetIp = dnsData.A().iterator().next();
-        } else if (dnsData.AAAA() != null) {
+        } else if (dnsData.AAAA() != null && !dnsData.AAAA().isEmpty()) {
             targetIp = dnsData.AAAA().iterator().next();
-        } else {
-            targetIp = null;
         }
 
         return targetIp;
