@@ -42,7 +42,8 @@ public class GeoIPCollector implements CommonResultIPCollector<GeoIPData> {
     public GeoIPCollector(ObjectMapper jsonMapper, Properties properties) throws IOException {
         _jsonMapper = jsonMapper;
 
-        var dbDir = new File(properties.getProperty(CollectorConfig.GEOIP_DIRECTORY_CONFIG));
+        var dbDir = new File(properties.getProperty(CollectorConfig.GEOIP_DIRECTORY_CONFIG,
+                CollectorConfig.GEOIP_DIRECTORY_DEFAULT));
         var asnDb = new File(dbDir, properties.getProperty(CollectorConfig.GEOIP_ASN_DB_NAME_CONFIG,
                 CollectorConfig.GEOIP_ASN_DB_NAME_DEFAULT));
         var cityDb = new File(dbDir, properties.getProperty(CollectorConfig.GEOIP_CITY_DB_NAME_CONFIG,
