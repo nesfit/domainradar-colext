@@ -183,7 +183,7 @@ class CompatibilityTransformation:
 
             return cert
 
-        tls = get_safe(data, "dnsResult.tlsData")
+        tls = get_safe(data, "tlsResult.tlsData")
         if tls is None:
             return None
 
@@ -248,7 +248,7 @@ class CompatibilityTransformation:
             return "6" if ver == "v6" else ("4" if ver == "v4" else ver)
 
         ips = get_safe(data, "dnsResult.ips")
-        ip_results = get_safe(data, "dnsResult.ipResults")
+        ip_results = get_safe(data, "dnsResult.ipResults") or {}
         ret = []
         for ip_obj in ips:
             ip = ip_obj["ip"]
