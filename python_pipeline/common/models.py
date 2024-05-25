@@ -1,100 +1,110 @@
 from typing import Optional
 
-from faust import Record
-from faust.models.fields import FieldDescriptor, IntegerField, StringField, BooleanField, FloatField
+from pydantic.alias_generators import to_camel
+from pydantic import BaseModel, Field, ConfigDict, AliasGenerator, AliasChoices
+
+from common import timestamp_now_millis
 
 
-class IPToProcess(Record, coerce=True, serializer='json'):
-    domain_name: str = StringField(field="domainName", required=True)
-    ip: str = StringField(field="ip", required=True)
+class CustomBaseModel(BaseModel):
+    model_config = ConfigDict(
+        alias_generator=AliasGenerator(
+            validation_alias=lambda field: AliasChoices(field, to_camel(field)),
+            serialization_alias=to_camel
+        )
+    )
 
 
-class IPProcessRequest(Record, coerce=True, serializer='json'):
-    collectors: Optional[list[str]] = FieldDescriptor[list[str]](field="collectors", required=False)
+# ---- Plain models ---- #
+
+class IPToProcess(CustomBaseModel):
+    domain_name: str = Field(serialization_alias="domainName")
+    ip: str
 
 
-class Result(Record, abstract=False, coerce=True, serializer='json'):
-    status_code: int = IntegerField(field="statusCode", required=True)
-    error: Optional[str] = StringField(required=False)
-    last_attempt: int = IntegerField(field="lastAttempt")
+class RTTData(CustomBaseModel):
+    min: float
+    avg: float
+    max: float
+    sent: int
+    received: int
+    jitter: float
 
 
-class IPResult(Result, abstract=True, serializer='json'):
-    collector: str = StringField(required=True)
-
-
-class RDAPIPResult(IPResult, abstract=False):
-    data: Optional[dict] = FieldDescriptor[dict](field="data", required=False)
-
-
-class RTTData(Record):
-    min: float = FloatField(required=True)
-    avg: float = FloatField(required=True)
-    max: float = FloatField(required=True)
-    sent: int = IntegerField(required=True)
-    received: int = IntegerField(required=True)
-    jitter: float = FloatField(required=True)
-
-
-class RTTResult(IPResult, abstract=False):
-    data: Optional[RTTData] = FieldDescriptor[RTTData](field="data", required=False)
-
-
-class RDAPDomainResult(Result, abstract=False):
-    rdap_data: Optional[dict] = FieldDescriptor[dict](field="rdapData", required=False)
-    entities: Optional[list[dict]] = FieldDescriptor[list[dict]](required=False)
-    rdap_target: bool = StringField(field="rdapTarget", required=True)
-
-    whois_status_code: int = IntegerField(field="whoisStatusCode", required=True)
-    whois_error: Optional[str] = StringField(field="whoisError", required=False)
-    raw_whois_data: Optional[str] = StringField(field="whoisRaw", required=False)
-    parsed_whois_data: Optional[dict] = FieldDescriptor[dict](field="whoisParsed", required=False)
-
-
-class RDAPRequest(Record, coerce=True, serializer='json'):
-    zone: Optional[str] = StringField(required=False)
-
-
-class SOARecord(Record):
-    primary_ns: str = StringField(input_name="primaryNs")
-    resp_mailbox_dname: str = StringField(input_name="respMailboxDname")
+class SOARecord(CustomBaseModel):
+    primary_ns: str = Field(serialization_alias="primaryNs")
+    resp_mailbox_dname: str = Field(serialization_alias="respMailboxDname")
     serial: str
     refresh: int
     retry: int
     expire: int
-    min_ttl: int = IntegerField(input_name="minTTL")
+    min_ttl: int = Field(serialization_alias="minTTL")
 
 
-class ZoneRequest(Record, coerce=True, serializer='json'):
-    collect_dns: bool = BooleanField(field="collectDNS", required=False, default=True)
-    collect_RDAP: bool = BooleanField(field="collectRDAP", required=False, default=True)
-    dns_types_to_collect: Optional[list[str]] = FieldDescriptor[list[str]](field="dnsTypesToCollect", required=False)
-    dns_types_to_process_IPs_from: Optional[list[str]] = FieldDescriptor[list[str]](field="dnsTypesToProcessIPsFrom",
-                                                                                    required=False)
+class ZoneInfo(CustomBaseModel):
+    zone: str
+    soa: SOARecord
+    public_suffix: str = Field(serialization_alias="publicSuffix")
+    registry_suffix: str = Field(serialization_alias="registrySuffix")
+    primary_nameserver_ips: Optional[set[str]] = Field(None, serialization_alias="primaryNameserverIps")
+    secondary_nameservers: Optional[set[str]] = Field(None, serialization_alias="secondaryNameservers")
+    secondary_nameserver_ips: Optional[set[str]] = Field(None, serialization_alias="secondaryNameserverIps")
 
 
-class ZoneInfo(Record):
-    zone: str = StringField(required=True)
-    soa: SOARecord = FieldDescriptor[SOARecord](required=True)
-    public_suffix: str = StringField(field="publicSuffix", required=True)
-    registry_suffix: str = StringField(field="registrySuffix", required=True)
-    primary_nameserver_ips: Optional[set[str]] = FieldDescriptor[set[str]](field="primaryNameserverIps",
-                                                                           required=False)
-    secondary_nameservers: Optional[set[str]] = FieldDescriptor[set[str]](field="secondaryNameservers",
-                                                                          required=False)
-    secondary_nameserver_ips: Optional[set[str]] = FieldDescriptor[set[str]](field="secondaryNameserverIps",
-                                                                             required=False)
+# ---- Requests ---- #
+
+class ZoneRequest(CustomBaseModel):
+    collect_dns: bool = Field(True, serialization_alias="collectDNS")
+    collect_RDAP: bool = Field(True, serialization_alias="collectRDAP")
+    dns_types_to_collect: Optional[list[str]] = Field(None, serialization_alias="dnsTypesToCollect")
+    dns_types_to_process_IPs_from: Optional[list[str]] = Field(None,
+                                                               serialization_alias="dnsTypesToProcessIPsFrom")
 
 
-class ZoneResult(Result, abstract=False):
-    zone: ZoneInfo = FieldDescriptor[ZoneInfo](required=False)
+class DNSRequest(CustomBaseModel):
+    zone_info: ZoneInfo = Field(serialization_alias="zoneInfo")
+    dns_types_to_collect: Optional[list[str]] = Field(None, serialization_alias="dnsTypesToCollect")
+    dns_types_to_process_IPs_from: Optional[list[str]] = Field(None,
+                                                               serialization_alias="dnsTypesToProcessIPsFrom")
 
 
-class DNSRequest(Record, coerce=True, serializer='json'):
-    dns_types_to_collect: Optional[list[str]] = FieldDescriptor[list[str]](field="dnsTypesToCollect",
-                                                                           required=False)
-    dns_types_to_process_IPs_from: Optional[list[str]] = FieldDescriptor[list[str]](
-        field="dnsTypesToProcessIPsFrom",
-        required=False)
+class RDAPRequest(CustomBaseModel):
+    zone: Optional[str] = None
 
-    zone_info: ZoneInfo = FieldDescriptor[ZoneInfo](field="zoneInfo", required=True)
+
+class IPProcessRequest(CustomBaseModel):
+    collectors: Optional[list[str]] = None
+
+
+# ---- Results ---- #
+
+class Result(CustomBaseModel):
+    status_code: int = Field(serialization_alias="statusCode")
+    error: Optional[str] = None
+    last_attempt: int = Field(serialization_alias="lastAttempt", default_factory=lambda: timestamp_now_millis())
+
+
+class IPResult(Result):
+    collector: str = ""
+
+
+class RDAPIPResult(IPResult):
+    data: Optional[dict] = None
+
+
+class RTTResult(IPResult):
+    data: Optional[RTTData] = None
+
+
+class RDAPDomainResult(Result):
+    rdap_target: str = Field("", serialization_alias="rdapTarget")
+    whois_status_code: int = Field(-1, serialization_alias="whoisStatusCode")
+    rdap_data: Optional[dict] = Field(None, serialization_alias="rdapData")
+    entities: Optional[list[dict]] = None
+    whois_error: Optional[str] = Field(None, serialization_alias="whoisError")
+    raw_whois_data: Optional[str] = Field(None, serialization_alias="whoisRaw")
+    parsed_whois_data: Optional[dict] = Field(None, serialization_alias="whoisParsed")
+
+
+class ZoneResult(Result):
+    zone: Optional[ZoneInfo] = None

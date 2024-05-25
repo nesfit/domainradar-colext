@@ -18,6 +18,7 @@ faust-streaming = { extras = ["rocksdict"], version = "^0.11.0" }
 pandas = "^2.2.2"
 # classifiers = { git = "git@github.com:nesfit/domainradar-clf.git", branch = "main" }
 pyarrow = "^16.0.0"
+pydantic = "^2.7.1"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0.0"

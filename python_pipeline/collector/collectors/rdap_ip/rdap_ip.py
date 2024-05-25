@@ -10,12 +10,13 @@ from whodap import IPv4Client, IPv6Client
 from whodap.response import IPv4Response, IPv6Response
 from whodap.errors import *
 
-from common import read_config, make_app, serialize_ip_to_process
+from common import read_config, make_app
 from common.audit import log_unhandled_error
-from common.models import IPToProcess, IPProcessRequest, RDAPIPResult, RDAPDomainResult
+from common.models import IPToProcess, IPProcessRequest, RDAPIPResult
 import common.result_codes as rc
-from collectors.util import (make_rdap_ssl_context, timestamp_now_millis, should_omit_ip,
+from collectors.util import (make_rdap_ssl_context, should_omit_ip,
                              handle_top_level_component_exception, get_ip_safe)
+from common.util import ensure_model
 
 COLLECTOR = "rdap_ip"
 
@@ -30,12 +31,8 @@ CONCURRENCY = component_config.get("concurrency", 4)
 rdap_ip_app = make_app(COLLECTOR, config)
 
 # The input and output topics
-topic_to_process = rdap_ip_app.topic('to_process_IP', key_type=IPToProcess,
-                                     value_type=IPProcessRequest, allow_empty=True)
-
-# The key is explicitly serialized to avoid Faust injecting its metadata in the output object
-topic_processed = rdap_ip_app.topic('collected_IP_data', key_type=bytes,
-                                    value_type=RDAPIPResult)
+topic_to_process = rdap_ip_app.topic('to_process_IP', allow_empty=True)
+topic_processed = rdap_ip_app.topic('collected_IP_data')
 
 
 async def fetch_ip(address, client_v4: IPv4Client, client_v6: IPv6Client) \
@@ -69,12 +66,11 @@ async def process_entry(dn_ip, ipv4_client, ipv6_client):
         rdap_data = rdap_data.to_dict()
 
     result = RDAPIPResult(status_code=err_code, error=err_msg,
-                          last_attempt=timestamp_now_millis(),
                           collector=COLLECTOR,
                           data=rdap_data)
 
     # (this could probably be send_soon not to block the loop)
-    await topic_processed.send(key=serialize_ip_to_process(dn_ip), value=result)
+    await topic_processed.send(key=dn_ip, value=result)
 
 
 # The RDAP-IP processor
@@ -96,6 +92,9 @@ async def process_entries(stream):
     # Main message processing loop
     # dn is the domain name / IP address pair
     async for dn_ip, process_request in stream.items():
+        dn_ip = ensure_model(IPToProcess, dn_ip)
+        process_request = ensure_model(IPProcessRequest, process_request)
+
         try:
             # Omit the DN if the collector is not in the list of collectors to process
             if should_omit_ip(process_request, COLLECTOR):
@@ -105,7 +104,7 @@ async def process_entries(stream):
         except Exception as e:
             ip = get_ip_safe(dn_ip)
             log_unhandled_error(e, COLLECTOR, ip, dn_ip=dn_ip)
-            await handle_top_level_component_exception(e, COLLECTOR, serialize_ip_to_process(dn_ip),
+            await handle_top_level_component_exception(e, COLLECTOR, dn_ip,
                                                        RDAPIPResult, topic_processed)
 
     await ipv4_client.aio_close()

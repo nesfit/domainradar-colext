@@ -22,6 +22,7 @@ tldextract = "^5.1.2"
 whoisit = "^2.7.6"
 aiolimiter = "^1.1.0"
 dnspython = "^2.6.1"
+pydantic = "^2.7.1"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0.0"

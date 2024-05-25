@@ -1,8 +1,9 @@
 from icmplib import async_ping, ICMPSocketError, DestinationUnreachable, TimeExceeded
 
-from collectors.util import (timestamp_now_millis, should_omit_ip, get_ip_safe,
+from collectors.util import (should_omit_ip, get_ip_safe,
                              handle_top_level_component_exception)
-from common import read_config, make_app, serialize_ip_to_process
+from common.util import ensure_model
+from common import read_config, make_app
 from common.audit import log_unhandled_error
 from common.models import IPToProcess, IPProcessRequest, RTTResult, RTTData
 import common.result_codes as rc
@@ -21,12 +22,8 @@ CONCURRENCY = component_config.get("concurrency", 4)
 rtt_app = make_app(COLLECTOR, config)
 
 # The input and output topics
-topic_to_process = rtt_app.topic('to_process_IP', key_type=IPToProcess,
-                                 value_type=IPProcessRequest, allow_empty=True)
-
-# The key is explicitly serialized to avoid Faust injecting its metadata in the output object
-topic_processed = rtt_app.topic('collected_IP_data', key_type=bytes,
-                                value_type=RTTResult)
+topic_to_process = rtt_app.topic('to_process_IP', allow_empty=True)
+topic_processed = rtt_app.topic('collected_IP_data')
 
 
 async def process_entry(dn_ip):
@@ -52,9 +49,8 @@ async def process_entry(dn_ip):
         err_msg = str(e)
 
     # (this could probably be send_soon not to block the loop)
-    await topic_processed.send(key=serialize_ip_to_process(dn_ip),
+    await topic_processed.send(key=dn_ip,
                                value=RTTResult(status_code=code, error=err_msg,
-                                               last_attempt=timestamp_now_millis(),
                                                collector=COLLECTOR,
                                                data=rtt_data))
 
@@ -65,6 +61,9 @@ async def process_entries(stream):
     # Main message processing loop
     # dn is the domain name / IP address pair
     async for dn_ip, process_request in stream.items():
+        dn_ip = ensure_model(IPToProcess, dn_ip)
+        process_request = ensure_model(IPProcessRequest, process_request)
+
         try:
             # Omit the DN if the collector is not in the list of collectors to process
             if should_omit_ip(process_request, COLLECTOR):
@@ -74,5 +73,4 @@ async def process_entries(stream):
         except Exception as e:
             ip = get_ip_safe(dn_ip)
             log_unhandled_error(e, COLLECTOR, str(ip), dn_ip=dn_ip)
-            await handle_top_level_component_exception(e, COLLECTOR, serialize_ip_to_process(dn_ip),
-                                                       RTTResult, topic_processed)
+            await handle_top_level_component_exception(e, COLLECTOR, dn_ip, RTTResult, topic_processed)

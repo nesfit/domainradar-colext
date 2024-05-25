@@ -7,13 +7,10 @@ from typing import Sequence
 
 import faust.events
 from faust import EventT
-from faust.serializers import codecs
 
-from common import read_config, make_app, StringCodec
+from common import read_config, make_app
 from common.audit import log_unhandled_error
 from . import extractor
-
-codecs.register("str", StringCodec())
 
 EXTRACTOR = "extractor"
 
@@ -33,12 +30,11 @@ extractor_app = make_app(EXTRACTOR, config)
 
 # The input and output topics
 # Let's deserialize the result into a dict manually
-topic_to_process = extractor_app.topic('all_collected_data', key_type=str,
-                                       value_type=bytes, value_serializer='raw',
-                                       allow_empty=True)
+topic_to_process = extractor_app.topic('all_collected_data', key_type=str, key_serializer='str',
+                                       value_type=bytes, value_serializer='raw', allow_empty=True)
 
 topic_processed = extractor_app.topic('feature_vectors', key_type=None,
-                                      value_type=bytes)
+                                      value_type=bytes, value_serializer='raw')
 
 
 @extractor_app.agent(topic_to_process, concurrency=CONCURRENCY)

@@ -1,7 +1,6 @@
 import asyncio
 
 from aiolimiter import AsyncLimiter
-from faust.serializers import codecs
 import httpx
 import tldextract
 
@@ -14,14 +13,13 @@ from whodap import DNSClient
 from whodap.response import DomainResponse
 from whodap.errors import *
 
-from common import read_config, make_app, StringCodec
+from common import read_config, make_app
 from common.audit import log_unhandled_error
 from common.models import RDAPRequest, RDAPDomainResult
 import common.result_codes as rc
-from collectors.util import fetch_entities, extract_known_tld, make_rdap_ssl_context, timestamp_now_millis, \
+from collectors.util import fetch_entities, extract_known_tld, make_rdap_ssl_context, \
     handle_top_level_component_exception
-
-codecs.register("str", StringCodec())
+from common.util import ensure_model
 
 COLLECTOR = "rdap_dn"
 
@@ -38,11 +36,9 @@ CONCURRENCY = component_config.get("concurrency", 4)
 rdap_dn_app = make_app(COLLECTOR, config)
 
 # The input and output topics
-topic_to_process = rdap_dn_app.topic('to_process_RDAP_DN', key_type=str, value_type=RDAPRequest,
-                                     key_serializer="str", allow_empty=True)
+topic_to_process = rdap_dn_app.topic('to_process_RDAP_DN', key_type=str, key_serializer='str', allow_empty=True)
 
-topic_processed = rdap_dn_app.topic('processed_RDAP_DN', key_type=str, value_type=RDAPDomainResult,
-                                    key_serializer="str")
+topic_processed = rdap_dn_app.topic('processed_RDAP_DN', key_type=str, key_serializer='str')
 
 _limiters: dict[str, AsyncLimiter] = {}
 
@@ -133,7 +129,6 @@ async def process_entry(dn, req, rdap_client, whois_client):
         entities = [e.to_dict() for e in entities]
 
     result = RDAPDomainResult(status_code=err_code, error=err_msg,
-                              last_attempt=timestamp_now_millis(),
                               rdap_data=rdap_data, entities=entities,
                               rdap_target=rdap_target,
                               whois_status_code=whois_err_code, whois_error=whois_err_msg,
@@ -162,6 +157,8 @@ async def process_entries(stream):
     # Main message processing loop
     # dn is the domain name, req is the optional RDAPRequest object
     async for dn, req in stream.items():
+        req = ensure_model(RDAPRequest, req)
+
         try:
             await process_entry(dn, req, rdap_client, whois_client)
         except Exception as e:

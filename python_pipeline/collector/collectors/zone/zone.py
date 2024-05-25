@@ -1,16 +1,13 @@
 import dns.exception
 from dns.resolver import Cache
-from faust.serializers import codecs
 
 import common.result_codes as rc
-from collectors.util import timestamp_now_millis, \
-    handle_top_level_component_exception
+from collectors.util import handle_top_level_component_exception
+from common.util import ensure_model
 from collectors.zone.collector import DNSCollectorOptions, DNSCollector
-from common import read_config, make_app, StringCodec
+from common import read_config, make_app
 from common.audit import log_unhandled_error
 from common.models import RDAPRequest, RDAPDomainResult, ZoneRequest, ZoneResult, DNSRequest
-
-codecs.register("str", StringCodec())
 
 COLLECTOR = "zone"
 
@@ -28,17 +25,13 @@ CONCURRENCY = component_config.get("concurrency", 4)
 zone_app = make_app(COLLECTOR, config)
 
 # The input and output topics
-topic_to_process = zone_app.topic('to_process_zone', key_type=str, value_type=ZoneRequest,
-                                  key_serializer="str", allow_empty=True)
+topic_to_process = zone_app.topic('to_process_zone', key_type=str, key_serializer='str', allow_empty=True)
 
-topic_processed_zone = zone_app.topic('processed_zone', key_type=str, value_type=ZoneResult,
-                                      key_serializer="str")
+topic_processed_zone = zone_app.topic('processed_zone', key_type=str, key_serializer='str')
 
-topic_dns_requests = zone_app.topic('to_process_DNS', key_type=str, value_type=DNSRequest,
-                                    key_serializer="str")
+topic_dns_requests = zone_app.topic('to_process_DNS', key_type=str, key_serializer='str')
 
-topic_rdap_requests = zone_app.topic('to_process_RDAP_DN', key_type=str, value_type=RDAPRequest,
-                                     key_serializer="str")
+topic_rdap_requests = zone_app.topic('to_process_RDAP_DN', key_type=str, key_serializer='str')
 
 
 # The Zone processor
@@ -53,21 +46,20 @@ async def process_entries(stream):
     async for dn, req in stream.items():
         try:
             zone_app.logger.info("%s: Processing zone", dn)
+            req = ensure_model(ZoneRequest, req)
+
             try:
                 zone_info = await collector.get_zone_info(dn)
             except dns.exception.Timeout:
                 zone_app.logger.info("%s: Timeout", dn)
-                result = ZoneResult(status_code=rc.CANNOT_FETCH, error="Timeout",
-                                    last_attempt=timestamp_now_millis(), zone=None)
+                result = ZoneResult(status_code=rc.CANNOT_FETCH, error="Timeout", zone=None)
             else:
                 if zone_info is None:
                     zone_app.logger.info("%s: Zone not found", dn)
-                    result = ZoneResult(status_code=rc.NOT_FOUND, error="Zone not found",
-                                        last_attempt=timestamp_now_millis(), zone=None)
+                    result = ZoneResult(status_code=rc.NOT_FOUND, error="Zone not found", zone=None)
                 else:
                     zone_app.logger.info("%s: Zone found: %s", dn, zone_info.zone)
-                    result = ZoneResult(status_code=0, zone=zone_info,
-                                        last_attempt=timestamp_now_millis())
+                    result = ZoneResult(status_code=0, zone=zone_info)
 
             await topic_processed_zone.send(key=dn, value=result)
 

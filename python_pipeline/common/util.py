@@ -1,12 +1,17 @@
 import os
 import ssl
 import tomllib
-from json import dumps
+from datetime import datetime
+from typing import TypeVar, Type
 
 import faust
 import logging
 
-from common.models import IPToProcess
+from faust.serializers import codecs
+from pydantic import ValidationError
+
+from . import StringCodec
+from .custom_codecs import PydanticCodec
 
 logger = logging.getLogger(__name__)
 
@@ -81,20 +86,16 @@ def make_app(name: str, config: dict) -> faust.App:
     # Returns None if SSL is disabled / not configured
     ssl_context = make_ssl_context(config)
 
+    codecs.register("str", StringCodec())
+    codecs.register("pydantic", PydanticCodec())
+
     return faust.App(component_config.get("app_id", "domrad-" + name),
                      broker=connection_config.get("brokers", "kafka://localhost:9092"),
                      broker_credentials=ssl_context,
                      debug=component_config.get("debug", False),
+                     key_serializer="pydantic",
+                     value_serializer="pydantic",
                      **component_faust_config)
-
-
-def serialize_ip_to_process(ip_to_process: IPToProcess) -> bytes:
-    try:
-        return dumps({"domainName": ip_to_process.domain_name,
-                      "ip": ip_to_process.ip}, separators=(',', ':'), indent=None).encode("utf-8")
-    except Exception as e:
-        logger.error("Error serializing IP to process", exc_info=e)
-        return b"{\"domainName\":\"ERROR\",\"ip\":\"255.255.255.255\"}"
 
 
 def get_safe(data: dict, path: str) -> dict | None:
@@ -109,4 +110,28 @@ def get_safe(data: dict, path: str) -> dict | None:
             data = data[key]
         return data
     except (KeyError, TypeError):
+        return None
+
+
+def timestamp_now_millis() -> int:
+    """Returns the current UNIX timestamp in milliseconds."""
+    return int(datetime.now().timestamp() * 1e3)
+
+
+TModel = TypeVar('TModel')
+
+
+def ensure_model(model_class: Type[TModel], data: dict | None) -> TModel | None:
+    if data is None:
+        return None
+
+    try:
+        return model_class.model_validate(data)
+    except ValidationError as e:
+        logger.warning("Error validating model", exc_info=e,
+                       extra={"input_data": data, "model": model_class.__name__})
+        return None
+    except Exception as e:
+        logger.error("Error validating model", exc_info=e,
+                     extra={"input_data": data, "model": model_class.__name__})
         return None

@@ -1,8 +1,7 @@
 import ssl
-from datetime import datetime
 from typing import List, Optional
 
-from faust.models import FieldDescriptor
+from pydantic import ValidationError
 from whodap import DNSClient
 from whodap.response import DomainResponse, RDAPResponse
 from whodap.client import RDAPClient
@@ -10,6 +9,7 @@ from whodap.client import RDAPClient
 from common.audit import log_unhandled_error
 from common.models import IPProcessRequest, Result
 from common import result_codes as rc
+from common.util import timestamp_now_millis
 
 
 async def fetch_entities(response: DomainResponse, client: RDAPClient) -> List[RDAPResponse]:
@@ -52,10 +52,6 @@ def make_rdap_ssl_context():
     return context
 
 
-def timestamp_now_millis():
-    return int(datetime.now().timestamp() * 1e3)
-
-
 def extract_known_tld(domain_name: str, client: DNSClient) -> tuple[str | None, str | None, str | None]:
     """
     Extract a TLD (or another suffix) registered in the IANA DNS RDAP bootstrap file.
@@ -95,36 +91,15 @@ def get_ip_safe(dn_ip):
 
 
 async def handle_top_level_component_exception(exc_info, component_id, key, result_class, topic):
-    def make_error_result_instance(error):
-        # noinspection PyBroadException
-        try:
-            attributes = result_class.__dict__
-            kwargs = {
-                "status_code": rc.INTERNAL_ERROR,
-                "error": error,
-                "last_attempt": timestamp_now_millis()
-            }
-
-            for attr_name in result_class.__dict__:
-                if attr_name.startswith("_") or attr_name in kwargs:
-                    continue
-                attr = attributes[attr_name]
-                if not isinstance(attr, FieldDescriptor):
-                    continue
-                if attr_name == "collector":
-                    kwargs[attr_name] = component_id
-                    continue
-                try:
-                    kwargs[attr_name] = attr.default if not attr.required else attr.type()
-                except TypeError:
-                    kwargs[attr_name] = None
-
-            return result_class(**kwargs)
-        except Exception:
-            return Result(status_code=rc.INTERNAL_ERROR, error=error, last_attempt=timestamp_now_millis())
-
     try:
-        result = make_error_result_instance(str(exc_info))
+        error_msg = str(exc_info)
+
+        try:
+            result = result_class(status_code=rc.INTERNAL_ERROR, error=error_msg)
+        except ValidationError:
+            result = Result(status_code=rc.INTERNAL_ERROR, error=error_msg)
+
         await topic.send(key=key, value=result)
-    except Exception as exc_info:
-        log_unhandled_error(exc_info, component_id, key, desc="Error sending the error message to the output topic")
+    except Exception as e:
+        log_unhandled_error(e, component_id, key, desc="Error sending the error message to the output topic",
+                            original_error=exc_info, topic=topic)
