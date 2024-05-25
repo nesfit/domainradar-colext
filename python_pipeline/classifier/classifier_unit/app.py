@@ -1,16 +1,14 @@
 """app.py: The main module for the classifier unit component. Defines the Faust application."""
 __author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
 
-import io
-
-from faust.serializers import codecs
 import pandas as pd
 import pyarrow as pa
 from pandas import DataFrame
 
-from common import read_config, make_app, StringCodec
-
-codecs.register("str", StringCodec())
+from common import read_config, make_app
+from common.audit import log_unhandled_error, log_warning
+from common.util import timestamp_now_millis
+from .dummy_pipeline import Pipeline
 
 CLASSIFIER = "classifier-unit"
 
@@ -31,8 +29,11 @@ topic_to_process = classifier_app.topic('feature_vectors', key_type=None,
                                         value_type=bytes, value_serializer='raw',
                                         allow_empty=False)
 
-topic_processed = classifier_app.topic('classification_results', key_type=str,
-                                       value_type=bytes)
+topic_processed = classifier_app.topic('classification_results', key_type=str, key_serializer='str',
+                                       value_type=bytes, value_serializer='raw')
+
+# The classification pipeline
+pipeline = Pipeline()
 
 
 # The main loop
@@ -58,5 +59,41 @@ async def process_entries(stream):
 
 
 async def process_dataframe(dataframe: DataFrame):
-    # TODO
-    print(dataframe)
+    try:
+        results = pipeline.classifyDomains(dataframe)
+        if not results:
+            log_warning(CLASSIFIER, "No classification results were generated.", None)
+            return
+
+        for result in results:
+            if "domain_name" not in result:
+                log_warning(CLASSIFIER, "Missing domain_name in a classification result.", None)
+                continue
+
+            await topic_processed.send(key=result["domain_name"], value=result)
+    except Exception as e:
+        keys = dataframe["domain_name"].tolist()
+        log_unhandled_error(e, CLASSIFIER, None, all_keys=keys)
+
+        for dn in keys:
+            result = make_error_result(dn, str(e))
+            await topic_processed.send(key=dn, value=result)
+
+
+def make_error_result(dn: str, error_message: str):
+    return {
+        "domain_name": dn,
+        "aggregate_probability": -1,
+        "aggregate_description": "",
+        "classification_results": [
+            {
+                "classification_date": timestamp_now_millis(),
+                "classifier": "Error",
+                "probability": -1,
+                "description": "An error occurred while performing the classification.",
+                "details": {
+                    "error": error_message
+                }
+            }
+        ]
+    }

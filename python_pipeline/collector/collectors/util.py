@@ -9,7 +9,6 @@ from whodap.client import RDAPClient
 from common.audit import log_unhandled_error
 from common.models import IPProcessRequest, Result
 from common import result_codes as rc
-from common.util import timestamp_now_millis
 
 
 async def fetch_entities(response: DomainResponse, client: RDAPClient) -> List[RDAPResponse]:
