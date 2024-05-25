@@ -1,5 +1,4 @@
 import asyncio
-import logging
 
 from aiolimiter import AsyncLimiter
 from faust.serializers import codecs
@@ -32,6 +31,8 @@ component_config = config.get(COLLECTOR, {})
 
 LIMITER_CONCURRENCY = component_config.get("limiter_concurrency", 5)
 LIMITER_WINDOW = component_config.get("limiter_window", 60)
+HTTP_TIMEOUT = component_config.get("http_timeout", 5)
+CONCURRENCY = component_config.get("concurrency", 4)
 
 # The Faust application
 rdap_dn_app = make_app(COLLECTOR, config)
@@ -143,11 +144,11 @@ async def process_entry(dn, req, rdap_client, whois_client):
 
 
 # The RDAP-DN processor
-@rdap_dn_app.agent(topic_to_process, concurrency=4)
+@rdap_dn_app.agent(topic_to_process, concurrency=CONCURRENCY)
 async def process_entries(stream):
     # The RDAP & WHOIS clients
     httpx_client = httpx.AsyncClient(verify=make_rdap_ssl_context(), follow_redirects=True,
-                                     timeout=component_config.get("http_timeout_sec", 5))
+                                     timeout=HTTP_TIMEOUT)
     whois_client = asyncwhois.client.DomainClient()
 
     while True:
