@@ -65,73 +65,36 @@ class SOARecord(Record):
     min_ttl: int = IntegerField(input_name="minTTL")
 
 
-class NSRecord(Record):
-    nameserver: str
-    related_ips: Optional[list[str]] = FieldDescriptor[list[str]](input_name="relatedIps",
-                                                                  required=False)
+class ZoneRequest(Record, coerce=True, serializer='json'):
+    collect_dns: bool = BooleanField(field="collectDNS", required=False, default=True)
+    collect_RDAP: bool = BooleanField(field="collectRDAP", required=False, default=True)
+    dns_types_to_collect: Optional[list[str]] = FieldDescriptor[list[str]](field="dnsTypesToCollect", required=False)
+    dns_types_to_process_IPs_from: Optional[list[str]] = FieldDescriptor[list[str]](field="dnsTypesToProcessIPsFrom",
+                                                                                    required=False)
 
 
-class CNAMERecord(Record):
-    value: str
-    related_ips: Optional[list[str]] = FieldDescriptor[list[str]](input_name="relatedIps",
-                                                                  required=False)
+class ZoneInfo(Record):
+    zone: str = StringField(required=True)
+    soa: SOARecord = FieldDescriptor[SOARecord](required=True)
+    public_suffix: str = StringField(field="publicSuffix", required=True)
+    registry_suffix: str = StringField(field="registrySuffix", required=True)
+    primary_nameserver_ips: Optional[set[str]] = FieldDescriptor[set[str]](field="primaryNameserverIps",
+                                                                           required=False)
+    secondary_nameservers: Optional[set[str]] = FieldDescriptor[set[str]](field="secondaryNameservers",
+                                                                          required=False)
+    secondary_nameserver_ips: Optional[set[str]] = FieldDescriptor[set[str]](field="secondaryNameserverIps",
+                                                                             required=False)
 
 
-class MXRecord(CNAMERecord):
-    priority: int
+class ZoneResult(Result, abstract=False):
+    zone: ZoneInfo = FieldDescriptor[ZoneInfo](required=False)
 
 
-class DNSData(Record):
-    ttl_values: dict[str, int] = FieldDescriptor[dict[str, int]](input_name="ttlValues")
-    a: Optional[list[str]] = FieldDescriptor[list[str]](input_name="A", required=False)
-    aaaa: Optional[list[str]] = FieldDescriptor[list[str]](input_name="AAAA", required=False)
-    cname: Optional[CNAMERecord] = FieldDescriptor[CNAMERecord](input_name="CNAME", required=False)
-    mx: Optional[MXRecord] = FieldDescriptor[MXRecord](input_name="MX", required=False)
-    ns: Optional[list[NSRecord]] = FieldDescriptor[list[NSRecord]](input_name="NS", required=False)
-    txt: Optional[list[str]] = FieldDescriptor[list[str]](input_name="TXT", required=False)
+class DNSRequest(Record, coerce=True, serializer='json'):
+    dns_types_to_collect: Optional[list[str]] = FieldDescriptor[list[str]](field="dnsTypesToCollect",
+                                                                           required=False)
+    dns_types_to_process_IPs_from: Optional[list[str]] = FieldDescriptor[list[str]](
+        field="dnsTypesToProcessIPsFrom",
+        required=False)
 
-
-class IPFromRecord(Record):
-    ip: str = StringField()
-    type: str = StringField()
-
-
-class TLSCertificateExtension(Record):
-    critical: bool
-    oid: str
-    valueEncoded: str
-
-
-class TLSCertificate(Record):
-    common_name: str = StringField(input_name="commonName")
-    country: Optional[str] = StringField(input_name="country", required=False)
-    is_root: bool = BooleanField(input_name="isRoot")
-    organization: Optional[str] = StringField(input_name="organization", required=False)
-    valid_len: int = IntegerField(input_name="validLen")
-    validity_end: float = IntegerField(input_name="validityEnd")
-    validity_start: float = IntegerField(input_name="validityStart")
-    extension_count: int = IntegerField(input_name="extensionCount")
-    extensions: Optional[list[TLSCertificateExtension]] = FieldDescriptor[list[TLSCertificateExtension]](required=False)
-
-
-class TLSData(Record):
-    fromIp: IPFromRecord
-    protocol: str
-    cipher: str
-    certificates: list[TLSCertificate]
-
-
-class DNSResult(Result):
-    dns_data: Optional[DNSData] = FieldDescriptor[DNSData](input_name="dnsData", required=False)
-    tls_data: Optional[TLSData] = FieldDescriptor[TLSData](input_name="tlsData", required=False)
-    # A set of IP addresses coupled with the name of the DNS record type the address was extracted from.
-    ips: Optional[set[IPFromRecord]] = FieldDescriptor[set[IPFromRecord]](required=False)
-    # A map of [IP Address] -> (map of [Collector ID] -> [Result]).
-    ip_results: Optional[dict[str, dict[str, IPResult]]] = FieldDescriptor[
-        dict[str, dict[str, IPResult]]](field="ipResults", required=False)
-
-
-class FinalResult(Record, serializer='json'):
-    dns_result: DNSResult = FieldDescriptor[DNSResult](input_name='dnsResult')
-    rdap_dn_result: RDAPDomainResult = FieldDescriptor[RDAPDomainResult](input_name='rdapDomainResult')
-    # TODO
+    zone_info: ZoneInfo = FieldDescriptor[ZoneInfo](field="zoneInfo", required=True)

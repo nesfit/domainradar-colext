@@ -13,18 +13,37 @@ check_hostname = true
 [rdap_dn]
 app_id = "domrad-rdap-dn"
 debug = false
-http_timeout_sec = 5
+# The number of worker threads that process input entries
+concurrency = 4
+
+# RDAP request timeout (seconds)
+http_timeout = 5
+# Allow max `limiter_concurrency` requests in `limiter_window` seconds
+# for a single RDAP endpoint.
+limiter_concurrency = 5
+limiter_window = 60
 
 [rdap_ip]
 app_id = "domrad-rdap-ip"
 debug = false
-http_timeout_sec = 5
+
+# RDAP request timeout (seconds)
+http_timeout = 5
 
 [rtt]
 app_id = "domrad-rtt"
 debug = false
+
 ping_count = 5
 privileged_mode = false
+
+[zone]
+app_id = "domrad-zone"
+debug = false
+
+dns_servers = ["195.113.144.194", "195.113.144.233"]
+timeout = 5
+rotate_nameservers = false
 
 [extractor]
 app_id = "domrad-extractor"
