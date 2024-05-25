@@ -9,9 +9,9 @@
 
 TAG_PREFIX="domrad"
 
-py_packages=("collector" "collector" "collector" "extractor" "classifier")
-py_modules=("collectors.rdap_ip" "collectors.rdap_dn" "collectors.rtt" "extractor" "classifier_unit")
-py_tags=("rdap-ip" "rdap-dn" "rtt" "extractor" "classifier")
+py_packages=("collector" "collector" "collector" "collector" "extractor" "classifier")
+py_modules=("collectors.zone" "collectors.rdap_ip" "collectors.rdap_dn" "collectors.rtt" "extractor" "classifier_unit")
+py_tags=("zone" "rdap-ip" "rdap-dn" "rtt" "extractor" "classifier")
 
 STREAMS_TAG="java-streams"
 PARCON_TAG="java-standalone"
