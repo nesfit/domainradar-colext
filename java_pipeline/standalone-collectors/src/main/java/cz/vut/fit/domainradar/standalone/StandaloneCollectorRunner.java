@@ -87,7 +87,8 @@ public class StandaloneCollectorRunner {
             }
 
             if (useAll || cmd.hasOption("col-zone")) {
-                components.add(new ZoneCollector(mapper, appId, properties));
+                Logger.error("The Java-based Zone collector should not be used at the moment. Use the Python one instead.");
+                // components.add(new ZoneCollector(mapper, appId, properties));
             }
 
             if (useAll || cmd.hasOption("col-nerd")) {

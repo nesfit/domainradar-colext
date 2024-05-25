@@ -30,7 +30,7 @@ import java.util.Properties;
 import java.util.concurrent.*;
 
 public class NERDCollector extends IPStandaloneCollector<NERDData> {
-    private static final org.slf4j.Logger Logger = LoggerFactory.getLogger(ZoneCollector.class);
+    private static final org.slf4j.Logger Logger = LoggerFactory.getLogger(NERDCollector.class);
 
     public static final String NAME = "nerd";
     private static final String NERD_BASE = "https://nerd.cesnet.cz/nerd/api/v1/";

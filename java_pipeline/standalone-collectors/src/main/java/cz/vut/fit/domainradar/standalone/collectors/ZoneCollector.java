@@ -26,6 +26,13 @@ import java.util.Objects;
 import java.util.Properties;
 import java.util.concurrent.*;
 
+/**
+ * @deprecated The Java implementation of the Zone collector is currently not really working reliably – for some reason,
+ * when large amounts of requests are to be handled simultaneously, the collector gets congested and soon begins to
+ * end the requests with timeouts. For the moment, the Python implementation is used instead. It may not offer as much
+ * true parallelization, but it works and seems to suffice for the current needs.
+ */
+@Deprecated()
 public class ZoneCollector extends BaseStandaloneCollector<String, ZoneProcessRequest> {
     public static final String NAME = "zone";
     private static final org.slf4j.Logger Logger = LoggerFactory.getLogger(ZoneCollector.class);
