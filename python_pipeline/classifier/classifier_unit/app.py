@@ -1,6 +1,8 @@
 """app.py: The main module for the classifier unit component. Defines the Faust application."""
 __author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
 
+from json import dumps
+
 import pandas as pd
 import pyarrow as pa
 from pandas import DataFrame
@@ -58,6 +60,10 @@ async def process_entries(stream):
             await process_dataframe(df)
 
 
+def serialize(value: dict) -> bytes:
+    return dumps(value, indent=None, separators=(',', ':')).encode("utf-8")
+
+
 async def process_dataframe(dataframe: DataFrame):
     try:
         results = pipeline.classifyDomains(dataframe)
@@ -70,14 +76,14 @@ async def process_dataframe(dataframe: DataFrame):
                 log_warning(CLASSIFIER, "Missing domain_name in a classification result.", None)
                 continue
 
-            await topic_processed.send(key=result["domain_name"], value=result)
+            await topic_processed.send(key=result["domain_name"], value=serialize(result))
     except Exception as e:
         keys = dataframe["domain_name"].tolist()
         log_unhandled_error(e, CLASSIFIER, None, all_keys=keys)
 
         for dn in keys:
             result = make_error_result(dn, str(e))
-            await topic_processed.send(key=dn, value=result)
+            await topic_processed.send(key=dn, value=serialize(result))
 
 
 def make_error_result(dn: str, error_message: str):
