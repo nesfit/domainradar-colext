@@ -9,6 +9,7 @@ import cryptography.x509
 from whoisit import Bootstrap
 from whoisit.errors import ParseError
 from whoisit.parser import ParseIPNetwork, ParseDomain
+from whois.parser import WhoisEntry
 
 from cryptography.x509 import Certificate
 from common import get_safe
@@ -53,6 +54,13 @@ class CompatibilityTransformation:
         ip_data = self._make_ip_data(data)
         country_codes, latitudes, longitudes = self._flatten_ip_data(ip_data)
 
+        reg_date = self._ensure_utc_datetime(rdap_parsed.get("registration_date"))
+        exp_date = self._ensure_utc_datetime(rdap_parsed.get("expiration_date"))
+        last_changed_date = self._ensure_utc_datetime(rdap_parsed.get("last_changed_date"))
+
+        if reg_date is None or exp_date is None or last_changed_date is None:
+            reg_date = exp_date = last_changed_date = datetime.fromtimestamp(0, UTC)
+
         res = {
             "domain_name": data["domain_name"],
             "dns_email_extras": self._make_email_extras(data),
@@ -69,9 +77,9 @@ class CompatibilityTransformation:
             "tls": self._make_tls(data),
             "dns_evaluated_on": get_safe(data, "dnsResult.lastAttempt"),
             "rdap_evaluated_on": get_safe(data, "rdapDomainResult.lastAttempt"),
-            "rdap_registration_date": self._ensure_utc_datetime(rdap_parsed.get("registration_date")),
-            "rdap_expiration_date": self._ensure_utc_datetime(rdap_parsed.get("expiration_date")),
-            "rdap_last_changed_date": self._ensure_utc_datetime(rdap_parsed.get("last_changed_date")),
+            "rdap_registration_date": reg_date,
+            "rdap_expiration_date": exp_date,
+            "rdap_last_changed_date": last_changed_date,
             "rdap_dnssec": self._make_rdap_dnssec(rdap_data),
             "rdap_entities": rdap_parsed.get("entities"),
             "ip_data": ip_data,
@@ -200,13 +208,34 @@ class CompatibilityTransformation:
         return {}  # TODO
 
     @staticmethod
-    def _parse_whois_to_rdap_equivalent(whois_parsed: dict, whois_raw: str):
-        # TODO
+    def _parse_whois_to_rdap_equivalent(dn: str, whois_parsed: dict, whois_raw: str):
+        reg_date = exp_date = last_changed_date = None
+
+        if whois_parsed is not None:
+            reg_date = whois_parsed.get("created_date", None)
+            exp_date = whois_parsed.get("expires_date", None)
+            last_changed_date = whois_parsed.get("updated_date", None)
+
+        has_all = reg_date is not None and exp_date is not None and last_changed_date is not None
+        if not has_all and whois_raw:
+            # noinspection PyBroadException
+            try:
+                entry = WhoisEntry.load(dn, whois_raw)
+
+                if not reg_date:
+                    reg_date = entry.get("creation_date", None)
+                if not exp_date:
+                    exp_date = entry.get("expiration_date", None)
+                if not last_changed_date:
+                    last_changed_date = entry.get("updated_date", None)
+            except Exception:
+                pass
+
         return {
-            "entities": [],
-            "registration_date": datetime.fromtimestamp(0, UTC),
-            "expiration_date": datetime.fromtimestamp(0, UTC),
-            "last_changed_date": datetime.fromtimestamp(0, UTC)
+            "entities": [],  # TODO: WHOIS entities
+            "registration_date": reg_date,
+            "expiration_date": exp_date,
+            "last_changed_date": last_changed_date
         }
 
     def _parse_rdap_dn(self, dn: str, rdap_data: dict | None, rdap_entities: list | None,
@@ -218,8 +247,8 @@ class CompatibilityTransformation:
                 return rdap_parser.parse()
             except ParseError:
                 return self._parse_rdap_backup(rdap_data)
-        elif whois_parsed is not None:
-            return self._parse_whois_to_rdap_equivalent(whois_parsed, whois_raw or "")
+        elif whois_parsed is not None or whois_raw is not None:
+            return self._parse_whois_to_rdap_equivalent(dn, whois_parsed, whois_raw or "")
         else:
             return {}
 
