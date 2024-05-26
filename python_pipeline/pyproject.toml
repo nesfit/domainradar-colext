@@ -6,7 +6,6 @@ description = "The DomainRadar Python pipeline – a meta package"
 authors = ["Ondřej Ondryáš <xondry02@stud.fit.vut.cz>"]
 license = "MIT"
 repository = "https://github.com/nesfit/domainradar-colext"
-readme = "../README.md"
 
 [tool.poetry.dependencies]
 python = "^3.11"

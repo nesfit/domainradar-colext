@@ -6,7 +6,7 @@ description = "DomainRadar Python pipeline – collectors"
 authors = ["Ondřej Ondryáš <xondry02@stud.fit.vut.cz>"]
 license = "MIT"
 repository = "https://github.com/nesfit/domainradar-colext"
-readme = "../../README.md"
+readme = "README.md"
 packages = [
     { include = "collectors" },
     { include = "common", from = ".." }

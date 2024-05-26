@@ -6,7 +6,7 @@ description = "DomainRadar Python pipeline – the feature extractor"
 authors = ["Ondřej Ondryáš <xondry02@stud.fit.vut.cz>"]
 license = "MIT"
 repository = "https://github.com/nesfit/domainradar-colext"
-readme = "../../README.md"
+readme = "README.md"
 packages = [
     { include = "extractor" },
     { include = "common", from = ".." }
