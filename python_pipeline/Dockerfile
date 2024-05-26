@@ -45,7 +45,7 @@ COPY ${TARGET_UNIT}/pyproject.toml ./
 
 # Install runtime deps (uses $POETRY_VIRTUALENVS_IN_PROJECT internally)
 RUN --mount=type=cache,target=$POETRY_CACHE_DIR \
-    poetry install --without=dev
+    poetry install --without=dev --no-directory --no-root
 
 FROM python-base AS production
 # Consume the build argument
