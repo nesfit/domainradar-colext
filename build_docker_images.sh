@@ -6,6 +6,10 @@
 #
 # Builds Docker images for the Java and Python pipeline components.
 # If no component type is specified, it builds all components.
+#
+# You can set the GITHUB_TOKEN_PATH environment variable to a file that
+# contains a GitHub username and a personal access token, separated by a space,
+# so that the build process can access private repositories.
 
 TAG_PREFIX="domrad"
 
@@ -74,6 +78,10 @@ if [ "$1" = "help" ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
   echo ""
   echo "Builds Docker images for the Java and Python pipeline components."
   echo "If no component type is specified, it builds all components."
+  echo ""
+  echo "You can set the GITHUB_TOKEN_PATH environment variable to a file that"
+  echo "contains a GitHub username and a personal access token, separated by a space,"
+  echo "so that the build process can access private repositories."
   exit 0
 fi
 
