@@ -95,6 +95,7 @@ def make_app(name: str, config: dict) -> faust.App:
                      debug=component_config.get("debug", False),
                      key_serializer="pydantic",
                      value_serializer="pydantic",
+                     web_enabled=False,
                      **component_faust_config)
 
 
