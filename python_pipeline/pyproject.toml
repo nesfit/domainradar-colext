@@ -8,7 +8,7 @@ license = "MIT"
 repository = "https://github.com/nesfit/domainradar-colext"
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = ">=3.11,<3.12"
 domrad-python-classifier-unit = { path = "./classifier/", develop = true }
 domrad-python-collectors = { path = "./collector/", develop = true }
 domrad-python-extractor = { path = "./extractor/", develop = true }

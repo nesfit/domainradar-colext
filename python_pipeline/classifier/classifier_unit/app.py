@@ -1,16 +1,18 @@
 """app.py: The main module for the classifier unit component. Defines the Faust application."""
 __author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
 
+import os.path
 from json import dumps
 
 import pandas as pd
 import pyarrow as pa
+from classifiers.options import PipelineOptions
 from pandas import DataFrame
 
 from common import read_config, make_app
 from common.audit import log_unhandled_error, log_warning
 from common.util import timestamp_now_millis
-from .dummy_pipeline import Pipeline
+from classifiers.pipeline import Pipeline
 
 CLASSIFIER = "classifier-unit"
 
@@ -18,10 +20,18 @@ CLASSIFIER = "classifier-unit"
 config = read_config()
 component_config = config.get(CLASSIFIER, {})
 
+MODEL_PATH = component_config.get("model_path")
 CONCURRENCY = component_config.get("concurrency", 4)
 BATCH_SIZE = component_config.get("batch_size", 1)
 BATCH_TIMEOUT = component_config.get("batch_timeout", 0)
 USE_BATCHING = BATCH_SIZE > 1 and BATCH_TIMEOUT != 0
+
+pipeline_options = PipelineOptions(MODEL_PATH)
+
+if not os.path.isdir(pipeline_options.models_dir):
+    raise ValueError(f"The models directory '{pipeline_options.models_dir}' does not exist.")
+if not os.path.isfile(pipeline_options.boundaries_dir):
+    raise ValueError(f"The boundaries directory '{pipeline_options.boundaries_dir}' does not exist.")
 
 # The Faust application
 classifier_app = make_app(CLASSIFIER, config)
@@ -66,7 +76,7 @@ def serialize(value: dict) -> bytes:
 
 async def process_dataframe(dataframe: DataFrame):
     try:
-        results = pipeline.classifyDomains(dataframe)
+        results = pipeline.classify_domains(dataframe)
         if not results:
             log_warning(CLASSIFIER, "No classification results were generated.", None)
             return
