@@ -10,11 +10,20 @@ client_key_file = "/path/to/client_key.pem"
 client_key_password = "password for the private key"
 check_hostname = true
 
+[faust]
+# All keys from this section will be passed directly to the faust.App constructor
+# See common/util.py:make_app for keys that cannot be set from this configuration
+# See https://faust-streaming.github.io/faust/userguide/settings.html#guide-settings
+
 [rdap_dn]
+# -- Available in all components -- #
+# Faust app ID
 app_id = "domrad-rdap-dn"
+# Faust debug mode
 debug = false
-# The number of worker threads that process input entries
+# The number of worker threads that process input entries (available in all components)
 concurrency = 4
+# --------------------------------- #
 
 # RDAP request timeout (seconds)
 http_timeout = 5
@@ -25,22 +34,16 @@ limiter_window = 60
 
 [rdap_ip]
 app_id = "domrad-rdap-ip"
-debug = false
-
 # RDAP request timeout (seconds)
 http_timeout = 5
 
 [rtt]
 app_id = "domrad-rtt"
-debug = false
-
 ping_count = 5
 privileged_mode = false
 
 [zone]
 app_id = "domrad-zone"
-debug = false
-
 dns_servers = ["195.113.144.194", "195.113.144.233"]
 timeout = 5
 rotate_nameservers = false
@@ -48,6 +51,21 @@ rotate_nameservers = false
 [extractor]
 app_id = "domrad-extractor"
 data_dir = "/path/to/data"
+# Number of records to collect in a buffer and process at once.
+# This should be fairly high, according to the input rate.
+# The downside of batching is that in case of an unhandled exception,
+# the whole batch is lost.
+batch_size = 100
+# Maximum time (in seconds) to wait for a full batch before processing.
+# In other words, the extractor will always process its current buffer
+# `batch_timeout` seconds after the last processed one, even if it's not full.
+batch_timeout = 5
 
 [classifier-unit]
 app_id = "domrad-classifier-unit"
+# If not set, the directory embedded with the "domainradar-clf" project will be used
+model_path = "/path/to/models"
+# This controls the "batching of batches" coming from the feature extractor.
+# It is recommended to only batch the data on the feature extractor level.
+batch_size = 1
+batch_timeout = 0
