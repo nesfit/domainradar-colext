@@ -44,11 +44,11 @@ public class CollectorConfig {
     public static final String DNS_MAIN_RESOLVER_ROUND_ROBIN_DOC = "If true, queries will be distributed across the configured DNS resolvers. Otherwise, the first server will be used until it is not available.";
     public static final String DNS_MAIN_RESOLVER_ROUND_ROBIN_DEFAULT = "true";
 
-    public static final String DNS_MAIN_RESOLVER_RANDOMIZE_CONFIG = "collectors.dns.main.resolver.round.robin";
+    public static final String DNS_MAIN_RESOLVER_RANDOMIZE_CONFIG = "collectors.dns.main.resolver.randomize";
     public static final String DNS_MAIN_RESOLVER_RANDOMIZE_DOC = "If true, the order of the DNS resolver IPs will be randomized for each scanner worker.";
     public static final String DNS_MAIN_RESOLVER_RANDOMIZE_DEFAULT = "true";
 
-    public static final String DNS_MAIN_RESOLVER_TIMEOUT_PER_NS_MS_CONFIG = "collectors.dns.main.resolver.timeout";
+    public static final String DNS_MAIN_RESOLVER_TIMEOUT_PER_NS_MS_CONFIG = "collectors.dns.main.resolver.timeout.per.ns";
     public static final String DNS_MAIN_RESOLVER_TIMEOUT_PER_NS_MS_DOC = "The timeout for DNS queries made against one of the configured resolvers (milliseconds).";
     public static final String DNS_MAIN_RESOLVER_TIMEOUT_PER_NS_MS_DEFAULT = "4000";
 
@@ -75,7 +75,6 @@ public class CollectorConfig {
     public static final String DNS_MAX_TIME_PER_RECORD_MS_CONFIG = "collectors.dns.max.time.per.record";
     public static final String DNS_MAX_TIME_PER_RECORD_MS_DOC = "The maximum time to wait for a single record query attempt (milliseconds).";
     public static final String DNS_MAX_TIME_PER_RECORD_MS_DEFAULT = "16000";
-
 
     /* --- Zone collector --- */
     public static final String ZONE_RESOLUTION_TIMEOUT_MS_CONFIG = "collectors.zone.resolution.timeout";
