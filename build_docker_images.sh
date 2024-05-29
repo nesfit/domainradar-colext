@@ -20,6 +20,11 @@ CONNECT_TAG="kafka-connect"
 OUT_BUILD=/dev/stdout
 OUT_MSG=/dev/stdout
 
+if [ -f "$GITHUB_TOKEN_PATH" ]; then
+    TOKEN_ARG="--secret=id=github,src=$(realpath "$GITHUB_TOKEN_PATH")"
+    echo "Using repository credentials from $GITHUB_TOKEN_PATH"
+fi
+
 build_java() {
   echo ">>> Building images for Java-based pipeline components <<<" >"$OUT_MSG"
   cd java_pipeline || return 1
@@ -50,8 +55,13 @@ build_python() {
     echo "  > Building ${py_modules[i]} <  " >"$OUT_MSG"
     echo "    > Tag: '$TAG_PREFIX/${py_tags[i]}' < " >"$OUT_MSG"
 
-    docker build --target production -t "$TAG_PREFIX/${py_tags[i]}" --build-arg "TARGET_UNIT=${py_packages[i]}" \
-      --build-arg "TARGET_MODULE=${py_modules[i]}" "$@" . 2>"$OUT_BUILD"
+    if [ -n "$TOKEN_ARG" ]; then
+      docker build --target production -t "$TAG_PREFIX/${py_tags[i]}" --build-arg "TARGET_UNIT=${py_packages[i]}" \
+        --build-arg "TARGET_MODULE=${py_modules[i]}" "$TOKEN_ARG" "$@" . 2>"$OUT_BUILD"
+    else
+      docker build --target production -t "$TAG_PREFIX/${py_tags[i]}" --build-arg "TARGET_UNIT=${py_packages[i]}" \
+        --build-arg "TARGET_MODULE=${py_modules[i]}" "$@" . 2>"$OUT_BUILD"
+    fi
   done
 
   cd ..
