@@ -4,7 +4,6 @@ Provides the extract_features function that takes raw data, passes it through th
 __author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
 
 from collections import OrderedDict
-from io import BytesIO
 from typing import Iterable
 
 import pandas as pd
