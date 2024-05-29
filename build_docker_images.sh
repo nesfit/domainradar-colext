@@ -1,11 +1,12 @@
 #!/bin/bash
 
-# Usage: $0 [-q|-qb] [java|python|all] [additional docker build options]"
+# Usage: ./build_docker_images.sh [-q|-qb] [java|python [single component tag]|all] [additional docker build options]"
 #   -q: quiet mode, suppresses all output"
 #   -qb: quiet build mode, suppresses Docker build output"
 #
 # Builds Docker images for the Java and Python pipeline components.
 # If no component type is specified, it builds all components.
+# For Python images, you can specify the tag of a single component to build.
 #
 # You can set the GITHUB_TOKEN_PATH environment variable to a file that
 # contains a GitHub username and a personal access token, separated by a space,
@@ -29,6 +30,7 @@ if [ -f "$GITHUB_TOKEN_PATH" ]; then
     echo "Using repository credentials from $GITHUB_TOKEN_PATH"
 fi
 
+
 build_java() {
   echo ">>> Building images for Java-based pipeline components <<<" >"$OUT_MSG"
   cd java_pipeline || return 1
@@ -51,11 +53,7 @@ build_java() {
   cd ..
 }
 
-build_python() {
-  echo ">>> Building images for Python-based pipeline components <<<" >"$OUT_MSG"
-  cd python_pipeline || return 1
-
-  for i in "${!py_packages[@]}"; do
+build_python_one() {
     echo "  > Building ${py_modules[i]} <  " >"$OUT_MSG"
     echo "    > Tag: '$TAG_PREFIX/${py_tags[i]}' < " >"$OUT_MSG"
 
@@ -66,18 +64,38 @@ build_python() {
       docker build --target production -t "$TAG_PREFIX/${py_tags[i]}" --build-arg "TARGET_UNIT=${py_packages[i]}" \
         --build-arg "TARGET_MODULE=${py_modules[i]}" "$@" . 2>"$OUT_BUILD"
     fi
-  done
+}
+
+build_python() {
+  echo ">>> Building images for Python-based pipeline components <<<" >"$OUT_MSG"
+  cd python_pipeline || return 1
+
+  # Check if we have an argument specifying a single component (tag)
+  if [ -n "$1" ]; then
+    for i in "${!py_tags[@]}"; do
+        if [ "${py_tags[i]}" == "$1" ] ; then
+            shift 1
+            build_python_one "$@"
+            break
+        fi
+    done
+  else
+    for i in "${!py_packages[@]}"; do
+      build_python_one "$@"
+    done
+  fi
 
   cd ..
 }
 
 if [ "$1" = "help" ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
-  echo "Usage: $0 [-q|-qb] [java|python|all] [additional docker build options]"
+  echo "Usage: $0 [-q|-qb] [java|python [single component tag]|all] [additional docker build options]"
   echo "  -q: quiet mode, suppresses all output"
   echo "  -qb: quiet build mode, suppresses Docker build output"
   echo ""
   echo "Builds Docker images for the Java and Python pipeline components."
   echo "If no component type is specified, it builds all components."
+  echo "For Python images, you can specify the tag of a single component to build."
   echo ""
   echo "You can set the GITHUB_TOKEN_PATH environment variable to a file that"
   echo "contains a GitHub username and a personal access token, separated by a space,"
