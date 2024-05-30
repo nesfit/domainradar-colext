@@ -76,14 +76,14 @@ build_python() {
         if [ "${py_tags[i]}" == "$1" ] ; then
             shift 1
             build_python_one "$@"
-            break
+            return 0
         fi
     done
-  else
-    for i in "${!py_packages[@]}"; do
-      build_python_one "$@"
-    done
   fi
+
+  for i in "${!py_packages[@]}"; do
+    build_python_one "$@"
+  done
 
   cd ..
 }
