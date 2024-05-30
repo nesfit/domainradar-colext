@@ -15,10 +15,10 @@ def extract_one(file):
 
     data = json.loads(data)
     extractor.init_transformations({})
-    data["domain_name"] = "ondryaso.eu"
     if isinstance(data, list):
         df = extractor.extract_features(data)
     else:
+        data["domain_name"] = "ondryaso.eu"
         df = extractor.extract_features([data])
 
     pprint(df.to_dict(orient='records'))

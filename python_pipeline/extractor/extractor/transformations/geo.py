@@ -5,8 +5,9 @@ __authors__ = [
     "Adam Horák <ihorak@fit.vut.cz>"
 ]
 
-from extractor.transformations.base_transformation import Transformation
 from pandas import DataFrame
+
+from extractor.transformations.base_transformation import Transformation
 from ._helpers import get_stddev, get_mean, get_min, get_max
 
 _continents = {
@@ -204,8 +205,24 @@ class GeoTransformation(Transformation):
 
         return df
 
-    def get_new_column_names(self) -> list[str]:
-        return ['geo_countries_count', 'geo_continents_count', 'geo_malic_host_country', 'geo_lat_stdev',
-                'geo_lon_stdev', 'geo_mean_lat', 'geo_mean_lon', 'geo_min_lat', 'geo_max_lat', 'geo_min_lon',
-                'geo_max_lon', 'geo_lat_range', 'geo_lon_range', 'geo_centroid_lat', 'geo_centroid_lon',
-                'geo_estimated_area', 'geo_continent_hash', 'geo_countries_hash']
+    def get_new_column_names(self) -> dict[str, str]:
+        return {
+            'geo_countries_count': "Int64",
+            'geo_continents_count': "Int64",
+            'geo_malic_host_country': "Int64",
+            'geo_lat_stdev': "float64",
+            'geo_lon_stdev': "float64",
+            'geo_mean_lat': "float64",
+            'geo_mean_lon': "float64",
+            'geo_min_lat': "float64",
+            'geo_max_lat': "float64",
+            'geo_min_lon': "float64",
+            'geo_max_lon': "float64",
+            'geo_lat_range': "float64",
+            'geo_lon_range': "float64",
+            'geo_centroid_lat': "float64",
+            'geo_centroid_lon': "float64",
+            'geo_estimated_area': "float64",
+            'geo_continent_hash': "Int64",
+            'geo_countries_hash': "Int64"
+        }

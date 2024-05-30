@@ -5,9 +5,9 @@ __authors__ = [
     "Adam Horák <ihorak@fit.vut.cz>"
 ]
 
-from extractor.transformations.base_transformation import Transformation
-
 from pandas import DataFrame
+
+from extractor.transformations.base_transformation import Transformation
 from ._helpers import get_normalized_entropy, simhash, todays_midnight_timestamp
 
 
@@ -79,10 +79,20 @@ class RDAPDomainTransformation(Transformation):
 
         return df
 
-    def get_new_column_names(self) -> list[str]:
-        return [
-            "rdap_registration_period", "rdap_domain_age", "rdap_time_from_last_change", "rdap_domain_active_time",
-            "rdap_has_dnssec", "rdap_registrar_name_len", "rdap_registrar_name_entropy", "rdap_registrar_name_hash",
-            "rdap_registrant_name_len", "rdap_registrant_name_entropy", "rdap_admin_name_len",
-            "rdap_admin_name_entropy", "rdap_admin_email_len", "rdap_admin_email_entropy"
-        ]
+    def get_new_column_names(self) -> dict[str, str]:
+        return {
+            "rdap_registration_period": "timedelta64[ms]",
+            "rdap_domain_age": "float64",
+            "rdap_time_from_last_change": "float64",
+            "rdap_domain_active_time": "float64",
+            "rdap_has_dnssec": "bool",  # FIXME
+            "rdap_registrar_name_len": "Int64",
+            "rdap_registrar_name_entropy": "float64",
+            "rdap_registrar_name_hash": "Int64",
+            "rdap_registrant_name_len": "Int64",
+            "rdap_registrant_name_entropy": "float64",
+            "rdap_admin_name_len": "Int64",
+            "rdap_admin_name_entropy": "float64",
+            "rdap_admin_email_len": "Int64",
+            "rdap_admin_email_entropy": "float64"
+        }

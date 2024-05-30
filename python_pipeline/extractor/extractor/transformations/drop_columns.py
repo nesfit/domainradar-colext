@@ -7,6 +7,8 @@ from pandas import DataFrame
 from extractor.transformations.base_transformation import Transformation
 
 _to_drop = [
+    "dns_zone",
+    "dns_evaluated_on",
     "dns_email_extras",
     "dns_ttls",
     "dns_SOA",
@@ -31,5 +33,5 @@ class DropColumnsTransformation(Transformation):
         df.drop(columns=_to_drop, errors='ignore', inplace=True)
         return df
 
-    def get_new_column_names(self) -> list[str]:
-        return []
+    def get_new_column_names(self) -> dict[str, str]:
+        return {}

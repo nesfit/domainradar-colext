@@ -5,8 +5,9 @@ __authors__ = [
     "Adam Horák <ihorak@fit.vut.cz>"
 ]
 
-from extractor.transformations.base_transformation import Transformation
 from pandas import DataFrame
+
+from extractor.transformations.base_transformation import Transformation
 from ._helpers import get_normalized_entropy
 
 
@@ -107,11 +108,11 @@ class RDAPAddressTransformation(Transformation):
 
         return df
 
-    def get_new_column_names(self) -> list[str]:
-        return [
-            "rdap_ip_v4_count", "rdap_ip_v6_count",
-            "rdap_ip_shortest_v4_prefix_len", "rdap_ip_longest_v4_prefix_len",
-            "rdap_ip_shortest_v6_prefix_len", "rdap_ip_longest_v6_prefix_len",
-            "rdap_ip_avg_admin_name_len", "rdap_ip_avg_admin_name_entropy",
-            "rdap_ip_avg_admin_email_len", "rdap_ip_avg_admin_email_entropy"
-        ]
+    def get_new_column_names(self) -> dict[str, str]:
+        return {
+            "rdap_ip_v4_count": "Int64", "rdap_ip_v6_count": "Int64",
+            "rdap_ip_shortest_v4_prefix_len": "Int64", "rdap_ip_longest_v4_prefix_len": "Int64",
+            "rdap_ip_shortest_v6_prefix_len": "Int64", "rdap_ip_longest_v6_prefix_len": "Int64",
+            "rdap_ip_avg_admin_name_len": "float64", "rdap_ip_avg_admin_name_entropy": "float64",
+            "rdap_ip_avg_admin_email_len": "float64", "rdap_ip_avg_admin_email_entropy": "float64"
+        }

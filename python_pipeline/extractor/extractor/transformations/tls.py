@@ -5,15 +5,15 @@ __authors__ = [
     "Adam Horák <ihorak@fit.vut.cz>"
 ]
 
+import datetime
+
 from cryptography import x509
 from cryptography.x509 import Certificate, ExtensionNotFound, ObjectIdentifier, Extension
 from cryptography.x509.oid import ExtensionOID, NameOID
-
-from extractor.transformations.base_transformation import Transformation
-
-import datetime
 from pandas import DataFrame, Series
 from pandas.errors import OutOfBoundsDatetime
+
+from extractor.transformations.base_transformation import Transformation
 from ._helpers import todays_midnight_timestamp, hash_md5
 
 _tls_version_ids = {
@@ -66,7 +66,7 @@ def _make_tls_features(row: Series, collection_date: datetime.datetime):
     tls_data = row['tls']
     if tls_data is None:
         row["tls_has_tls"] = False
-        return
+        return row
 
     # FEATURES
     tls_version_id = _tls_version_ids.get(tls_data['protocol'], 0)
@@ -118,7 +118,7 @@ def _make_tls_features(row: Series, collection_date: datetime.datetime):
     all_certs = tls_data['certificates']
     if len(all_certs) == 0:
         row["tls_has_tls"] = False
-        return
+        return row
 
     mean_len = 0
     cert_counter = 0
@@ -268,44 +268,44 @@ class TLSTransformation(Transformation):
         df = df.apply(_make_tls_features, axis=1, args=(date,))
         return df
 
-    def get_new_column_names(self) -> list[str]:
-        return [
-            "tls_has_tls",  # Has TLS
-            "tls_chain_len",  # Length of certificate chain
-            "tls_is_self_signed",  # Is self-signed
-            "tls_root_authority_hash",  # Hash of root certificate authority
-            "tls_leaf_authority_hash",  # Hash of leaf certificate authority
-            "tls_negotiated_version_id",  # Evaluated TLS version
-            "tls_negotiated_cipher_id",  # Evaluated cipher
-            "tls_root_cert_validity_len",  # Total validity time of root certificate
-            # NOTUSED # "tls_root_cert_lifetime",  # How long was the root certificate valid at the time of collection
-            # NOTUSED # "tls_root_cert_validity_remaining",  # Time to expire of root certificate from time of collection
-            "tls_leaf_cert_validity_len",  # Total validity time of leaf certificate
-            # NOTUSED # "tls_leaf_cert_lifetime",  # How long was the leaf certificate valid at the time of collection
-            # NOTUSED # "tls_leaf_cert_validity_remaining",  # Time to expire of leaf certificate from time of collection
-            # NOTUSED # "tls_mean_certs_validity_len",  # Mean validity time of all certificates in chain including root
-            "tls_broken_chain",  # Chain was never valid,
-            "tls_expired_chain",  # Chain already expired at time of collection
-            "tls_total_extension_count",  # Total number of extensions in certificate
-            "tls_critical_extensions",  # Total number of critical extensions in certificate
-            "tls_with_policies_crt_count",  # Number of certificates enforcing specific encryption policy
+    def get_new_column_names(self) -> dict[str, str]:
+        return {
+            "tls_has_tls": "bool",  # Has TLS  # FIXME
+            "tls_chain_len": "Int64",  # Length of certificate chain
+            "tls_is_self_signed": "Int64",  # Is self-signed  # FIXME
+            "tls_root_authority_hash": "Int64",  # Hash of root certificate authority
+            "tls_leaf_authority_hash": "Int64",  # Hash of leaf certificate authority
+            "tls_negotiated_version_id": "Int64",  # Evaluated TLS version
+            "tls_negotiated_cipher_id": "Int64",  # Evaluated cipher
+            "tls_root_cert_validity_len": "float64",  # Total validity time of root certificate
+            # NOTUSED # "tls_root_cert_lifetime": "Int64",  # How long was the root certificate valid at the time of collection
+            # NOTUSED # "tls_root_cert_validity_remaining": "Int64",  # Time to expire of root certificate from time of collection
+            "tls_leaf_cert_validity_len": "float64",  # Total validity time of leaf certificate
+            # NOTUSED # "tls_leaf_cert_lifetime": "Int64",  # How long was the leaf certificate valid at the time of collection
+            # NOTUSED # "tls_leaf_cert_validity_remaining": "Int64",  # Time to expire of leaf certificate from time of collection
+            # NOTUSED # "tls_mean_certs_validity_len": "Int64",  # Mean validity time of all certificates in chain including root
+            "tls_broken_chain": "Int64",  # Chain was never valid: "Int64",  # FIXME
+            "tls_expired_chain": "Int64",  # Chain already expired at time of collection  # FIXME
+            "tls_total_extension_count": "Int64",  # Total number of extensions in certificate
+            "tls_critical_extensions": "Int64",  # Total number of critical extensions in certificate
+            "tls_with_policies_crt_count": "Int64",  # Number of certificates enforcing specific encryption policy
             # Percentage of certificates enforcing specific encryption policy
-            "tls_percentage_crt_with_policies",
-            "tls_x509_anypolicy_crt_count",  # Number of certificates enforcing X509 - ANY policy
+            "tls_percentage_crt_with_policies": "float64",
+            "tls_x509_anypolicy_crt_count": "Int64",  # Number of certificates enforcing X509 - ANY policy
             # Number of certificates supporting Joint ISO-ITU-T policy (OID root is 1)
-            "tls_iso_policy_crt_count",
+            "tls_iso_policy_crt_count": "Int64",
             # Number of certificates supporting Joint ISO-ITU-T policy (OID root is 2)
-            "tls_joint_isoitu_policy_crt_count",
-            # NOTUSED # "tls_iso_policy_oid",  # OID of ISO policy (if any or 0)
-            # NOTUSED # "tls_isoitu_policy_oid",  # OID of ISO/ITU policy (if any or 0)
-            # NOTUSED # "tls_unknown_policy_crt_count",  # How many certificates uses unknown (not X509v3, not version 1, not version 2) policy
-            "tls_subject_count",  # How many subjects can be found in SAN extension (can be linked to phishing)
+            "tls_joint_isoitu_policy_crt_count": "Int64",
+            # NOTUSED # "tls_iso_policy_oid": "Int64",  # OID of ISO policy (if any or 0)
+            # NOTUSED # "tls_isoitu_policy_oid": "Int64",  # OID of ISO/ITU policy (if any or 0)
+            # NOTUSED # "tls_unknown_policy_crt_count": "Int64",  # How many certificates uses unknown (not X509v3: "Int64", not version 1: "Int64", not version 2) policy
+            "tls_subject_count": "Int64",  # How many subjects can be found in SAN extension (can be linked to phishing)
             # How many certificates are used for server authentication
-            "tls_server_auth_crt_count",
-            "tls_client_auth_crt_count",  # How many certificates are used for client authentication
-            # NOTUSED # "CA_certs_in_chain_count",  # Count of CA certificates (can sign other certificates)
-            "tls_CA_certs_in_chain_ratio",  # Ration of CA certificates in chain
-            "tls_unique_SLD_count",  # Number of unique SLDs in SAN extension
-            # NOTUSED # "tls_common_names",  # List of common names in certificate chain (CATEGORICAL!)
-            "tls_common_name_count",  # Number of common names in certificate chain
-        ]
+            "tls_server_auth_crt_count": "Int64",
+            "tls_client_auth_crt_count": "Int64",  # How many certificates are used for client authentication
+            # NOTUSED # "CA_certs_in_chain_count": "Int64",  # Count of CA certificates (can sign other certificates)
+            "tls_CA_certs_in_chain_ratio": "float64",  # Ration of CA certificates in chain
+            "tls_unique_SLD_count": "Int64",  # Number of unique SLDs in SAN extension
+            # NOTUSED # "tls_common_names": "Int64",  # List of common names in certificate chain (CATEGORICAL!)
+            "tls_common_name_count": "Int64",  # Number of common names in certificate chain
+        }

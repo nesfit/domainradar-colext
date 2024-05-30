@@ -6,15 +6,14 @@ __authors__ = [
     "Petr Pouč <xpoucp01@vut.cz>"
 ]
 
-import os
-
-from extractor.transformations.base_transformation import Transformation
-from pandas import DataFrame
 import json
-
+import os
 import re
 
 import tldextract
+from pandas import DataFrame
+
+from extractor.transformations.base_transformation import Transformation
 from ._helpers import get_normalized_entropy, get_stddev, simhash
 
 phishing_keywords = [
@@ -581,23 +580,73 @@ class LexicalTransformation(Transformation):
         df.drop(columns=['tmp_tld', 'tmp_sld', 'tmp_stld', 'tmp_concat_subdomains', 'tmp_part_lengths'], inplace=True)
         return df
 
-    def get_new_column_names(self) -> list[str]:
-        return [
-            "tmp_tld", "tmp_sld", "tmp_stld", "tmp_concat_subdomains", "tmp_part_lengths",
-            "lex_name_len", "lex_has_digit", "lex_phishing_keyword_count", "lex_benign_keyword_count",
-            "lex_consecutive_chars", "lex_tld_len", "lex_tld_abuse_score", "lex_tld_hash", "lex_sld_len",
-            "lex_sld_norm_entropy", "lex_sld_digit_count", "lex_sld_digit_ratio", "lex_sld_phishing_keyword_count",
-            "lex_sld_vowel_count", "lex_sld_vowel_ratio", "lex_sld_consonant_count", "lex_sld_consonant_ratio",
-            "lex_sld_non_alphanum_count", "lex_sld_non_alphanum_ratio", "lex_sld_hex_count", "lex_sld_hex_ratio",
-            "lex_sub_count", "lex_stld_unique_char_count", "lex_begins_with_digit", "lex_www_flag",
-            "lex_sub_max_consonant_len", "lex_sub_norm_entropy", "lex_sub_digit_count", "lex_sub_digit_ratio",
-            "lex_sub_vowel_count", "lex_sub_vowel_ratio", "lex_sub_consonant_count", "lex_sub_consonant_ratio",
-            "lex_sub_non_alphanum_count", "lex_sub_non_alphanum_ratio", "lex_sub_hex_count", "lex_sub_hex_ratio",
-            "lex_phishing_bigram_matches", "lex_phishing_trigram_matches", "lex_phishing_tetragram_matches",
-            "lex_phishing_pentagram_matches", "lex_malware_bigram_matches", "lex_malware_trigram_matches",
-            "lex_malware_tetragram_matches", "lex_dga_bigram_matches", "lex_dga_trigram_matches",
-            "lex_dga_tetragram_matches", "lex_avg_part_len", "lex_stdev_part_lens", "lex_longest_part_len",
-            "lex_short_part_count", "lex_medium_part_count", "lex_long_part_count", "lex_superlong_part_count",
-            "lex_shortest_sub_len", "lex_ipv4_in_domain", "lex_has_trusted_suffix", "lex_has_wellknown_suffix",
-            "lex_has_cdn_suffix", "lex_has_vps_suffix", "lex_has_img_suffix", "lex_suffix_score"
-        ]
+    def get_new_column_names(self) -> dict[str, str]:
+        return {
+            "tmp_tld": "",
+            "tmp_sld": "",
+            "tmp_stld": "",
+            "tmp_concat_subdomains": "",
+            "tmp_part_lengths": "",
+            "lex_name_len": "Int64",
+            "lex_has_digit": "Int64",
+            "lex_phishing_keyword_count": "Int64",
+            "lex_benign_keyword_count": "Int64",
+            "lex_consecutive_chars": "Int64",
+            "lex_tld_len": "Int64",
+            "lex_tld_abuse_score": "float64",
+            "lex_tld_hash": "Int64",
+            "lex_sld_len": "Int64",
+            "lex_sld_norm_entropy": "float64",
+            "lex_sld_digit_count": "Int64",
+            "lex_sld_digit_ratio": "float64",
+            "lex_sld_phishing_keyword_count": "Int64",
+            "lex_sld_vowel_count": "Int64",
+            "lex_sld_vowel_ratio": "float64",
+            "lex_sld_consonant_count": "Int64",
+            "lex_sld_consonant_ratio": "float64",
+            "lex_sld_non_alphanum_count": "Int64",
+            "lex_sld_non_alphanum_ratio": "float64",
+            "lex_sld_hex_count": "Int64",
+            "lex_sld_hex_ratio": "float64",
+            "lex_sub_count": "Int64",
+            "lex_stld_unique_char_count": "Int64",
+            "lex_begins_with_digit": "Int64",  # FIXME
+            "lex_www_flag": "Int64",  # FIXME
+            "lex_sub_max_consonant_len": "Int64",
+            "lex_sub_norm_entropy": "float64",
+            "lex_sub_digit_count": "Int64",
+            "lex_sub_digit_ratio": "float64",
+            "lex_sub_vowel_count": "Int64",
+            "lex_sub_vowel_ratio": "float64",
+            "lex_sub_consonant_count": "Int64",
+            "lex_sub_consonant_ratio": "float64",
+            "lex_sub_non_alphanum_count": "Int64",
+            "lex_sub_non_alphanum_ratio": "float64",
+            "lex_sub_hex_count": "Int64",
+            "lex_sub_hex_ratio": "float64",
+            "lex_phishing_bigram_matches": "Int64",
+            "lex_phishing_trigram_matches": "Int64",
+            "lex_phishing_tetragram_matches": "Int64",
+            "lex_phishing_pentagram_matches": "Int64",
+            "lex_malware_bigram_matches": "Int64",
+            "lex_malware_trigram_matches": "Int64",
+            "lex_malware_tetragram_matches": "Int64",
+            "lex_dga_bigram_matches": "Int64",
+            "lex_dga_trigram_matches": "Int64",
+            "lex_dga_tetragram_matches": "Int64",
+            "lex_avg_part_len": "float64",
+            "lex_stdev_part_lens": "float64",
+            "lex_longest_part_len": "Int64",
+            "lex_short_part_count": "Int64",
+            "lex_medium_part_count": "Int64",
+            "lex_long_part_count": "Int64",
+            "lex_superlong_part_count": "Int64",
+            "lex_shortest_sub_len": "Int64",
+            "lex_ipv4_in_domain": "Int64",  # FIXME
+            "lex_has_trusted_suffix": "Int64",  # FIXME
+            "lex_has_wellknown_suffix": "Int64",  # FIXME
+            "lex_has_cdn_suffix": "Int64",  # FIXME
+            "lex_has_vps_suffix": "Int64",  # FIXME
+            "lex_has_img_suffix": "Int64",  # FIXME
+            "lex_suffix_score": "float64"
+        }

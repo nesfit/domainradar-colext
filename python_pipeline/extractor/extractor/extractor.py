@@ -35,6 +35,7 @@ _all_transformations = OrderedDict([
 
 _enabled_transformations: list[Transformation] = []
 _compat_transformation = CompatibilityTransformation()
+_dataframe_columns: list = []
 _target_features: dict = {}
 
 
@@ -44,7 +45,7 @@ def init_transformations(config: dict):
     If the key is not present, all transformations are enabled.
     :param config: The configuration dictionary.
     """
-    global _enabled_transformations, _target_features
+    global _enabled_transformations, _dataframe_columns, _target_features
 
     enabled_transformation_ids: Iterable[str] | None = config.get("enabled_transformations", None)
 
@@ -56,10 +57,12 @@ def init_transformations(config: dict):
             if tid in enabled_transformation_ids:
                 _enabled_transformations.append(transformation(config))
 
-    target_features = []
+    target_features = {}
     for transformation in _enabled_transformations:
-        target_features = target_features + transformation.get_new_column_names()
-    _target_features = {col: None for col in target_features}
+        target_features = target_features | transformation.get_new_column_names()
+
+    _dataframe_columns = target_features.keys()
+    _target_features = {k: v for k, v in target_features.items() if not k.startswith("tmp_")}
 
 
 def extract_features(raw_data: Iterable[dict]) -> DataFrame:
@@ -74,12 +77,14 @@ def extract_features(raw_data: Iterable[dict]) -> DataFrame:
     # Create a DataFrame where each row is one entry from the raw_data iterable
     data_frame = DataFrame(raw_data_compatible, copy=False)
     # Create new columns
-    new_cols = DataFrame(columns=list(_target_features.keys()))
+    new_cols = DataFrame(columns=_dataframe_columns)
     data_frame = pd.concat([data_frame, new_cols], axis=1)
     if data_frame.columns.has_duplicates:
         raise ValueError("Invalid input: after adding the features, the DataFrame contains duplicate columns.")
     # Apply the transformations
     for transformation in _enabled_transformations:
         data_frame = transformation.transform(data_frame)
+    # Set the datatypes
+    data_frame = data_frame.astype(_target_features, copy=False)
     # Return the final DataFrame
     return data_frame

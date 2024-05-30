@@ -1,10 +1,12 @@
 """dns.py: Feature extraction transformations for DNS data."""
 __author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
 
-from extractor.transformations.base_transformation import Transformation
 from typing import Optional, List, Dict
+
 import numpy as np
 from pandas import DataFrame, Series
+
+from extractor.transformations.base_transformation import Transformation
 from ._helpers import get_normalized_entropy, DNS_TYPES
 from .lexical import count_subdomains
 
@@ -144,25 +146,25 @@ class DNSTransformation(Transformation):
             *df["dns_ttls"].apply(make_ttl_features))
 
         # SOA features
-        df["dns_SOA_tmp"] = df.apply(
+        df["tmp_dns_SOA"] = df.apply(
             lambda row: row["dns_zone_SOA"] if row["dns_SOA"] is None and row["dns_zone_level"] > 0 else row["dns_SOA"],
             axis=1)
 
         df["dns_soa_primary_ns_level"], df["dns_soa_primary_ns_digit_count"], df["dns_soa_primary_ns_len"], df[
-            "dns_soa_primary_ns_entropy"] = zip(*df["dns_SOA_tmp"].apply(
+            "dns_soa_primary_ns_entropy"] = zip(*df["tmp_dns_SOA"].apply(
             lambda soa: make_string_features(soa["primary_ns"]) if soa is not None else (None, None, None, None)))
 
         df["dns_soa_email_level"], df["dns_soa_email_digit_count"], df["dns_soa_email_len"], df[
-            "dns_soa_email_entropy"] = zip(*df["dns_SOA_tmp"].apply(
+            "dns_soa_email_entropy"] = zip(*df["tmp_dns_SOA"].apply(
             lambda soa: make_string_features(soa["resp_mailbox_dname"]) if soa is not None else (
                 None, None, None, None)))
 
         df["dns_soa_refresh"], df["dns_soa_retry"], df["dns_soa_expire"], df["dns_soa_min_ttl"] = zip(
-            *df["dns_SOA_tmp"].apply(
+            *df["tmp_dns_SOA"].apply(
                 lambda soa: (soa["refresh"], soa["retry"], soa["expire"], soa["min_ttl"]) if soa else (
                     None, None, None, None)))
 
-        df.drop(columns=["dns_SOA_tmp"], inplace=True)
+        df.drop(columns=["tmp_dns_SOA"], inplace=True)
 
         # MX features
         df["dns_domain_name_in_mx"] = df[["domain_name", "dns_MX"]].apply(
@@ -180,14 +182,40 @@ class DNSTransformation(Transformation):
 
         return df
 
-    def get_new_column_names(self) -> list[str]:
-        return [
-            "dns_zone_level", "dns_zone_digit_count", "dns_zone_len", "dns_zone_entropy", "dns_resolved_record_types",
-            "dns_ttl_avg", "dns_ttl_stdev", "dns_ttl_low", "dns_ttl_mid", "dns_ttl_distinct_count", "dns_SOA_tmp",
-            "dns_soa_primary_ns_level", "dns_soa_primary_ns_digit_count", "dns_soa_primary_ns_len",
-            "dns_soa_primary_ns_entropy", "dns_soa_email_level", "dns_soa_email_digit_count", "dns_soa_email_len",
-            "dns_soa_email_entropy", "dns_soa_refresh", "dns_soa_retry", "dns_soa_expire", "dns_soa_min_ttl",
-            "dns_domain_name_in_mx", "dns_mx_avg_len", "dns_mx_avg_entropy", "dns_txt_avg_len", "dns_txt_avg_entropy",
-            "dns_txt_external_verification_score", "dns_txt_spf_exists", "dns_txt_dkim_exists", "dns_txt_dmarc_exists",
-            *[f'dns_{c}_count' for c in ['A', 'AAAA', 'MX', 'NS', 'TXT', 'SOA', 'CNAME']], "dns_has_dnskey"
-        ]
+    def get_new_column_names(self) -> dict[str, str]:
+        return {
+            "tmp_dns_SOA": "",
+            "dns_has_dnskey": "Int64",
+            "dns_zone_level": "Int64",
+            "dns_zone_digit_count": "Int64",
+            "dns_zone_len": "Int64",
+            "dns_zone_entropy": "float64",
+            "dns_resolved_record_types": "Int64",
+            "dns_ttl_avg": "float64",
+            "dns_ttl_stdev": "float64",
+            "dns_ttl_low": "float64",
+            "dns_ttl_mid": "float64",
+            "dns_ttl_distinct_count": "Int64",
+            "dns_soa_primary_ns_level": "Int64",
+            "dns_soa_primary_ns_digit_count": "Int64",
+            "dns_soa_primary_ns_len": "Int64",
+            "dns_soa_primary_ns_entropy": "float64",
+            "dns_soa_email_level": "Int64",
+            "dns_soa_email_digit_count": "Int64",
+            "dns_soa_email_len": "Int64",
+            "dns_soa_email_entropy": "float64",
+            "dns_soa_refresh": "Int64",
+            "dns_soa_retry": "Int64",
+            "dns_soa_expire": "Int64",
+            "dns_soa_min_ttl": "Int64",
+            "dns_domain_name_in_mx": "bool",  # FIXME
+            "dns_mx_avg_len": "float64",
+            "dns_mx_avg_entropy": "float64",
+            "dns_txt_avg_len": "float64",
+            "dns_txt_avg_entropy": "float64",
+            "dns_txt_external_verification_score": "float64",
+            "dns_txt_spf_exists": "Int64",  # FIXME
+            "dns_txt_dkim_exists": "Int64",  # FIXME
+            "dns_txt_dmarc_exists": "Int64",  # FIXME
+            **{f'dns_{c}_count': "Int64" for c in ['A', 'AAAA', 'MX', 'NS', 'TXT']}
+        }

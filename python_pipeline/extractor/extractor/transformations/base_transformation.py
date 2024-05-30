@@ -2,6 +2,8 @@
 __author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
 
 import abc
+from typing import Mapping
+
 from pandas import DataFrame
 
 
@@ -22,5 +24,5 @@ class Transformation(abc.ABC):
         raise NotImplementedError("transform method must be implemented in the subclass")
 
     @abc.abstractmethod
-    def get_new_column_names(self) -> list[str]:
+    def get_new_column_names(self) -> Mapping[str, str]:
         raise NotImplementedError("get_new_column_names method must be implemented in the subclass")

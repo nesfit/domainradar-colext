@@ -4,13 +4,13 @@ __authors__ = [
     "Radek Hranický <hranicky@fit.vut.cz>"
 ]
 
-from extractor.transformations.base_transformation import Transformation
 import ipaddress
 
+import numpy as np
 from pandas import DataFrame
 
+from extractor.transformations.base_transformation import Transformation
 from ._helpers import mean_of_existing_values
-import numpy as np
 
 
 def make_entropy(data):
@@ -106,8 +106,14 @@ class IPTransformation(Transformation):
 
         return df
 
-    def get_new_column_names(self) -> list[str]:
-        return [
-            "ip_count", "ip_mean_average_rtt", "ip_v4_ratio", "ip_a_aaaa_to_all_ratio", "ip_entropy",
-            "ip_as_address_entropy", "ip_asn_entropy", "ip_distinct_as_count"
-        ]
+    def get_new_column_names(self) -> dict[str, str]:
+        return {
+            "ip_count": "Int64",
+            "ip_mean_average_rtt": "float64",
+            "ip_v4_ratio": "float64",
+            "ip_a_aaaa_to_all_ratio": "float64",
+            "ip_entropy": "float64",
+            "ip_as_address_entropy": "float64",
+            "ip_asn_entropy": "float64",
+            "ip_distinct_as_count": "Int64"
+        }
