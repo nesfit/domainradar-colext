@@ -129,7 +129,7 @@ class DNSTransformation(Transformation):
         df = add_dns_record_counts(df)
 
         # Zone DN info
-        df.fillna({"dns_zone": ""}, inplace=True)
+        df.fillna({"dns_zone": "", "dns_has_dnskey": 0.0}, inplace=True)
         df["dns_zone_level"] = df["dns_zone"].apply(lambda dn: count_subdomains(dn))
         df["dns_zone_digit_count"] = df["dns_zone"].str.count(r'\d')
         df["dns_zone_len"] = df["dns_zone"].str.len()
@@ -189,5 +189,5 @@ class DNSTransformation(Transformation):
             "dns_soa_email_entropy", "dns_soa_refresh", "dns_soa_retry", "dns_soa_expire", "dns_soa_min_ttl",
             "dns_domain_name_in_mx", "dns_mx_avg_len", "dns_mx_avg_entropy", "dns_txt_avg_len", "dns_txt_avg_entropy",
             "dns_txt_external_verification_score", "dns_txt_spf_exists", "dns_txt_dkim_exists", "dns_txt_dmarc_exists",
-            *[f'dns_{c}_count' for c in ['A', 'AAAA', 'MX', 'NS', 'TXT']]
+            *[f'dns_{c}_count' for c in ['A', 'AAAA', 'MX', 'NS', 'TXT', 'SOA', 'CNAME']], "dns_has_dnskey"
         ]
