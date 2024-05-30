@@ -30,7 +30,7 @@ pipeline_options = PipelineOptions(MODEL_PATH)
 
 if not os.path.isdir(pipeline_options.models_dir):
     raise ValueError(f"The models directory '{pipeline_options.models_dir}' does not exist.")
-if not os.path.isfile(pipeline_options.boundaries_dir):
+if not os.path.isdir(pipeline_options.boundaries_dir):
     raise ValueError(f"The boundaries directory '{pipeline_options.boundaries_dir}' does not exist.")
 
 # The Faust application
@@ -45,7 +45,7 @@ topic_processed = classifier_app.topic('classification_results', key_type=str, k
                                        value_type=bytes, value_serializer='raw')
 
 # The classification pipeline
-pipeline = Pipeline()
+pipeline = Pipeline(pipeline_options)
 
 
 # The main loop
