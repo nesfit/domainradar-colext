@@ -131,8 +131,8 @@ class DNSTransformation(Transformation):
         df = add_dns_record_counts(df)
 
         # Zone DN info
-        df["dns_zone"].astype(str).fillna("", inplace=True)
-        df["dns_has_dnskey"].astype("Int64").fillna(0, inplace=True)
+        df.fillna({"dns_zone": "", "dns_has_dnskey": 0}, inplace=True)
+
         df["dns_zone_level"] = df["dns_zone"].apply(lambda dn: count_subdomains(dn))
         df["dns_zone_digit_count"] = df["dns_zone"].str.count(r'\d')
         df["dns_zone_len"] = df["dns_zone"].str.len()

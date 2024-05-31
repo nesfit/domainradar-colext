@@ -1,6 +1,6 @@
 """extractor.py: The feature extraction process implementation.
 Provides the extract_features function that takes raw data, passes it through the configured transformations and returns
- a list of feature vectors. The list of transformations is initialized from the configuration."""
+ a DataFrame of feature vectors. The list of transformations is initialized from the configuration."""
 __author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
 
 from collections import OrderedDict
@@ -20,8 +20,6 @@ from .transformations.rdap_dn import RDAPDomainTransformation
 from .transformations.rdap_ip import RDAPAddressTransformation
 from .transformations.tls import TLSTransformation
 
-# The list of all transformations. The order in this dictionary determines the order in which the transformations
-# will be applied to the data. The keys are used in the configuration to enable or disable specific transformations.
 _all_transformations = OrderedDict([
     ("dns", DNSTransformation),
     ("ip", IPTransformation),
@@ -32,20 +30,29 @@ _all_transformations = OrderedDict([
     ("rdap_ip", RDAPAddressTransformation),
     ("drop", DropColumnsTransformation)
 ])
-
+"""An ordered dictionary of all data transformer classes.
+ The order in this dictionary determines the order in which the transformations will be applied to the data. 
+ The keys are used in the configuration to enable or disable specific transformations."""
 _enabled_transformations: list[Transformation] = []
+"""A list of all enabled and initialized transformer objects."""
 _compat_transformation = CompatibilityTransformation()
-_dataframe_columns: list = []
-_target_features: dict = {}
+"""A special transformation that converts the raw data into a format compatible with the other transformations."""
+_added_columns_names: list = []
+"""A list of the names of all columns added by the transformations."""
+_added_columns_with_types: dict = {}
+"""A dictionary of the names of all columns added by the transformations and their target DataFrame types."""
+_all_columns_with_types: dict = {}
+"""A dictionary of all output columns and their target DataFrame types, including the columns added by the
+compatibility transformation."""
 
 
 def init_transformations(config: dict):
     """
-    Initializes the transformation list based on the `enabled_transformations` key in the configuration.
-    If the key is not present, all transformations are enabled.
+    Initializes the transformation list and other metadata based on the `enabled_transformations` key
+    in the configuration. If the key is not present, all transformations are enabled.
     :param config: The configuration dictionary.
     """
-    global _enabled_transformations, _dataframe_columns, _target_features
+    global _enabled_transformations, _added_columns_names, _added_columns_with_types, _all_columns_with_types
 
     enabled_transformation_ids: Iterable[str] | None = config.get("enabled_transformations", None)
 
@@ -61,8 +68,9 @@ def init_transformations(config: dict):
     for transformation in _enabled_transformations:
         target_features = target_features | transformation.get_new_column_names()
 
-    _dataframe_columns = target_features.keys()
-    _target_features = {k: v for k, v in target_features.items() if not k.startswith("tmp_")}
+    _added_columns_names = target_features.keys()
+    _added_columns_with_types = {k: v for k, v in target_features.items() if not k.startswith("tmp_")}
+    _all_columns_with_types = _added_columns_with_types | CompatibilityTransformation.datatypes
 
 
 def extract_features(raw_data: Iterable[dict]) -> DataFrame:
@@ -77,14 +85,17 @@ def extract_features(raw_data: Iterable[dict]) -> DataFrame:
     # Create a DataFrame where each row is one entry from the raw_data iterable
     data_frame = DataFrame(raw_data_compatible, copy=False)
     # Create new columns
-    new_cols = DataFrame(columns=_dataframe_columns)
+    new_cols = DataFrame(columns=_added_columns_names)
     data_frame = pd.concat([data_frame, new_cols], axis=1)
     if data_frame.columns.has_duplicates:
         raise ValueError("Invalid input: after adding the features, the DataFrame contains duplicate columns.")
+    # Set correct datatypes
+    data_frame = data_frame.astype(_all_columns_with_types, copy=False)
     # Apply the transformations
     for transformation in _enabled_transformations:
         data_frame = transformation.transform(data_frame)
-    # Set the datatypes
-    data_frame = data_frame.astype(_target_features, copy=False)
+    # Ensure the datatypes for the new columns
+    # TODO: evaluate if this is necessary
+    data_frame = data_frame.astype(_added_columns_with_types, copy=False)
     # Return the final DataFrame
     return data_frame

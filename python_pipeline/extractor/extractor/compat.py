@@ -6,12 +6,12 @@ import base64
 from datetime import datetime, UTC
 
 import cryptography.x509
+from cryptography.x509 import Certificate
+from whois.parser import WhoisEntry
 from whoisit import Bootstrap
 from whoisit.errors import ParseError
 from whoisit.parser import ParseIPNetwork, ParseDomain
-from whois.parser import WhoisEntry
 
-from cryptography.x509 import Certificate
 from common import get_safe
 
 
@@ -29,6 +29,33 @@ from common import get_safe
 # certificates are represented directly as cryptography's Certificate; or str (parse errors)
 
 class CompatibilityTransformation:
+    datatypes = {
+        "domain_name": "str",
+        "dns_email_extras": "object",
+        "dns_ttls": "object",
+        "dns_zone": "str",
+        "dns_SOA": "object",
+        "dns_zone_SOA": "object",
+        "dns_A": "object",
+        "dns_AAAA": "object",
+        "dns_TXT": "object",
+        "dns_NS": "object",
+        "dns_MX": "object",
+        "dns_CNAME": "object",
+        "tls": "object",
+        "dns_evaluated_on": "datetime64[ms, UTC]",
+        "rdap_evaluated_on": "datetime64[ms, UTC]",
+        "rdap_registration_date": "datetime64[ms, UTC]",
+        "rdap_expiration_date": "datetime64[ms, UTC]",
+        "rdap_last_changed_date": "datetime64[ms, UTC]",
+        "rdap_dnssec": "object",
+        "rdap_entities": "object",
+        "ip_data": "object",
+        "countries": "object",
+        "latitudes": "object",
+        "longitudes": "object"
+    }
+
     def __init__(self):
         self.whoisit_bootstrap = Bootstrap(allow_insecure_ssl=True)
         try:
@@ -57,9 +84,6 @@ class CompatibilityTransformation:
         reg_date = self._ensure_utc_datetime(rdap_parsed.get("registration_date"))
         exp_date = self._ensure_utc_datetime(rdap_parsed.get("expiration_date"))
         last_changed_date = self._ensure_utc_datetime(rdap_parsed.get("last_changed_date"))
-
-        if reg_date is None or exp_date is None or last_changed_date is None:
-            reg_date = exp_date = last_changed_date = datetime.fromtimestamp(0, UTC)
 
         res = {
             "domain_name": data["domain_name"],
