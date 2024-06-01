@@ -25,6 +25,7 @@ _to_drop = [
     "rdap_last_changed_date",
     "rdap_registration_date",
     "rdap_evaluated_on",
+    "rdap_dnssec",
     "ip_data",
     "countries",
     "latitudes",
