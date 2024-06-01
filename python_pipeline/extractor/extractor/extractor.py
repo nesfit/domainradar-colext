@@ -10,6 +10,7 @@ import pandas as pd
 from pandas import DataFrame
 
 from .compat import CompatibilityTransformation
+from .output_fields import in_classifier_order
 from .transformations.base_transformation import Transformation
 from .transformations.dns import DNSTransformation
 from .transformations.drop_columns import DropColumnsTransformation
@@ -97,5 +98,7 @@ def extract_features(raw_data: Iterable[dict]) -> DataFrame:
     # Ensure the datatypes for the new columns
     # TODO: evaluate if this is necessary
     data_frame = data_frame.astype(_added_columns_with_types, copy=False)
+    # Adjust column order to match the expected input of the classifiers
+    data_frame = data_frame.reindex(columns=in_classifier_order, copy=False)
     # Return the final DataFrame
     return data_frame
