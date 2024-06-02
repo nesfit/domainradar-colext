@@ -12,7 +12,23 @@
     <name>standalone-collectors</name>
     <packaging>jar</packaging>
 
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>io.vertx</groupId>
+                <artifactId>vertx-stack-depchain</artifactId>
+                <version>4.5.8</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
     <dependencies>
+        <dependency>
+            <groupId>io.vertx</groupId>
+            <artifactId>vertx-core</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.apache.kafka</groupId>
             <artifactId>kafka-clients</artifactId>
@@ -21,10 +37,6 @@
         <dependency>
             <groupId>io.confluent.parallelconsumer</groupId>
             <artifactId>parallel-consumer-core</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>io.confluent.parallelconsumer</groupId>
-            <artifactId>parallel-consumer-vertx</artifactId>
         </dependency>
         <dependency>
             <groupId>commons-cli</groupId>

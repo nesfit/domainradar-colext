@@ -79,7 +79,7 @@ public class StandaloneCollectorRunner {
 
         try {
             if (useAll || cmd.hasOption("col-dns")) {
-                components.add(new DNSCollector(mapper, appId, properties));
+                components.add(new VertxDNSCollector(mapper, appId, properties));
             }
 
             if (useAll || cmd.hasOption("col-tls")) {
