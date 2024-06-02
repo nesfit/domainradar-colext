@@ -22,7 +22,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class CollectedDataMergerComponent implements PipelineComponent {
-    public record IPDataPair(String ip, Map<String, CommonIPResult<JsonNode>> ipData) {
+    public record IPDataPair(String ip, Map<String, CommonIPResult<byte[]>> ipData) {
     }
 
     private static final org.slf4j.Logger Logger = LoggerFactory.getLogger(CollectedDataMergerComponent.class);
@@ -34,13 +34,13 @@ public class CollectedDataMergerComponent implements PipelineComponent {
 
     @Override
     public void use(StreamsBuilder builder) {
-        final var commonIpResultOfNodeTypeRef = new TypeReference<CommonIPResult<JsonNode>>() {
+        final var commonIpResultOfNodeTypeRef = new TypeReference<CommonIPResult<byte[]>>() {
         };
         final var commonIpResultSerde = JsonSerde.of(_jsonMapper, commonIpResultOfNodeTypeRef);
-        final var hashMapWithIpResultsTypeRef = new TypeReference<ConcurrentHashMap<String, CommonIPResult<JsonNode>>>() {
+        final var hashMapWithIpResultsTypeRef = new TypeReference<ConcurrentHashMap<String, CommonIPResult<byte[]>>>() {
         };
         final var hashMapWithIpResultsSerde = JsonSerde.of(_jsonMapper, hashMapWithIpResultsTypeRef);
-        final var hashMapWithAllIpResultsTypeRef = new TypeReference<Map<String, Map<String, CommonIPResult<JsonNode>>>>() {
+        final var hashMapWithAllIpResultsTypeRef = new TypeReference<Map<String, Map<String, CommonIPResult<byte[]>>>>() {
         };
         final var hashMapWithAllIpResultsSerde = JsonSerde.of(_jsonMapper, hashMapWithAllIpResultsTypeRef);
 

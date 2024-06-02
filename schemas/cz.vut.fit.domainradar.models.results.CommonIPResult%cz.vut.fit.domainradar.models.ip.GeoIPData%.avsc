@@ -1,0 +1,95 @@
+{
+  "type" : "record",
+  "name" : "CommonIPResult",
+  "namespace" : "cz.vut.fit.domainradar.models.results",
+  "fields" : [ {
+    "name" : "collector",
+    "type" : [ "null", "string" ]
+  }, {
+    "name" : "data",
+    "type" : [ "null", {
+      "type" : "record",
+      "name" : "GeoIPData",
+      "namespace" : "cz.vut.fit.domainradar.models.ip",
+      "fields" : [ {
+        "name" : "asn",
+        "type" : [ "null", {
+          "type" : "long",
+          "java-class" : "java.lang.Long"
+        } ]
+      }, {
+        "name" : "asnOrg",
+        "type" : [ "null", "string" ]
+      }, {
+        "name" : "city",
+        "type" : [ "null", "string" ]
+      }, {
+        "name" : "continentCode",
+        "type" : [ "null", "string" ]
+      }, {
+        "name" : "countryCode",
+        "type" : [ "null", "string" ]
+      }, {
+        "name" : "latitude",
+        "type" : [ "null", {
+          "type" : "double",
+          "java-class" : "java.lang.Double"
+        } ]
+      }, {
+        "name" : "longitude",
+        "type" : [ "null", {
+          "type" : "double",
+          "java-class" : "java.lang.Double"
+        } ]
+      }, {
+        "name" : "networkAddress",
+        "type" : [ "null", "string" ]
+      }, {
+        "name" : "postalCode",
+        "type" : [ "null", "string" ]
+      }, {
+        "name" : "prefixLength",
+        "type" : [ "null", {
+          "type" : "int",
+          "java-class" : "java.lang.Integer"
+        } ]
+      }, {
+        "name" : "region",
+        "type" : [ "null", "string" ]
+      }, {
+        "name" : "regionCode",
+        "type" : [ "null", "string" ]
+      }, {
+        "name" : "registeredCountryGeoNameId",
+        "type" : [ "null", {
+          "type" : "long",
+          "java-class" : "java.lang.Long"
+        } ]
+      }, {
+        "name" : "representedCountryGeoNameId",
+        "type" : [ "null", {
+          "type" : "long",
+          "java-class" : "java.lang.Long"
+        } ]
+      }, {
+        "name" : "timezone",
+        "type" : [ "null", "string" ]
+      } ]
+    } ]
+  }, {
+    "name" : "error",
+    "type" : [ "null", "string" ]
+  }, {
+    "name" : "lastAttempt",
+    "type" : [ "null", {
+      "type" : "long",
+      "logicalType" : "timestamp-millis"
+    } ]
+  }, {
+    "name" : "statusCode",
+    "type" : {
+      "type" : "int",
+      "java-class" : "java.lang.Integer"
+    }
+  } ]
+}

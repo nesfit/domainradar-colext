@@ -15,17 +15,4 @@ public record DNSData(@NotNull Map<String, Long> ttlValues,
                       @Nullable List<NSRecord> NS,
                       @Nullable List<String> TXT,
                       @Nullable Map<String, String> errors) {
-
-    public record CNAMERecord(@NotNull String value, @Nullable List<String> relatedIps) {
-    }
-
-    public record MXRecord(@NotNull String value, int priority, @Nullable List<String> relatedIps) {
-    }
-
-    public record NSRecord(@NotNull String nameserver, @Nullable List<String> relatedIps) {
-    }
-
-    public record SOARecord(@NotNull String primaryNs, @NotNull String respMailboxDname, @NotNull String serial,
-                            long refresh, long retry, long expire, long minTTL) {
-    }
 }

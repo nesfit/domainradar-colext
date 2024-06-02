@@ -4,7 +4,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 
-public record ZoneProcessRequest(
+public record ZoneRequest(
         boolean collectDNS,
         boolean collectRDAP,
         @Nullable
@@ -12,7 +12,7 @@ public record ZoneProcessRequest(
         @Nullable
         List<String> dnsTypesToProcessIPsFrom) {
 
-    public ZoneProcessRequest() {
+    public ZoneRequest() {
         this(true, true, null, null);
     }
 }

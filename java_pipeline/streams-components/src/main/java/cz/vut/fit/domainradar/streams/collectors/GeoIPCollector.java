@@ -13,7 +13,7 @@ import cz.vut.fit.domainradar.Topics;
 import cz.vut.fit.domainradar.models.IPToProcess;
 import cz.vut.fit.domainradar.models.ResultCodes;
 import cz.vut.fit.domainradar.models.ip.GeoIPData;
-import cz.vut.fit.domainradar.models.requests.IPProcessRequest;
+import cz.vut.fit.domainradar.models.requests.IPRequest;
 import cz.vut.fit.domainradar.models.results.CommonIPResult;
 import cz.vut.fit.domainradar.serialization.JsonSerde;
 import cz.vut.fit.domainradar.streams.CommonResultIPCollector;
@@ -56,7 +56,7 @@ public class GeoIPCollector implements CommonResultIPCollector<GeoIPData> {
     @Override
     public void use(StreamsBuilder builder) {
         var toProcessIpSerde = JsonSerde.of(_jsonMapper, IPToProcess.class);
-        var ipRequestSerde = JsonSerde.of(_jsonMapper, IPProcessRequest.class);
+        var ipRequestSerde = JsonSerde.of(_jsonMapper, IPRequest.class);
 
         builder.stream(Topics.IN_IP, Consumed.with(toProcessIpSerde, ipRequestSerde))
                 .filter((ip, request) -> request == null

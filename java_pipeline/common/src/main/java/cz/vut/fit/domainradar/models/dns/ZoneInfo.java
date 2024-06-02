@@ -7,7 +7,7 @@ import java.util.Set;
 
 public record ZoneInfo(
         @NotNull String zone,
-        @NotNull DNSData.SOARecord soa,
+        @NotNull SOARecord soa,
         @NotNull String publicSuffix,
         @NotNull String registrySuffix,
         @Nullable Set<String> primaryNameserverIps,

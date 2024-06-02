@@ -1,0 +1,96 @@
+{
+  "type" : "record",
+  "name" : "DNSRequest",
+  "namespace" : "cz.vut.fit.domainradar.models.requests",
+  "fields" : [ {
+    "name" : "typesToCollect",
+    "type" : [ "null", {
+      "type" : "array",
+      "items" : "string"
+    } ]
+  }, {
+    "name" : "typesToProcessIPsFrom",
+    "type" : [ "null", {
+      "type" : "array",
+      "items" : "string"
+    } ]
+  }, {
+    "name" : "zoneInfo",
+    "type" : {
+      "type" : "record",
+      "name" : "ZoneInfo",
+      "namespace" : "cz.vut.fit.domainradar.models.dns",
+      "fields" : [ {
+        "name" : "primaryNameserverIps",
+        "type" : [ "null", {
+          "type" : "array",
+          "items" : "string",
+          "java-class" : "java.util.Set"
+        } ]
+      }, {
+        "name" : "publicSuffix",
+        "type" : [ "null", "string" ]
+      }, {
+        "name" : "registrySuffix",
+        "type" : [ "null", "string" ]
+      }, {
+        "name" : "secondaryNameserverIps",
+        "type" : [ "null", {
+          "type" : "array",
+          "items" : "string",
+          "java-class" : "java.util.Set"
+        } ]
+      }, {
+        "name" : "secondaryNameservers",
+        "type" : [ "null", {
+          "type" : "array",
+          "items" : "string",
+          "java-class" : "java.util.Set"
+        } ]
+      }, {
+        "name" : "soa",
+        "type" : [ "null", {
+          "type" : "record",
+          "name" : "SOARecord",
+          "fields" : [ {
+            "name" : "expire",
+            "type" : {
+              "type" : "long",
+              "java-class" : "java.lang.Long"
+            }
+          }, {
+            "name" : "minTTL",
+            "type" : {
+              "type" : "long",
+              "java-class" : "java.lang.Long"
+            }
+          }, {
+            "name" : "primaryNs",
+            "type" : [ "null", "string" ]
+          }, {
+            "name" : "refresh",
+            "type" : {
+              "type" : "long",
+              "java-class" : "java.lang.Long"
+            }
+          }, {
+            "name" : "respMailboxDname",
+            "type" : [ "null", "string" ]
+          }, {
+            "name" : "retry",
+            "type" : {
+              "type" : "long",
+              "java-class" : "java.lang.Long"
+            }
+          }, {
+            "name" : "serial",
+            "type" : [ "null", "string" ]
+          } ]
+        } ]
+      }, {
+        "name" : "zone",
+        "type" : [ "null", "string" ]
+      } ]
+    }
+  } ]
+}

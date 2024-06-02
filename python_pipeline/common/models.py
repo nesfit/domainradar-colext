@@ -1,9 +1,8 @@
-from typing import Optional
+import datetime
+from typing import Optional, Any
 
-from pydantic.alias_generators import to_camel
 from pydantic import BaseModel, Field, ConfigDict, AliasGenerator, AliasChoices
-
-from common import timestamp_now_millis
+from pydantic.alias_generators import to_camel
 
 
 class CustomBaseModel(BaseModel):
@@ -46,9 +45,9 @@ class ZoneInfo(CustomBaseModel):
     soa: SOARecord
     public_suffix: str = Field(serialization_alias="publicSuffix")
     registry_suffix: str = Field(serialization_alias="registrySuffix")
-    primary_nameserver_ips: Optional[set[str]] = Field(None, serialization_alias="primaryNameserverIps")
-    secondary_nameservers: Optional[set[str]] = Field(None, serialization_alias="secondaryNameservers")
-    secondary_nameserver_ips: Optional[set[str]] = Field(None, serialization_alias="secondaryNameserverIps")
+    primary_nameserver_ips: Optional[list[str]] = Field(None, serialization_alias="primaryNameserverIps")
+    secondary_nameservers: Optional[list[str]] = Field(None, serialization_alias="secondaryNameservers")
+    secondary_nameserver_ips: Optional[list[str]] = Field(None, serialization_alias="secondaryNameserverIps")
 
 
 # ---- Requests ---- #
@@ -62,17 +61,17 @@ class ZoneRequest(CustomBaseModel):
 
 
 class DNSRequest(CustomBaseModel):
-    zone_info: ZoneInfo = Field(serialization_alias="zoneInfo")
-    dns_types_to_collect: Optional[list[str]] = Field(None, serialization_alias="dnsTypesToCollect")
+    dns_types_to_collect: Optional[list[str]] = Field(None, serialization_alias="typesToCollect")
     dns_types_to_process_IPs_from: Optional[list[str]] = Field(None,
-                                                               serialization_alias="dnsTypesToProcessIPsFrom")
+                                                               serialization_alias="typesToProcessIPsFrom")
+    zone_info: ZoneInfo = Field(serialization_alias="zoneInfo")
 
 
-class RDAPRequest(CustomBaseModel):
+class RDAPDomainRequest(CustomBaseModel):
     zone: Optional[str] = None
 
 
-class IPProcessRequest(CustomBaseModel):
+class IPRequest(CustomBaseModel):
     collectors: Optional[list[str]] = None
 
 
@@ -81,7 +80,8 @@ class IPProcessRequest(CustomBaseModel):
 class Result(CustomBaseModel):
     status_code: int = Field(serialization_alias="statusCode")
     error: Optional[str] = None
-    last_attempt: int = Field(serialization_alias="lastAttempt", default_factory=lambda: timestamp_now_millis())
+    last_attempt: datetime.datetime = Field(serialization_alias="lastAttempt",
+                                            default_factory=lambda: datetime.datetime.now(datetime.UTC))
 
 
 class IPResult(Result):
@@ -89,7 +89,7 @@ class IPResult(Result):
 
 
 class RDAPIPResult(IPResult):
-    data: Optional[dict] = None
+    data: Optional[dict[str, Any]] = None
 
 
 class RTTResult(IPResult):
@@ -99,12 +99,36 @@ class RTTResult(IPResult):
 class RDAPDomainResult(Result):
     rdap_target: str = Field("", serialization_alias="rdapTarget")
     whois_status_code: int = Field(-1, serialization_alias="whoisStatusCode")
-    rdap_data: Optional[dict] = Field(None, serialization_alias="rdapData")
-    entities: Optional[list[dict]] = None
+    rdap_data: Optional[dict[str, Any]] = Field(None, serialization_alias="rdapData")
+    entities: Optional[list[dict[str, Any]]] = None
     whois_error: Optional[str] = Field(None, serialization_alias="whoisError")
     raw_whois_data: Optional[str] = Field(None, serialization_alias="whoisRaw")
-    parsed_whois_data: Optional[dict] = Field(None, serialization_alias="whoisParsed")
+    parsed_whois_data: Optional[dict[str, Any]] = Field(None, serialization_alias="whoisParsed")
 
 
 class ZoneResult(Result):
     zone: Optional[ZoneInfo] = None
+
+
+avro_namespaces = {
+    "default": "cz.vut.fit.domainradar.models",
+    IPToProcess: "cz.vut.fit.domainradar.models",
+    RTTData: "cz.vut.fit.domainradar.models.ip",
+    SOARecord: "cz.vut.fit.domainradar.models.dns",
+    ZoneInfo: "cz.vut.fit.domainradar.models.dns",
+    ZoneRequest: "cz.vut.fit.domainradar.models.requests",
+    DNSRequest: "cz.vut.fit.domainradar.models.requests",
+    RDAPDomainRequest: "cz.vut.fit.domainradar.models.requests",
+    IPRequest: "cz.vut.fit.domainradar.models.requests",
+    # IPResult: None,
+    # RDAPIPResult: "cz.vut.fit.domainradar.models.results",
+    # RTTResult: "cz.vut.fit.domainradar.models.results",
+    RDAPDomainResult: "cz.vut.fit.domainradar.models.results",
+    ZoneResult: "cz.vut.fit.domainradar.models.results",
+}
+
+avro_overrides = {
+    IPResult: None,
+    RDAPIPResult: "cz.vut.fit.domainradar.models.results.CommonIPResult%[B%",
+    RTTResult: "cz.vut.fit.domainradar.models.results.CommonIPResult%cz.vut.fit.domainradar.models.ip.RTTData%"
+}

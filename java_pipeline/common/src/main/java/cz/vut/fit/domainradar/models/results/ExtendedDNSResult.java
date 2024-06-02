@@ -1,6 +1,5 @@
 package cz.vut.fit.domainradar.models.results;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import cz.vut.fit.domainradar.models.ResultCodes;
 import cz.vut.fit.domainradar.models.dns.DNSData;
 import org.jetbrains.annotations.NotNull;
@@ -26,15 +25,15 @@ public record ExtendedDNSResult(int statusCode,
                                 @Nullable String error,
                                 @NotNull Instant lastAttempt,
                                 @Nullable DNSData dnsData,
-                                @Nullable Set<DNSResult.IPFromRecord> ips,
-                                @Nullable Map<String, Map<String, CommonIPResult<JsonNode>>> ipResults
+                                @Nullable Set<IPFromRecord> ips,
+                                @Nullable Map<String, Map<String, CommonIPResult<byte[]>>> ipResults
 ) implements Result {
     /**
      * Makes an instance by copying fields from the given <code>{@link DNSResult}</code> and storing the
      * given IP data map as <code>{@link #ipResults}</code>. This makes a shallow copy of the input DNS result
      * and stores a reference to the map, not a copy.
      */
-    public ExtendedDNSResult(DNSResult result, @Nullable Map<String, Map<String, CommonIPResult<JsonNode>>> ips) {
+    public ExtendedDNSResult(DNSResult result, @Nullable Map<String, Map<String, CommonIPResult<byte[]>>> ips) {
         this(result.statusCode(), result.error(), result.lastAttempt(), result.dnsData(), result.ips(), ips);
     }
 }

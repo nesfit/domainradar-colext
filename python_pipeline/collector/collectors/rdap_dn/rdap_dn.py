@@ -13,13 +13,12 @@ from whodap import DNSClient
 from whodap.response import DomainResponse
 from whodap.errors import *
 
-from common import read_config, make_app
+from common import read_config, make_app, ensure_model
 from common.audit import log_unhandled_error
-from common.models import RDAPRequest, RDAPDomainResult
+from common.models import RDAPDomainRequest, RDAPDomainResult
 import common.result_codes as rc
 from collectors.util import fetch_entities, extract_known_tld, make_rdap_ssl_context, \
     handle_top_level_component_exception
-from common.util import ensure_model
 
 COLLECTOR = "rdap_dn"
 
@@ -157,7 +156,7 @@ async def process_entries(stream):
     # Main message processing loop
     # dn is the domain name, req is the optional RDAPRequest object
     async for dn, req in stream.items():
-        req = ensure_model(RDAPRequest, req)
+        req = ensure_model(RDAPDomainRequest, req)
 
         try:
             await process_entry(dn, req, rdap_client, whois_client)

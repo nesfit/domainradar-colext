@@ -1,0 +1,15 @@
+{
+  "type" : "record",
+  "name" : "Certificate",
+  "namespace" : "cz.vut.fit.domainradar.models.tls",
+  "fields" : [ {
+    "name" : "derData",
+    "type" : [ "null", {
+      "type" : "bytes",
+      "java-class" : "[B"
+    } ]
+  }, {
+    "name" : "dn",
+    "type" : [ "null", "string" ]
+  } ]
+}

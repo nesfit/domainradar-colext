@@ -118,8 +118,8 @@ class DNSCollector:
         # Remove the primary NS IPs from the set of nameserver IPs
         nameserver_ips.difference_update(primary_ns_ips)
 
-        return ZoneInfo(soa=soa_record, zone=zone, primary_nameserver_ips=primary_ns_ips,
-                        secondary_nameservers=nameservers, secondary_nameserver_ips=nameserver_ips,
+        return ZoneInfo(soa=soa_record, zone=zone, primary_nameserver_ips=list(primary_ns_ips),
+                        secondary_nameservers=list(nameservers), secondary_nameserver_ips=list(nameserver_ips),
                         public_suffix=name_parts.suffix, registry_suffix=name_parts.suffix)
 
     async def _find_nameservers(self, domain_name: str) -> set[str]:

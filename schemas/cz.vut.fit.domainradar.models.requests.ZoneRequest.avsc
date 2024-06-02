@@ -1,0 +1,24 @@
+{
+  "type" : "record",
+  "name" : "ZoneRequest",
+  "namespace" : "cz.vut.fit.domainradar.models.requests",
+  "fields" : [ {
+    "name" : "collectDNS",
+    "type" : "boolean"
+  }, {
+    "name" : "collectRDAP",
+    "type" : "boolean"
+  }, {
+    "name" : "dnsTypesToCollect",
+    "type" : [ "null", {
+      "type" : "array",
+      "items" : "string"
+    } ]
+  }, {
+    "name" : "dnsTypesToProcessIPsFrom",
+    "type" : [ "null", {
+      "type" : "array",
+      "items" : "string"
+    } ]
+  } ]
+}

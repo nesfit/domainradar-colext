@@ -10,12 +10,12 @@ import java.time.Instant;
 public record RDAPDomainResult(int statusCode,
                                @Nullable String error,
                                @NotNull Instant lastAttempt,
-                               @Nullable JsonNode rdapData,
-                               @Nullable JsonNode entities,
+                               @Nullable String rdapData, // Raw JSON
+                               @Nullable String entities, // Raw JSON
                                boolean forSourceName,
                                int whoisStatusCode,
                                @Nullable String whoisError,
                                @Nullable String whoisRaw,
-                               @Nullable JsonNode whoisParsed
+                               @Nullable String whoisParsed
 ) implements Result {
 }

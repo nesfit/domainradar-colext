@@ -1,0 +1,57 @@
+{
+  "type" : "record",
+  "name" : "TLSResult",
+  "namespace" : "cz.vut.fit.domainradar.models.results",
+  "fields" : [ {
+    "name" : "error",
+    "type" : [ "null", "string" ]
+  }, {
+    "name" : "lastAttempt",
+    "type" : [ "null", {
+      "type" : "long",
+      "logicalType" : "timestamp-millis"
+    } ]
+  }, {
+    "name" : "statusCode",
+    "type" : {
+      "type" : "int",
+      "java-class" : "java.lang.Integer"
+    }
+  }, {
+    "name" : "tlsData",
+    "type" : [ "null", {
+      "type" : "record",
+      "name" : "TLSData",
+      "namespace" : "cz.vut.fit.domainradar.models.tls",
+      "fields" : [ {
+        "name" : "certificates",
+        "type" : [ "null", {
+          "type" : "array",
+          "items" : {
+            "type" : "record",
+            "name" : "Certificate",
+            "fields" : [ {
+              "name" : "derData",
+              "type" : [ "null", {
+                "type" : "bytes",
+                "java-class" : "[B"
+              } ]
+            }, {
+              "name" : "dn",
+              "type" : [ "null", "string" ]
+            } ]
+          }
+        } ]
+      }, {
+        "name" : "cipher",
+        "type" : [ "null", "string" ]
+      }, {
+        "name" : "fromIp",
+        "type" : [ "null", "string" ]
+      }, {
+        "name" : "protocol",
+        "type" : [ "null", "string" ]
+      } ]
+    } ]
+  } ]
+}

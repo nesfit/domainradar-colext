@@ -1,0 +1,101 @@
+{
+  "type" : "record",
+  "name" : "DNSData",
+  "namespace" : "cz.vut.fit.domainradar.models.dns",
+  "fields" : [ {
+    "name" : "A",
+    "type" : [ "null", {
+      "type" : "array",
+      "items" : "string",
+      "java-class" : "java.util.Set"
+    } ]
+  }, {
+    "name" : "AAAA",
+    "type" : [ "null", {
+      "type" : "array",
+      "items" : "string",
+      "java-class" : "java.util.Set"
+    } ]
+  }, {
+    "name" : "CNAME",
+    "type" : [ "null", {
+      "type" : "record",
+      "name" : "CNAMERecord",
+      "fields" : [ {
+        "name" : "relatedIps",
+        "type" : [ "null", {
+          "type" : "array",
+          "items" : "string"
+        } ]
+      }, {
+        "name" : "value",
+        "type" : [ "null", "string" ]
+      } ]
+    } ]
+  }, {
+    "name" : "MX",
+    "type" : [ "null", {
+      "type" : "array",
+      "items" : {
+        "type" : "record",
+        "name" : "MXRecord",
+        "fields" : [ {
+          "name" : "priority",
+          "type" : {
+            "type" : "int",
+            "java-class" : "java.lang.Integer"
+          }
+        }, {
+          "name" : "relatedIps",
+          "type" : [ "null", {
+            "type" : "array",
+            "items" : "string"
+          } ]
+        }, {
+          "name" : "value",
+          "type" : [ "null", "string" ]
+        } ]
+      }
+    } ]
+  }, {
+    "name" : "NS",
+    "type" : [ "null", {
+      "type" : "array",
+      "items" : {
+        "type" : "record",
+        "name" : "NSRecord",
+        "fields" : [ {
+          "name" : "nameserver",
+          "type" : [ "null", "string" ]
+        }, {
+          "name" : "relatedIps",
+          "type" : [ "null", {
+            "type" : "array",
+            "items" : "string"
+          } ]
+        } ]
+      }
+    } ]
+  }, {
+    "name" : "TXT",
+    "type" : [ "null", {
+      "type" : "array",
+      "items" : "string"
+    } ]
+  }, {
+    "name" : "errors",
+    "type" : [ "null", {
+      "type" : "map",
+      "values" : "string"
+    } ]
+  }, {
+    "name" : "ttlValues",
+    "type" : [ "null", {
+      "type" : "map",
+      "values" : {
+        "type" : "long",
+        "java-class" : "java.lang.Long"
+      }
+    } ]
+  } ]
+}

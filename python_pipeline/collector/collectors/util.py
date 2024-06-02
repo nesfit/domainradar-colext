@@ -7,7 +7,7 @@ from whodap.response import DomainResponse, RDAPResponse
 from whodap.client import RDAPClient
 
 from common.audit import log_unhandled_error
-from common.models import IPProcessRequest, Result
+from common.models import IPRequest, Result
 from common import result_codes as rc
 
 
@@ -81,7 +81,7 @@ def extract_known_tld(domain_name: str, client: DNSClient) -> tuple[str | None, 
     return domain, tld, iana_tlds.get(tld)
 
 
-def should_omit_ip(request: Optional[IPProcessRequest], collector_name: str) -> bool:
+def should_omit_ip(request: Optional[IPRequest], collector_name: str) -> bool:
     return request is not None and request.collectors is not None and collector_name not in request.collectors
 
 

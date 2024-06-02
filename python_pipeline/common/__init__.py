@@ -1,23 +1,22 @@
-from .custom_codecs import StringCodec, PydanticCodec
+from .custom_codecs import StringCodec, PydanticCodec, PydanticAvroCodec
 
 from .util import (
     ensure_data_dir,
     read_config,
     make_ssl_context,
-    make_app,
     get_safe,
-    timestamp_now_millis,
-    ensure_model
+    timestamp_now_millis
 )
+from .faust_util import make_app
+from .models_util import ensure_model
 
 __all__ = [
     "ensure_data_dir",
     "read_config",
     "make_ssl_context",
-    "make_app",
     "get_safe",
     "timestamp_now_millis",
-    "ensure_model",
     "StringCodec",
-    "PydanticCodec"
+    "PydanticCodec",
+    "PydanticAvroCodec",
 ]

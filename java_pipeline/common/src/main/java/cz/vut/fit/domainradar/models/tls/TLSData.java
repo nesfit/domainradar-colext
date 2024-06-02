@@ -9,8 +9,4 @@ public record TLSData(@NotNull String fromIp,
                       @NotNull String cipher,
                       @NotNull List<Certificate> certificates) {
 
-    public record Certificate(@NotNull String dn,
-                              byte[] derData) {
-    }
-
 }

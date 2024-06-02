@@ -109,7 +109,7 @@ public class TLSCollector extends BaseStandaloneCollector<String, String> {
 
                 // Extract certificates from the server
                 Certificate[] serverCerts = session.getPeerCertificates();
-                var certificates = new ArrayList<TLSData.Certificate>();
+                var certificates = new ArrayList<cz.vut.fit.domainradar.models.tls.Certificate>();
                 for (var cert : serverCerts) {
                     if (cert instanceof X509Certificate) {
                         certificates.add(parseCertificate((X509Certificate) cert));
@@ -126,14 +126,14 @@ public class TLSCollector extends BaseStandaloneCollector<String, String> {
         }, _executor);
     }
 
-    public static TLSData.Certificate parseCertificate(X509Certificate cert) {
+    public static cz.vut.fit.domainradar.models.tls.Certificate parseCertificate(X509Certificate cert) {
         X500Principal subject = cert.getSubjectX500Principal();
         String subjectDN = subject.getName(X500Principal.RFC1779);
 
         try {
-            return new TLSData.Certificate(subjectDN, cert.getEncoded());
+            return new cz.vut.fit.domainradar.models.tls.Certificate(subjectDN, cert.getEncoded());
         } catch (CertificateEncodingException e) {
-            return new TLSData.Certificate(subjectDN, new byte[0]);
+            return new cz.vut.fit.domainradar.models.tls.Certificate(subjectDN, new byte[0]);
         }
     }
 

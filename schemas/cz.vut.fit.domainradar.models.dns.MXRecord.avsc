@@ -1,0 +1,21 @@
+{
+  "type" : "record",
+  "name" : "MXRecord",
+  "namespace" : "cz.vut.fit.domainradar.models.dns",
+  "fields" : [ {
+    "name" : "priority",
+    "type" : {
+      "type" : "int",
+      "java-class" : "java.lang.Integer"
+    }
+  }, {
+    "name" : "relatedIps",
+    "type" : [ "null", {
+      "type" : "array",
+      "items" : "string"
+    } ]
+  }, {
+    "name" : "value",
+    "type" : [ "null", "string" ]
+  } ]
+}

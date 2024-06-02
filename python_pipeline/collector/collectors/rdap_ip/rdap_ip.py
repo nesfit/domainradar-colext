@@ -10,13 +10,12 @@ from whodap import IPv4Client, IPv6Client
 from whodap.response import IPv4Response, IPv6Response
 from whodap.errors import *
 
-from common import read_config, make_app
+from common import read_config, make_app, ensure_model
 from common.audit import log_unhandled_error
-from common.models import IPToProcess, IPProcessRequest, RDAPIPResult
+from common.models import IPToProcess, IPRequest, RDAPIPResult
 import common.result_codes as rc
 from collectors.util import (make_rdap_ssl_context, should_omit_ip,
                              handle_top_level_component_exception, get_ip_safe)
-from common.util import ensure_model
 
 COLLECTOR = "rdap_ip"
 
@@ -93,7 +92,7 @@ async def process_entries(stream):
     # dn is the domain name / IP address pair
     async for dn_ip, process_request in stream.items():
         dn_ip = ensure_model(IPToProcess, dn_ip)
-        process_request = ensure_model(IPProcessRequest, process_request)
+        process_request = ensure_model(IPRequest, process_request)
 
         try:
             # Omit the DN if the collector is not in the list of collectors to process

@@ -2,7 +2,7 @@ package cz.vut.fit.domainradar.standalone.collectors.dns;
 
 import cz.vut.fit.domainradar.CollectorConfig;
 import cz.vut.fit.domainradar.models.IPToProcess;
-import cz.vut.fit.domainradar.models.requests.DNSProcessRequest;
+import cz.vut.fit.domainradar.models.requests.DNSRequest;
 import cz.vut.fit.domainradar.models.results.DNSResult;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.slf4j.LoggerFactory;
@@ -94,7 +94,7 @@ public class Processor implements Closeable {
         Logger.info("DNS RecordFetchHandler started");
     }
 
-    public void submit(String domainName, DNSProcessRequest processRequest) {
+    public void submit(String domainName, DNSRequest processRequest) {
         int mask;
         List<String> typesToCollect;
         if (processRequest.typesToCollect() == null || processRequest.typesToCollect().isEmpty()) {

@@ -1,0 +1,12 @@
+{
+  "type" : "record",
+  "name" : "IPToProcess",
+  "namespace" : "cz.vut.fit.domainradar.models",
+  "fields" : [ {
+    "name" : "domainName",
+    "type" : [ "null", "string" ]
+  }, {
+    "name" : "ip",
+    "type" : [ "null", "string" ]
+  } ]
+}

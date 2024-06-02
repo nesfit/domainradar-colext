@@ -1,0 +1,12 @@
+{
+  "type" : "record",
+  "name" : "IPRequest",
+  "namespace" : "cz.vut.fit.domainradar.models.requests",
+  "fields" : [ {
+    "name" : "collectors",
+    "type" : [ "null", {
+      "type" : "array",
+      "items" : "string"
+    } ]
+  } ]
+}

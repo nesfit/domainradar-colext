@@ -2,10 +2,9 @@ from icmplib import async_ping, ICMPSocketError, DestinationUnreachable, TimeExc
 
 from collectors.util import (should_omit_ip, get_ip_safe,
                              handle_top_level_component_exception)
-from common.util import ensure_model
-from common import read_config, make_app
+from common import read_config, make_app, ensure_model
 from common.audit import log_unhandled_error
-from common.models import IPToProcess, IPProcessRequest, RTTResult, RTTData
+from common.models import IPToProcess, IPRequest, RTTResult, RTTData
 import common.result_codes as rc
 
 COLLECTOR = "rtt"
@@ -62,7 +61,7 @@ async def process_entries(stream):
     # dn is the domain name / IP address pair
     async for dn_ip, process_request in stream.items():
         dn_ip = ensure_model(IPToProcess, dn_ip)
-        process_request = ensure_model(IPProcessRequest, process_request)
+        process_request = ensure_model(IPRequest, process_request)
 
         try:
             # Omit the DN if the collector is not in the list of collectors to process

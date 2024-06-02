@@ -1,0 +1,15 @@
+{
+  "type" : "record",
+  "name" : "NSRecord",
+  "namespace" : "cz.vut.fit.domainradar.models.dns",
+  "fields" : [ {
+    "name" : "nameserver",
+    "type" : [ "null", "string" ]
+  }, {
+    "name" : "relatedIps",
+    "type" : [ "null", {
+      "type" : "array",
+      "items" : "string"
+    } ]
+  } ]
+}

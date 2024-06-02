@@ -4,9 +4,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import cz.vut.fit.domainradar.CollectorConfig;
 import cz.vut.fit.domainradar.Topics;
 import cz.vut.fit.domainradar.models.ResultCodes;
-import cz.vut.fit.domainradar.models.requests.DNSProcessRequest;
-import cz.vut.fit.domainradar.models.requests.RDAPDomainProcessRequest;
-import cz.vut.fit.domainradar.models.requests.ZoneProcessRequest;
+import cz.vut.fit.domainradar.models.requests.DNSRequest;
+import cz.vut.fit.domainradar.models.requests.RDAPDomainRequest;
+import cz.vut.fit.domainradar.models.requests.ZoneRequest;
 import cz.vut.fit.domainradar.models.results.ZoneResult;
 import cz.vut.fit.domainradar.serialization.JsonSerde;
 import cz.vut.fit.domainradar.standalone.BaseStandaloneCollector;
@@ -33,13 +33,13 @@ import java.util.concurrent.*;
  * true parallelization, but it works and seems to suffice for the current needs.
  */
 @Deprecated()
-public class ZoneCollector extends BaseStandaloneCollector<String, ZoneProcessRequest> {
+public class ZoneCollector extends BaseStandaloneCollector<String, ZoneRequest> {
     public static final String NAME = "zone";
     private static final org.slf4j.Logger Logger = LoggerFactory.getLogger(ZoneCollector.class);
 
     private final KafkaProducer<String, ZoneResult> _resultProducer;
-    private final KafkaProducer<String, DNSProcessRequest> _dnsRequestProducer;
-    private final KafkaProducer<String, RDAPDomainProcessRequest> _rdapRequestProducer;
+    private final KafkaProducer<String, DNSRequest> _dnsRequestProducer;
+    private final KafkaProducer<String, RDAPDomainRequest> _rdapRequestProducer;
 
     private final ExecutorService _executor;
     private final InternalDNSResolver _dns;
@@ -49,7 +49,7 @@ public class ZoneCollector extends BaseStandaloneCollector<String, ZoneProcessRe
     public ZoneCollector(@NotNull ObjectMapper jsonMapper,
                          @NotNull String appName,
                          @NotNull Properties properties) throws UnknownHostException {
-        super(jsonMapper, appName, properties, Serdes.String(), JsonSerde.of(jsonMapper, ZoneProcessRequest.class));
+        super(jsonMapper, appName, properties, Serdes.String(), JsonSerde.of(jsonMapper, ZoneRequest.class));
 
         _zoneResolutionTimeout = Long.parseLong(properties.getProperty(CollectorConfig.ZONE_RESOLUTION_TIMEOUT_MS_CONFIG,
                 CollectorConfig.ZONE_RESOLUTION_TIMEOUT_MS_DEFAULT));
@@ -57,9 +57,9 @@ public class ZoneCollector extends BaseStandaloneCollector<String, ZoneProcessRe
         _resultProducer = super.createProducer(new StringSerializer(),
                 JsonSerde.of(jsonMapper, ZoneResult.class).serializer(), "result");
         _dnsRequestProducer = super.createProducer(new StringSerializer(),
-                JsonSerde.of(jsonMapper, DNSProcessRequest.class).serializer(), "dns-req");
+                JsonSerde.of(jsonMapper, DNSRequest.class).serializer(), "dns-req");
         _rdapRequestProducer = super.createProducer(new StringSerializer(),
-                JsonSerde.of(jsonMapper, RDAPDomainProcessRequest.class).serializer(), "rdap-req");
+                JsonSerde.of(jsonMapper, RDAPDomainRequest.class).serializer(), "rdap-req");
 
         _executor = Executors.newVirtualThreadPerTaskExecutor();
         _dns = new InternalDNSResolver(_executor, _properties);
@@ -68,7 +68,7 @@ public class ZoneCollector extends BaseStandaloneCollector<String, ZoneProcessRe
     @Override
     public void run(CommandLine cmd) {
         buildProcessor(0);
-        final var defaultRequestValue = new ZoneProcessRequest(true, true, null, null);
+        final var defaultRequestValue = new ZoneRequest(true, true, null, null);
 
         _parallelProcessor.subscribe(UniLists.of(Topics.IN_ZONE));
         _parallelProcessor.poll(ctx -> {
@@ -96,8 +96,8 @@ public class ZoneCollector extends BaseStandaloneCollector<String, ZoneProcessRe
         });
     }
 
-    private CompletableFuture<Void> processRequest(final String dn, final ZoneProcessRequest reqValue,
-                                                   final ZoneProcessRequest defaultRequestValue) {
+    private CompletableFuture<Void> processRequest(final String dn, final ZoneRequest reqValue,
+                                                   final ZoneRequest defaultRequestValue) {
         return _dns.getZoneInfo(dn)
                 .exceptionally(e -> {
                     // Shouldn't happen (error ought to be handled in the InternalDNSResolver)
@@ -117,17 +117,17 @@ public class ZoneCollector extends BaseStandaloneCollector<String, ZoneProcessRe
                         var request = Objects.requireNonNullElse(reqValue, defaultRequestValue);
 
                         if (request.collectDNS()) {
-                            _dnsRequestProducer.send(new ProducerRecord<>(Topics.IN_DNS, dn, new DNSProcessRequest(
+                            _dnsRequestProducer.send(new ProducerRecord<>(Topics.IN_DNS, dn, new DNSRequest(
                                     request.dnsTypesToCollect(), request.dnsTypesToProcessIPsFrom(), result.zone())));
                         }
 
                         if (request.collectRDAP()) {
                             _rdapRequestProducer.send(new ProducerRecord<>(Topics.IN_RDAP_DN, dn,
-                                    new RDAPDomainProcessRequest(result.zone().zone())));
+                                    new RDAPDomainRequest(result.zone().zone())));
                         }
                     } else {
                         _rdapRequestProducer.send(new ProducerRecord<>(Topics.IN_RDAP_DN, dn,
-                                new RDAPDomainProcessRequest(null)));
+                                new RDAPDomainRequest(null)));
                     }
                 }).toCompletableFuture();
     }

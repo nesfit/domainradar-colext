@@ -3,11 +3,10 @@ from dns.resolver import Cache
 
 import common.result_codes as rc
 from collectors.util import handle_top_level_component_exception
-from common.util import ensure_model
 from collectors.zone.collector import DNSCollectorOptions, DNSCollector
-from common import read_config, make_app
+from common import read_config, make_app, ensure_model
 from common.audit import log_unhandled_error
-from common.models import RDAPRequest, RDAPDomainResult, ZoneRequest, ZoneResult, DNSRequest
+from common.models import RDAPDomainRequest, RDAPDomainResult, ZoneRequest, ZoneResult, DNSRequest
 
 COLLECTOR = "zone"
 
@@ -73,7 +72,7 @@ async def process_entries(stream):
                     await topic_dns_requests.send(key=dn, value=dns_req)
 
                 if not req or req.collect_RDAP:
-                    rdap_req = RDAPRequest(zone=result.zone.zone)
+                    rdap_req = RDAPDomainRequest(zone=result.zone.zone)
                     await topic_rdap_requests.send(key=dn, value=rdap_req)
 
         except Exception as e:

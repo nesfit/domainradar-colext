@@ -1,0 +1,9 @@
+{
+  "type" : "record",
+  "name" : "RDAPDomainRequest",
+  "namespace" : "cz.vut.fit.domainradar.models.requests",
+  "fields" : [ {
+    "name" : "zone",
+    "type" : [ "null", "string" ]
+  } ]
+}

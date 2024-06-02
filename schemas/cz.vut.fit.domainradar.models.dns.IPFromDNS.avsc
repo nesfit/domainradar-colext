@@ -1,0 +1,12 @@
+{
+  "type" : "record",
+  "name" : "IPFromDNS",
+  "namespace" : "cz.vut.fit.domainradar.models.dns",
+  "fields" : [ {
+    "name" : "ip",
+    "type" : [ "null", "string" ]
+  }, {
+    "name" : "sourceRecordType",
+    "type" : [ "null", "string" ]
+  } ]
+}

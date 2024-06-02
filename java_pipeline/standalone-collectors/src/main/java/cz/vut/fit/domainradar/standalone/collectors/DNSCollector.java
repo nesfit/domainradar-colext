@@ -3,7 +3,7 @@ package cz.vut.fit.domainradar.standalone.collectors;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import cz.vut.fit.domainradar.Topics;
 import cz.vut.fit.domainradar.models.IPToProcess;
-import cz.vut.fit.domainradar.models.requests.DNSProcessRequest;
+import cz.vut.fit.domainradar.models.requests.DNSRequest;
 import cz.vut.fit.domainradar.models.results.DNSResult;
 import cz.vut.fit.domainradar.serialization.JsonSerde;
 import cz.vut.fit.domainradar.standalone.BaseStandaloneCollector;
@@ -21,7 +21,7 @@ import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-public class DNSCollector extends BaseStandaloneCollector<String, DNSProcessRequest> {
+public class DNSCollector extends BaseStandaloneCollector<String, DNSRequest> {
     public static String NAME = "dns";
 
     private final ExecutorService _executor;
@@ -36,7 +36,7 @@ public class DNSCollector extends BaseStandaloneCollector<String, DNSProcessRequ
                         @NotNull Properties properties) {
         super(jsonMapper, appName, properties,
                 Serdes.String(),
-                JsonSerde.of(jsonMapper, DNSProcessRequest.class));
+                JsonSerde.of(jsonMapper, DNSRequest.class));
 
         _executor = Executors.newVirtualThreadPerTaskExecutor();
 

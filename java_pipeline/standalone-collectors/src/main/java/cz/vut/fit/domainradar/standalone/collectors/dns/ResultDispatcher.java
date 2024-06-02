@@ -3,8 +3,12 @@ package cz.vut.fit.domainradar.standalone.collectors.dns;
 import cz.vut.fit.domainradar.Topics;
 import cz.vut.fit.domainradar.models.IPToProcess;
 import cz.vut.fit.domainradar.models.ResultCodes;
+import cz.vut.fit.domainradar.models.dns.CNAMERecord;
 import cz.vut.fit.domainradar.models.dns.DNSData;
+import cz.vut.fit.domainradar.models.dns.MXRecord;
+import cz.vut.fit.domainradar.models.dns.NSRecord;
 import cz.vut.fit.domainradar.models.results.DNSResult;
+import cz.vut.fit.domainradar.models.results.IPFromRecord;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.jetbrains.annotations.NotNull;
@@ -123,17 +127,17 @@ class ResultDispatcher implements Runnable {
                 container.missingMask &= RecordTypeFlags.AAAA_CLEAR;
             }
             case "CNAME" -> {
-                container.CNAME = (DNSData.CNAMERecord) item.value();
+                container.CNAME = (CNAMERecord) item.value();
                 container.ttlCNAME = item.ttl();
                 container.missingMask &= RecordTypeFlags.CNAME_CLEAR;
             }
             case "MX" -> {
-                container.MX = (List<DNSData.MXRecord>) item.value();
+                container.MX = (List<MXRecord>) item.value();
                 container.ttlMX = item.ttl();
                 container.missingMask &= RecordTypeFlags.MX_CLEAR;
             }
             case "NS" -> {
-                container.NS = (List<DNSData.NSRecord>) item.value();
+                container.NS = (List<NSRecord>) item.value();
                 container.ttlNS = item.ttl();
                 container.missingMask &= RecordTypeFlags.NS_CLEAR;
             }
@@ -155,11 +159,11 @@ class ResultDispatcher implements Runnable {
         return collection == null ? Stream.empty() : collection.stream();
     }
 
-    private Set<DNSResult.IPFromRecord> getIPsToProcess(DNSDataContainer data) {
+    private Set<IPFromRecord> getIPsToProcess(DNSDataContainer data) {
         if (data.typesToProcessIPsFrom == null || data.typesToProcessIPsFrom.isEmpty())
             return Set.of();
 
-        var ret = new HashSet<DNSResult.IPFromRecord>();
+        var ret = new HashSet<IPFromRecord>();
         for (var type : data.typesToProcessIPsFrom) {
             var ips = switch (type) {
                 case "A" -> streamIfNotNull(data.A);
@@ -176,7 +180,7 @@ class ResultDispatcher implements Runnable {
                 default -> Stream.<String>empty();
             };
 
-            ret.addAll(ips.map(ip -> new DNSResult.IPFromRecord(ip, type)).collect(Collectors.toSet()));
+            ret.addAll(ips.map(ip -> new IPFromRecord(ip, type)).collect(Collectors.toSet()));
         }
 
         return ret;

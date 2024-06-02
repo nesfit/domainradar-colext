@@ -20,12 +20,14 @@ public class JsonSerde<T> implements Serde<T> {
         _deserializer = new JsonDeserializerTypedByClass<>(objectMapper, cls);
     }
 
-    public static <T> JsonSerde<T> of(ObjectMapper objectMapper, TypeReference<T> typeRef) {
-        return new JsonSerde<>(objectMapper, typeRef);
+    public static <T> Serde<T> of(ObjectMapper objectMapper, TypeReference<T> typeRef) {
+        // return new JsonSerde<>(objectMapper, typeRef);
+        return AvroSerde.of(objectMapper, typeRef);
     }
 
-    public static <T> JsonSerde<T> of(ObjectMapper objectMapper, Class<T> cls) {
-        return new JsonSerde<>(objectMapper, cls);
+    public static <T> Serde<T> of(ObjectMapper objectMapper, Class<T> cls) {
+        // return new JsonSerde<>(objectMapper, cls);
+        return AvroSerde.of(objectMapper, cls);
     }
 
     @Override

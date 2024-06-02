@@ -1,0 +1,367 @@
+{
+  "type" : "record",
+  "name" : "FinalResult",
+  "namespace" : "cz.vut.fit.domainradar.models.results",
+  "fields" : [ {
+    "name" : "dnsResult",
+    "type" : [ "null", {
+      "type" : "record",
+      "name" : "ExtendedDNSResult",
+      "fields" : [ {
+        "name" : "dnsData",
+        "type" : [ "null", {
+          "type" : "record",
+          "name" : "DNSData",
+          "namespace" : "cz.vut.fit.domainradar.models.dns",
+          "fields" : [ {
+            "name" : "A",
+            "type" : [ "null", {
+              "type" : "array",
+              "items" : "string",
+              "java-class" : "java.util.Set"
+            } ]
+          }, {
+            "name" : "AAAA",
+            "type" : [ "null", {
+              "type" : "array",
+              "items" : "string",
+              "java-class" : "java.util.Set"
+            } ]
+          }, {
+            "name" : "CNAME",
+            "type" : [ "null", {
+              "type" : "record",
+              "name" : "CNAMERecord",
+              "fields" : [ {
+                "name" : "relatedIps",
+                "type" : [ "null", {
+                  "type" : "array",
+                  "items" : "string"
+                } ]
+              }, {
+                "name" : "value",
+                "type" : [ "null", "string" ]
+              } ]
+            } ]
+          }, {
+            "name" : "MX",
+            "type" : [ "null", {
+              "type" : "array",
+              "items" : {
+                "type" : "record",
+                "name" : "MXRecord",
+                "fields" : [ {
+                  "name" : "priority",
+                  "type" : {
+                    "type" : "int",
+                    "java-class" : "java.lang.Integer"
+                  }
+                }, {
+                  "name" : "relatedIps",
+                  "type" : [ "null", {
+                    "type" : "array",
+                    "items" : "string"
+                  } ]
+                }, {
+                  "name" : "value",
+                  "type" : [ "null", "string" ]
+                } ]
+              }
+            } ]
+          }, {
+            "name" : "NS",
+            "type" : [ "null", {
+              "type" : "array",
+              "items" : {
+                "type" : "record",
+                "name" : "NSRecord",
+                "fields" : [ {
+                  "name" : "nameserver",
+                  "type" : [ "null", "string" ]
+                }, {
+                  "name" : "relatedIps",
+                  "type" : [ "null", {
+                    "type" : "array",
+                    "items" : "string"
+                  } ]
+                } ]
+              }
+            } ]
+          }, {
+            "name" : "TXT",
+            "type" : [ "null", {
+              "type" : "array",
+              "items" : "string"
+            } ]
+          }, {
+            "name" : "errors",
+            "type" : [ "null", {
+              "type" : "map",
+              "values" : "string"
+            } ]
+          }, {
+            "name" : "ttlValues",
+            "type" : [ "null", {
+              "type" : "map",
+              "values" : {
+                "type" : "long",
+                "java-class" : "java.lang.Long"
+              }
+            } ]
+          } ]
+        } ]
+      }, {
+        "name" : "error",
+        "type" : [ "null", "string" ]
+      }, {
+        "name" : "ipResults",
+        "type" : [ "null", {
+          "type" : "map",
+          "values" : {
+            "type" : "map",
+            "values" : {
+              "type" : "record",
+              "name" : "CommonIPResult",
+              "fields" : [ {
+                "name" : "collector",
+                "type" : [ "null", "string" ]
+              }, {
+                "name" : "data",
+                "type" : [ "null", {
+                  "type" : "bytes",
+                  "java-class" : "[B"
+                } ]
+              }, {
+                "name" : "error",
+                "type" : [ "null", "string" ]
+              }, {
+                "name" : "lastAttempt",
+                "type" : [ "null", {
+                  "type" : "long",
+                  "logicalType" : "timestamp-millis"
+                } ]
+              }, {
+                "name" : "statusCode",
+                "type" : {
+                  "type" : "int",
+                  "java-class" : "java.lang.Integer"
+                }
+              } ]
+            }
+          }
+        } ]
+      }, {
+        "name" : "ips",
+        "type" : [ "null", {
+          "type" : "array",
+          "items" : {
+            "type" : "record",
+            "name" : "IPFromRecord",
+            "fields" : [ {
+              "name" : "ip",
+              "type" : [ "null", "string" ]
+            }, {
+              "name" : "type",
+              "type" : [ "null", "string" ]
+            } ]
+          },
+          "java-class" : "java.util.Set"
+        } ]
+      }, {
+        "name" : "lastAttempt",
+        "type" : [ "null", {
+          "type" : "long",
+          "logicalType" : "timestamp-millis"
+        } ]
+      }, {
+        "name" : "statusCode",
+        "type" : {
+          "type" : "int",
+          "java-class" : "java.lang.Integer"
+        }
+      } ]
+    } ]
+  }, {
+    "name" : "rdapDomainResult",
+    "type" : [ "null", {
+      "type" : "record",
+      "name" : "RDAPDomainResult",
+      "fields" : [ {
+        "name" : "entities",
+        "type" : [ "null", "string" ]
+      }, {
+        "name" : "error",
+        "type" : [ "null", "string" ]
+      }, {
+        "name" : "forSourceName",
+        "type" : "boolean"
+      }, {
+        "name" : "lastAttempt",
+        "type" : [ "null", {
+          "type" : "long",
+          "logicalType" : "timestamp-millis"
+        } ]
+      }, {
+        "name" : "rdapData",
+        "type" : [ "null", "string" ]
+      }, {
+        "name" : "statusCode",
+        "type" : {
+          "type" : "int",
+          "java-class" : "java.lang.Integer"
+        }
+      }, {
+        "name" : "whoisError",
+        "type" : [ "null", "string" ]
+      }, {
+        "name" : "whoisParsed",
+        "type" : [ "null", "string" ]
+      }, {
+        "name" : "whoisRaw",
+        "type" : [ "null", "string" ]
+      }, {
+        "name" : "whoisStatusCode",
+        "type" : {
+          "type" : "int",
+          "java-class" : "java.lang.Integer"
+        }
+      } ]
+    } ]
+  }, {
+    "name" : "tlsResult",
+    "type" : [ "null", {
+      "type" : "record",
+      "name" : "TLSResult",
+      "fields" : [ {
+        "name" : "error",
+        "type" : [ "null", "string" ]
+      }, {
+        "name" : "lastAttempt",
+        "type" : [ "null", {
+          "type" : "long",
+          "logicalType" : "timestamp-millis"
+        } ]
+      }, {
+        "name" : "statusCode",
+        "type" : {
+          "type" : "int",
+          "java-class" : "java.lang.Integer"
+        }
+      }, {
+        "name" : "tlsData",
+        "type" : [ "null", {
+          "type" : "record",
+          "name" : "TLSData",
+          "namespace" : "cz.vut.fit.domainradar.models.tls",
+          "fields" : [ {
+            "name" : "certificates",
+            "type" : [ "null", {
+              "type" : "array",
+              "items" : {
+                "type" : "record",
+                "name" : "Certificate",
+                "fields" : [ {
+                  "name" : "derData",
+                  "type" : [ "null", {
+                    "type" : "bytes",
+                    "java-class" : "[B"
+                  } ]
+                }, {
+                  "name" : "dn",
+                  "type" : [ "null", "string" ]
+                } ]
+              }
+            } ]
+          }, {
+            "name" : "cipher",
+            "type" : [ "null", "string" ]
+          }, {
+            "name" : "fromIp",
+            "type" : [ "null", "string" ]
+          }, {
+            "name" : "protocol",
+            "type" : [ "null", "string" ]
+          } ]
+        } ]
+      } ]
+    } ]
+  }, {
+    "name" : "zone",
+    "type" : [ "null", {
+      "type" : "record",
+      "name" : "ZoneInfo",
+      "namespace" : "cz.vut.fit.domainradar.models.dns",
+      "fields" : [ {
+        "name" : "primaryNameserverIps",
+        "type" : [ "null", {
+          "type" : "array",
+          "items" : "string",
+          "java-class" : "java.util.Set"
+        } ]
+      }, {
+        "name" : "publicSuffix",
+        "type" : [ "null", "string" ]
+      }, {
+        "name" : "registrySuffix",
+        "type" : [ "null", "string" ]
+      }, {
+        "name" : "secondaryNameserverIps",
+        "type" : [ "null", {
+          "type" : "array",
+          "items" : "string",
+          "java-class" : "java.util.Set"
+        } ]
+      }, {
+        "name" : "secondaryNameservers",
+        "type" : [ "null", {
+          "type" : "array",
+          "items" : "string",
+          "java-class" : "java.util.Set"
+        } ]
+      }, {
+        "name" : "soa",
+        "type" : [ "null", {
+          "type" : "record",
+          "name" : "SOARecord",
+          "fields" : [ {
+            "name" : "expire",
+            "type" : {
+              "type" : "long",
+              "java-class" : "java.lang.Long"
+            }
+          }, {
+            "name" : "minTTL",
+            "type" : {
+              "type" : "long",
+              "java-class" : "java.lang.Long"
+            }
+          }, {
+            "name" : "primaryNs",
+            "type" : [ "null", "string" ]
+          }, {
+            "name" : "refresh",
+            "type" : {
+              "type" : "long",
+              "java-class" : "java.lang.Long"
+            }
+          }, {
+            "name" : "respMailboxDname",
+            "type" : [ "null", "string" ]
+          }, {
+            "name" : "retry",
+            "type" : {
+              "type" : "long",
+              "java-class" : "java.lang.Long"
+            }
+          }, {
+            "name" : "serial",
+            "type" : [ "null", "string" ]
+          } ]
+        } ]
+      }, {
+        "name" : "zone",
+        "type" : [ "null", "string" ]
+      } ]
+    } ]
+  } ]
+}

@@ -1,0 +1,12 @@
+{
+  "type" : "record",
+  "name" : "NERDData",
+  "namespace" : "cz.vut.fit.domainradar.models.ip",
+  "fields" : [ {
+    "name" : "reputation",
+    "type" : {
+      "type" : "double",
+      "java-class" : "java.lang.Double"
+    }
+  } ]
+}

@@ -1,6 +1,8 @@
 package cz.vut.fit.domainradar.standalone.collectors.dns;
 
-import cz.vut.fit.domainradar.models.dns.DNSData;
+import cz.vut.fit.domainradar.models.dns.CNAMERecord;
+import cz.vut.fit.domainradar.models.dns.MXRecord;
+import cz.vut.fit.domainradar.models.dns.NSRecord;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
@@ -14,9 +16,9 @@ class DNSDataContainer {
 
     @Nullable Set<String> A;
     @Nullable Set<String> AAAA;
-    @Nullable DNSData.CNAMERecord CNAME;
-    @Nullable List<DNSData.MXRecord> MX;
-    @Nullable List<DNSData.NSRecord> NS;
+    @Nullable CNAMERecord CNAME;
+    @Nullable List<MXRecord> MX;
+    @Nullable List<NSRecord> NS;
     @Nullable List<String> TXT;
     long ttlA = -1, ttlAAAA = -1, ttlCNAME = -1, ttlMX = -1, ttlNS = -1, ttlTXT = -1;
     int missingMask, initialMask;

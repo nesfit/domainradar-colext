@@ -4,7 +4,6 @@ import com.google.common.net.InetAddresses;
 import com.google.common.net.InternetDomainName;
 import cz.vut.fit.domainradar.CollectorConfig;
 import cz.vut.fit.domainradar.models.ResultCodes;
-import cz.vut.fit.domainradar.models.dns.DNSData;
 import cz.vut.fit.domainradar.models.dns.ZoneInfo;
 import cz.vut.fit.domainradar.models.results.ZoneResult;
 import org.jetbrains.annotations.NotNull;
@@ -108,7 +107,7 @@ public class InternalDNSResolver {
                     });
         }
 
-        public CompletionStage<TTLTuple<DNSData.CNAMERecord>> resolveCNAME() {
+        public CompletionStage<TTLTuple<cz.vut.fit.domainradar.models.dns.CNAMERecord>> resolveCNAME() {
             return this.resolve(Type.CNAME)
                     .thenCompose(result -> {
                         if (result == null) {
@@ -127,14 +126,14 @@ public class InternalDNSResolver {
 
                         var resolveIpsStage = InternalDNSResolver.this.resolveIpsAsync(record.getTarget());
 
-                        return resolveIpsStage.thenApply(ips -> TTLTuple.of(result, new DNSData.CNAMERecord(
+                        return resolveIpsStage.thenApply(ips -> TTLTuple.of(result, new cz.vut.fit.domainradar.models.dns.CNAMERecord(
                                 record.getTarget().toString(true),
                                 ips.stream().map(InetAddress::getHostAddress).collect(Collectors.toList())
                         )));
                     });
         }
 
-        public CompletionStage<TTLTuple<List<DNSData.MXRecord>>> resolveMX() {
+        public CompletionStage<TTLTuple<List<cz.vut.fit.domainradar.models.dns.MXRecord>>> resolveMX() {
             return this.resolve(Type.MX)
                     .thenCompose(result -> {
                         if (result == null) {
@@ -155,11 +154,11 @@ public class InternalDNSResolver {
 
                         return CompletableFuture.allOf(stages)
                                 .thenApply(unused -> {
-                                    var returnRecords = new ArrayList<DNSData.MXRecord>();
+                                    var returnRecords = new ArrayList<cz.vut.fit.domainradar.models.dns.MXRecord>();
                                     for (var i = 0; i < records.size(); i++) {
                                         final var inRecord = records.get(i);
                                         //noinspection unchecked
-                                        returnRecords.add(new DNSData.MXRecord(
+                                        returnRecords.add(new cz.vut.fit.domainradar.models.dns.MXRecord(
                                                 inRecord.getTarget().toString(true),
                                                 inRecord.getPriority(),
                                                 ((CompletableFuture<Set<InetAddress>>) stages[i]).join().stream()
@@ -171,7 +170,7 @@ public class InternalDNSResolver {
                     });
         }
 
-        public CompletionStage<TTLTuple<List<DNSData.NSRecord>>> resolveNS() {
+        public CompletionStage<TTLTuple<List<cz.vut.fit.domainradar.models.dns.NSRecord>>> resolveNS() {
             return this.resolve(Type.NS)
                     .thenCompose(result -> {
                         if (result == null) {
@@ -192,10 +191,10 @@ public class InternalDNSResolver {
 
                         return CompletableFuture.allOf(stages)
                                 .thenApply(unused -> {
-                                    var returnRecords = new ArrayList<DNSData.NSRecord>();
+                                    var returnRecords = new ArrayList<cz.vut.fit.domainradar.models.dns.NSRecord>();
                                     for (var i = 0; i < records.size(); i++) {
                                         //noinspection unchecked
-                                        returnRecords.add(new DNSData.NSRecord(
+                                        returnRecords.add(new cz.vut.fit.domainradar.models.dns.NSRecord(
                                                 records.get(i).getTarget().toString(true),
                                                 ((CompletableFuture<Set<InetAddress>>) stages[i]).join().stream()
                                                         .map(InetAddress::getHostAddress)
@@ -539,8 +538,8 @@ public class InternalDNSResolver {
                 .thenCompose(Function.identity());
     }
 
-    private static DNSData.SOARecord makeSoa(org.xbill.DNS.SOARecord xbillDnsRecord) {
-        return new DNSData.SOARecord(xbillDnsRecord.getHost().toString(true),
+    private static cz.vut.fit.domainradar.models.dns.SOARecord makeSoa(org.xbill.DNS.SOARecord xbillDnsRecord) {
+        return new cz.vut.fit.domainradar.models.dns.SOARecord(xbillDnsRecord.getHost().toString(true),
                 xbillDnsRecord.getAdmin().toString(true),
                 Long.toString(xbillDnsRecord.getSerial()),
                 xbillDnsRecord.getRefresh(),

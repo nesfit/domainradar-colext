@@ -1,0 +1,42 @@
+{
+  "type" : "record",
+  "name" : "RTTData",
+  "namespace" : "cz.vut.fit.domainradar.models.ip",
+  "fields" : [ {
+    "name" : "avg",
+    "type" : {
+      "type" : "double",
+      "java-class" : "java.lang.Double"
+    }
+  }, {
+    "name" : "jitter",
+    "type" : {
+      "type" : "double",
+      "java-class" : "java.lang.Double"
+    }
+  }, {
+    "name" : "max",
+    "type" : {
+      "type" : "double",
+      "java-class" : "java.lang.Double"
+    }
+  }, {
+    "name" : "min",
+    "type" : {
+      "type" : "double",
+      "java-class" : "java.lang.Double"
+    }
+  }, {
+    "name" : "received",
+    "type" : {
+      "type" : "int",
+      "java-class" : "java.lang.Integer"
+    }
+  }, {
+    "name" : "sent",
+    "type" : {
+      "type" : "int",
+      "java-class" : "java.lang.Integer"
+    }
+  } ]
+}
