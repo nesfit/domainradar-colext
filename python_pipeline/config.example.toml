@@ -57,6 +57,8 @@ types_to_scan = ["A", "AAAA", "CNAME", "MX", "NS", "TXT"]
 types_to_process_IPs_from = ["A", "AAAA", "CNAME"]
 # Maximum number of retries for a single DNS query in case of a timeout.
 max_record_retries = 2
+# Log level for the DNS scanner.
+scanner_log_level = "INFO"
 # EXPERIMENTAL: Use a single UDP socket instance for all DNS queries. If changed to false,
 # each UDP query will open a new socket and close it after the response is received.
 use_one_socket = true

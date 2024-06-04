@@ -20,7 +20,7 @@ DNS_SERVERS = component_config.get("dns_servers", ['195.113.144.194', '193.17.47
                                                    '195.113.144.233', '185.43.135.1'])
 TIMEOUT = component_config.get("timeout", 5)
 ROTATE_NAMESERVERS = component_config.get("rotate_nameservers", False)
-CONCURRENCY = component_config.get("concurrency", 32)
+CONCURRENCY = component_config.get("concurrency", 16)
 
 # The Faust application
 zone_app = make_app(COLLECTOR, config)

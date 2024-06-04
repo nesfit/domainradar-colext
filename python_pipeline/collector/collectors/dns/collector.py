@@ -239,18 +239,21 @@ class DNSCollector:
                 res_data, res_sig = get_response_pair(response)
                 return res_data, res_sig, True, None
             except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer, KeyError):
-                self._logger.debug(f"{domain}: {record_type} not found (using primary NS {ns_to_try})")
+                self._logger.debug(f"{domain}: {record_type} not found (primary NS {ns_to_try})")
                 fallback = True
             except dns.exception.Timeout:
                 retries_left -= 1
                 if retries_left == 0:
                     return None, None, True, "Timeout"
                 else:
-                    self._logger.debug(f"{domain}: {record_type} timeout, {retries_left} retries left")
+                    self._logger.debug(
+                        f"{domain}: {record_type} timeout, {retries_left} retries left (pNS {ns_to_try})")
                     if len(primary_ns) > nameserver_count_threshold:
                         del primary_ns[0]
+                    else:
+                        break
             except Exception as e:
-                self._logger.debug(f"{domain}: Cannot fetch {record_type} from NS {ns_to_try}")
+                self._logger.info(f"{domain}: {record_type} error (pNS {ns_to_try}): {str(e)}")
                 return None, None, True, str(e)
 
         # noinspection PyBroadException
@@ -259,13 +262,13 @@ class DNSCollector:
             res_data, res_sig = get_response_pair(answer.response)
             return res_data, res_sig, False, None
         except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer, KeyError):
-            self._logger.debug(f"{domain}: {record_type} not found (using fallback NS)")
+            self._logger.debug(f"{domain}: {record_type} not found (fallback NS)")
             return None, None, False, None
         except dns.exception.Timeout:
-            self._logger.debug(f"{domain}: {record_type} timeout (using fallback NS)")
+            self._logger.debug(f"{domain}: {record_type} timeout (fallback NS)")
             return None, None, False, "Timeout"
         except Exception as e:
-            self._logger.debug(f"{domain}: Cannot fetch {record_type} from fallback NS")
+            self._logger.info(f"{domain}: {record_type} error (fallback NS): {str(e)}")
             return None, None, False, str(e)
 
     async def _resolve_ips(self, domain_name: str | Name) -> set[str]:
@@ -278,11 +281,10 @@ class DNSCollector:
             try:
                 answer = await self._dns.resolve(domain_name, rtype)
                 ips.update(x.address for x in answer if x.rdtype == rtype)
-            except dns.resolver.NoAnswer:
-                pass
-            except dns.resolver.NXDOMAIN:
+            except (dns.resolver.NoAnswer | dns.resolver.NXDOMAIN):
                 pass
             except dns.exception.Timeout:
+                self._logger.debug(f"{domain_name}: IP resolution timeout (fallback NS)")
                 pass
 
         return ips
