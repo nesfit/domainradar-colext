@@ -38,7 +38,8 @@ class SOARecord(CustomBaseModel):
     refresh: int
     retry: int
     expire: int
-    min_ttl: int = Field(serialization_alias="minTTL")
+    min_ttl: int = Field(serialization_alias="minTTL",
+                         validation_alias=AliasChoices("min_ttl", "minTTL"))
 
 
 class ZoneInfo(CustomBaseModel):
@@ -49,6 +50,39 @@ class ZoneInfo(CustomBaseModel):
     primary_nameserver_ips: Optional[set[str]] = Field(None, serialization_alias="primaryNameserverIps")
     secondary_nameservers: Optional[set[str]] = Field(None, serialization_alias="secondaryNameservers")
     secondary_nameserver_ips: Optional[set[str]] = Field(None, serialization_alias="secondaryNameserverIps")
+
+
+class IPFromRecord(CustomBaseModel):
+    ip: str
+    type: str
+
+
+class CNAMERecord(CustomBaseModel):
+    value: str
+    related_ips: Optional[set[str]] = Field(None, serialization_alias="relatedIps")
+
+
+class MXRecord(CustomBaseModel):
+    value: str
+    priority: int
+    related_ips: Optional[set[str]] = Field(None, serialization_alias="relatedIps")
+
+
+class NSRecord(CustomBaseModel):
+    nameserver: str
+    related_ips: Optional[set[str]] = Field(None, serialization_alias="relatedIps")
+
+
+class DNSData(CustomBaseModel):
+    ttl_values: dict[str, int] = Field({}, serialization_alias="ttlValues")
+    a: Optional[set[str]] = Field(None, serialization_alias="A")
+    aaaa: Optional[set[str]] = Field(None, serialization_alias="AAAA")
+    cname: Optional[CNAMERecord] = Field(None, serialization_alias="CNAME")
+    mx: Optional[list[MXRecord]] = Field(None, serialization_alias="MX")
+    ns: Optional[list[NSRecord]] = Field(None, serialization_alias="NS")
+    txt: Optional[list[str]] = Field(None, serialization_alias="TXT")
+    errors: Optional[dict[str, str]] = Field(None)
+    has_dnskey: bool = Field(False, serialization_alias="hasDNSKEY")
 
 
 # ---- Requests ---- #
@@ -63,9 +97,9 @@ class ZoneRequest(CustomBaseModel):
 
 class DNSRequest(CustomBaseModel):
     zone_info: ZoneInfo = Field(serialization_alias="zoneInfo")
-    dns_types_to_collect: Optional[list[str]] = Field(None, serialization_alias="dnsTypesToCollect")
+    dns_types_to_collect: Optional[list[str]] = Field(None, serialization_alias="typesToCollect")
     dns_types_to_process_IPs_from: Optional[list[str]] = Field(None,
-                                                               serialization_alias="dnsTypesToProcessIPsFrom")
+                                                               serialization_alias="typesToProcessIPsFrom")
 
 
 class RDAPRequest(CustomBaseModel):
@@ -108,3 +142,8 @@ class RDAPDomainResult(Result):
 
 class ZoneResult(Result):
     zone: Optional[ZoneInfo] = None
+
+
+class DNSResult(Result):
+    dns_data: Optional[DNSData] = None
+    ips: Optional[list[IPFromRecord]] = None

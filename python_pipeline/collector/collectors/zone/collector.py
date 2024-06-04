@@ -6,19 +6,11 @@ import dns.asyncresolver
 import dns.rdatatype as rdt
 import tldextract
 
+from collectors.options import DNSCollectorOptions
 from common.models import ZoneInfo, SOARecord
 
 
-class DNSCollectorOptions:
-    def __init__(self, **kwargs):
-        # CESNET, CZ.NIC, CESNET, CZ.NIC
-        self.dns_servers = kwargs.get('dns_servers') or ['195.113.144.194', '193.17.47.1',
-                                                         '195.113.144.233', '185.43.135.1']
-        self.timeout = kwargs.get('timeout') or 5
-        self.rotate_nameservers = kwargs.get('rotate_nameservers') or False
-
-
-class DNSCollector:
+class ZoneCollector:
     def __init__(self, options: DNSCollectorOptions, logger: Logger, cache: dns.resolver.Cache | None = None):
         self._options = options
         self._logger = logger

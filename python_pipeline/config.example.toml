@@ -43,6 +43,15 @@ app_id = "domrad-rtt"
 ping_count = 5
 privileged_mode = false
 
+[dns]
+app_id = "domrad-dns"
+dns_servers = ["195.113.144.194", "195.113.144.233"]
+timeout = 5
+rotate_nameservers = false
+types_to_scan = ["A", "AAAA", "MX", "NS", "TXT", "CNAME"]
+types_to_process_IPs_from = ["A", "AAAA", "CNAME"]
+max_record_retries = 2
+
 [zone]
 app_id = "domrad-zone"
 dns_servers = ["195.113.144.194", "195.113.144.233"]

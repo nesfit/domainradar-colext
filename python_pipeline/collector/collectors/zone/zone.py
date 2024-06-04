@@ -4,7 +4,8 @@ from dns.resolver import Cache
 import common.result_codes as rc
 from collectors.util import handle_top_level_component_exception
 from common.util import ensure_model
-from collectors.zone.collector import DNSCollectorOptions, DNSCollector
+from collectors.zone.collector import ZoneCollector
+from collectors.options import DNSCollectorOptions
 from common import read_config, make_app
 from common.audit import log_unhandled_error
 from common.models import RDAPRequest, RDAPDomainResult, ZoneRequest, ZoneResult, DNSRequest
@@ -19,7 +20,7 @@ DNS_SERVERS = component_config.get("dns_servers", ['195.113.144.194', '193.17.47
                                                    '195.113.144.233', '185.43.135.1'])
 TIMEOUT = component_config.get("timeout", 5)
 ROTATE_NAMESERVERS = component_config.get("rotate_nameservers", False)
-CONCURRENCY = component_config.get("concurrency", 4)
+CONCURRENCY = component_config.get("concurrency", 32)
 
 # The Faust application
 zone_app = make_app(COLLECTOR, config)
@@ -39,7 +40,7 @@ topic_rdap_requests = zone_app.topic('to_process_RDAP_DN', key_type=str, key_ser
 async def process_entries(stream):
     options = DNSCollectorOptions(dns_servers=DNS_SERVERS, timeout=TIMEOUT, rotate_nameservers=ROTATE_NAMESERVERS)
     cache = Cache()
-    collector = DNSCollector(options, zone_app.logger, cache)
+    collector = ZoneCollector(options, zone_app.logger, cache)
 
     # Main message processing loop
     # dn is the domain name, req is the optional ZoneRequest object
