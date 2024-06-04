@@ -23,6 +23,7 @@ ROTATE_NAMESERVERS = component_config.get("rotate_nameservers", False)
 TYPES_TO_SCAN = component_config.get("types_to_scan", ['A', 'AAAA', 'CNAME', 'MX', 'NS', 'TXT'])
 TYPES_TO_PROCESS_IPS_FROM = component_config.get("types_to_process_IPs_from", ['A', 'AAAA', 'CNAME'])
 MAX_RECORD_RETRIES = component_config.get("max_record_retries", 2)
+USE_ONE_SOCKET = component_config.get("use_one_socket", False)
 CONCURRENCY = component_config.get("concurrency", 32)
 
 # The Faust application
@@ -58,7 +59,7 @@ def get_ip_for_tls(dns_data: DNSData) -> str | None:
 async def process_entries(stream):
     options = DNSCollectorOptions(dns_servers=DNS_SERVERS, timeout=TIMEOUT, rotate_nameservers=ROTATE_NAMESERVERS,
                                   types_to_scan=TYPES_TO_SCAN, types_to_process_IPs_from=TYPES_TO_PROCESS_IPS_FROM,
-                                  max_record_retries=MAX_RECORD_RETRIES)
+                                  max_record_retries=MAX_RECORD_RETRIES, use_one_socket=USE_ONE_SOCKET)
     cache = Cache()
     collector = DNSCollector(options, dns_app.logger, cache)
 

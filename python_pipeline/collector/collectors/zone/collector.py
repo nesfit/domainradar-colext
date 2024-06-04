@@ -22,14 +22,6 @@ class ZoneCollector:
         self._dns.lifetime = options.timeout * 1.2
         self._dns.cache = cache
 
-        self._udp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
-        self._udp_sock.setblocking(False)
-
-    def __del__(self):
-        if self._udp_sock:
-            self._udp_sock.close()
-            self._udp_sock = None
-
     async def get_zone_info(self, domain_name: str) -> ZoneInfo | None:
         """
         Finds the zone domain name and SOA record of the most specific zone (deepest point of delegation)

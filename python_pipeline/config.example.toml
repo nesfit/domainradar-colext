@@ -45,18 +45,30 @@ privileged_mode = false
 
 [dns]
 app_id = "domrad-dns"
+# The DNS servers to use for fallback resolution if the primary NS does not respond.
 dns_servers = ["195.113.144.194", "195.113.144.233"]
+# A single DNS query timeout.
 timeout = 5
+# Whether to query the fallback DNS servers in a round-robin fashion.
 rotate_nameservers = false
-types_to_scan = ["A", "AAAA", "MX", "NS", "TXT", "CNAME"]
+# DNS record types to query for (supported types: A, AAAA, CNAME, MX, NS, TXT).
+types_to_scan = ["A", "AAAA", "CNAME", "MX", "NS", "TXT"]
+# DNS record types to further process IPs from (supported types: A, AAAA, CNAME, MX, NS).
 types_to_process_IPs_from = ["A", "AAAA", "CNAME"]
+# Maximum number of retries for a single DNS query in case of a timeout.
 max_record_retries = 2
+# EXPERIMENTAL: Use a single UDP socket instance for all DNS queries. If changed to false,
+# each UDP query will open a new socket and close it after the response is received.
+use_one_socket = true
 
 [zone]
 app_id = "domrad-zone"
+# The DNS servers to use for queries needed for zone resolution.
 dns_servers = ["195.113.144.194", "195.113.144.233"]
+# A single DNS query timeout.
 timeout = 5
-rotate_nameservers = false
+# Whether to query the DNS servers in a round-robin fashion.
+rotate_nameservers = true
 
 [extractor]
 app_id = "domrad-extractor"

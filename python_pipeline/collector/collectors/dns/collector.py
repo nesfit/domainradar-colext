@@ -32,7 +32,7 @@ class DNSCollector:
         self._udp_sock = None
 
     async def scan_dns(self, domain_name: str, request: DNSRequest) -> tuple[DNSData, list[IPFromRecord]]:
-        if self._udp_sock is None:
+        if self._options.use_one_socket and self._udp_sock is None:
             self._udp_sock = await dns.asyncbackend.get_default_backend().make_socket(socket.AF_INET, socket.SOCK_DGRAM)
 
         zone = request.zone_info
