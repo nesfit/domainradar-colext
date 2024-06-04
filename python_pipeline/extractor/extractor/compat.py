@@ -233,12 +233,26 @@ class CompatibilityTransformation:
 
     @staticmethod
     def _parse_whois_to_rdap_equivalent(dn: str, whois_parsed: dict, whois_raw: str):
+        def adjust_format(in_date, last):
+            if in_date is None:
+                return None
+            if isinstance(in_date, list):
+                if len(in_date) == 0:
+                    return None
+                else:
+                    return in_date[-1 if last else 0]
+            if isinstance(in_date, str):
+                try:
+                    return datetime.fromisoformat(in_date)
+                except ValueError:
+                    return None
+
         reg_date = exp_date = last_changed_date = None
 
         if whois_parsed is not None:
-            reg_date = whois_parsed.get("created_date", None)
-            exp_date = whois_parsed.get("expires_date", None)
-            last_changed_date = whois_parsed.get("updated_date", None)
+            reg_date = whois_parsed.get("created_date", whois_parsed.get("created", None))
+            exp_date = whois_parsed.get("expires_date", whois_parsed.get("updated", None))
+            last_changed_date = whois_parsed.get("updated_date", whois_parsed.get("expires", None))
 
         has_all = reg_date is not None and exp_date is not None and last_changed_date is not None
         if not has_all and whois_raw:
@@ -254,6 +268,10 @@ class CompatibilityTransformation:
                     last_changed_date = entry.get("updated_date", None)
             except Exception:
                 pass
+
+        reg_date = adjust_format(reg_date, False)
+        exp_date = adjust_format(exp_date, True)
+        last_changed_date = adjust_format(last_changed_date, True)
 
         return {
             "entities": [],  # TODO: WHOIS entities

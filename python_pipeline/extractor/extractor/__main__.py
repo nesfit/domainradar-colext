@@ -18,7 +18,6 @@ def extract_one(file):
     if isinstance(data, list):
         df = extractor.extract_features(data)
     else:
-        data["domain_name"] = "ondryaso.eu"
         df = extractor.extract_features([data])
 
     pprint(df.to_dict(orient='records'))
