@@ -281,7 +281,7 @@ class DNSCollector:
             try:
                 answer = await self._dns.resolve(domain_name, rtype)
                 ips.update(x.address for x in answer if x.rdtype == rtype)
-            except (dns.resolver.NoAnswer | dns.resolver.NXDOMAIN):
+            except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN):
                 pass
             except dns.exception.Timeout:
                 self._logger.debug(f"{domain_name}: IP resolution timeout (fallback NS)")
