@@ -2,7 +2,7 @@ import os
 import ssl
 import tomllib
 from datetime import datetime
-from typing import TypeVar, Type
+from typing import TypeVar, Type, Any
 
 import faust
 import logging
@@ -99,7 +99,7 @@ def make_app(name: str, config: dict) -> faust.App:
                      **component_faust_config)
 
 
-def get_safe(data: dict, path: str) -> dict | None:
+def get_safe(data: dict, path: str) -> Any | None:
     """Gets a value from a nested dictionary, returning None if the path doesn't exist."""
     if data is None:
         return None

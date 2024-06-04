@@ -98,6 +98,7 @@ class CompatibilityTransformation:
             "dns_NS": self._make_ns(dns_data),
             "dns_MX": self._make_mx(dns_data),
             "dns_CNAME": get_safe(dns_data, "CNAME.value"),
+            "dns_has_dnskey": 1 if get_safe(dns_data, "hasDNSKEY") else 0,
             "tls": self._make_tls(data),
             "dns_evaluated_on": get_safe(data, "dnsResult.lastAttempt"),
             "rdap_evaluated_on": get_safe(data, "rdapDomainResult.lastAttempt"),
