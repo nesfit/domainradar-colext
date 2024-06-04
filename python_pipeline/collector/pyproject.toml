@@ -14,6 +14,7 @@ packages = [
 
 [tool.poetry.dependencies]
 python = "^3.11"
+aiokafka = { extras = ["zstd"], version = "^0.10.0" }
 faust-streaming = { extras = ["rocksdict"], version = "^0.11.0" }
 asyncwhois = "^1.1.3"
 whodap = "^0.1.12"

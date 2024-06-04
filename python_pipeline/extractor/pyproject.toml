@@ -14,6 +14,7 @@ packages = [
 
 [tool.poetry.dependencies]
 python = "^3.11"
+aiokafka = { extras = ["zstd"], version = "^0.10.0" }
 faust-streaming = { extras = ["rocksdict"], version = "^0.11.0" }
 tldextract = "^5.1.2"
 pandas = "^2.2.2"
