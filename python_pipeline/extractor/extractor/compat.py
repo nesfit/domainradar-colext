@@ -318,7 +318,7 @@ class CompatibilityTransformation:
         def t_ip_ver(ver: str | None):
             return "6" if ver == "v6" else ("4" if ver == "v4" else ver)
 
-        ips = get_safe(data, "dnsResult.ips")
+        ips = get_safe(data, "dnsResult.ips") or []
         ip_results = get_safe(data, "dnsResult.ipResults") or {}
         ret = []
         for ip_obj in ips:
