@@ -26,7 +26,7 @@ ROTATE_NAMESERVERS = component_config.get("rotate_nameservers", False)
 TYPES_TO_SCAN = component_config.get("types_to_scan", ['A', 'AAAA', 'CNAME', 'MX', 'NS', 'TXT'])
 TYPES_TO_PROCESS_IPS_FROM = component_config.get("types_to_process_IPs_from", ['A', 'AAAA', 'CNAME'])
 MAX_RECORD_RETRIES = component_config.get("max_record_retries", 2)
-USE_ONE_SOCKET = component_config.get("use_one_socket", False)
+USE_ONE_SOCKET = component_config.get("use_one_socket", True)
 SCANNER_LOG_LEVEL = component_config.get("scanner_log_level", "INFO")
 CONCURRENCY = component_config.get("concurrency", 16)
 
