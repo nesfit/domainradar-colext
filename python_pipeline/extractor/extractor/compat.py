@@ -42,6 +42,7 @@ class CompatibilityTransformation:
         "dns_NS": "object",
         "dns_MX": "object",
         "dns_CNAME": "object",
+        "dns_has_dnskey": "Int64",
         "tls": "object",
         "dns_evaluated_on": "datetime64[ms, UTC]",
         "rdap_evaluated_on": "datetime64[ms, UTC]",

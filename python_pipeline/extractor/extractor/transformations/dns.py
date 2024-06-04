@@ -186,7 +186,6 @@ class DNSTransformation(Transformation):
     def get_new_column_names(self) -> dict[str, str]:
         return {
             "tmp_dns_SOA": "",
-            "dns_has_dnskey": "Int64",
             "dns_dnssec_score": "float64",
             "dns_zone_level": "Int64",
             "dns_zone_digit_count": "Int64",
