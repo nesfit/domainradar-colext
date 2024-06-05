@@ -16,9 +16,9 @@ def extract_one(file):
     data = json.loads(data)
     extractor.init_transformations({})
     if isinstance(data, list):
-        df = extractor.extract_features(data)
+        df, _ = extractor.extract_features(data)
     else:
-        df = extractor.extract_features([data])
+        df, _ = extractor.extract_features([data])
 
     pprint(df.to_dict(orient='records'))
 

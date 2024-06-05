@@ -73,7 +73,7 @@ def init_transformations(config: dict):
     _all_columns_with_types = _added_columns_with_types | CompatibilityTransformation.datatypes
 
 
-def extract_features(raw_data: Iterable[dict]) -> DataFrame:
+def extract_features(raw_data: Iterable[dict]) -> tuple[DataFrame | None, dict[str, Exception]]:
     """
     Extracts features from the raw data by passing it through the transformations enabled in the configuration.
     The `init_transformations` function must be called once before this function can be used.
@@ -81,7 +81,16 @@ def extract_features(raw_data: Iterable[dict]) -> DataFrame:
     :return: A DataFrame where each row represents one input entry and the columns are the extracted features.
     """
     # Transform the raw data into a format compatible with the transformations
-    raw_data_compatible = (_compat_transformation.transform(x) for x in raw_data)
+    raw_data_compatible = []
+    errors = {}
+    for raw_data_entry in raw_data:
+        try:
+            raw_data_compatible.append(_compat_transformation.transform(raw_data_entry))
+        except Exception as e:
+            errors[raw_data_entry.get("domain_name", "?")] = e
+    if len(raw_data_compatible) == 0:
+        return None, errors
+
     # Create a DataFrame where each row is one entry from the raw_data iterable
     data_frame = DataFrame(raw_data_compatible, copy=False)
     # Create new columns
@@ -98,4 +107,4 @@ def extract_features(raw_data: Iterable[dict]) -> DataFrame:
     # TODO: evaluate if this is necessary
     data_frame = data_frame.astype(_added_columns_with_types, copy=False)
     # Return the final DataFrame
-    return data_frame
+    return data_frame, errors

@@ -62,14 +62,19 @@ async def process_entries(stream):
             # Reset the output buffer position
             buffer.seek(0)
             # Extract features
-            df = extractor.extract_features(events_parsed)
-            # Serialize the dataframe into a memory buffer
-            # noinspection PyTypeChecker
-            df.to_feather(buffer)
-            # Get the result bytes
-            result_bytes = buffer.getbuffer()[0:buffer.tell()].tobytes()
-            # Send the result
-            await topic_processed.send(key=None, value=result_bytes, partition=partition)
+            df, errors = extractor.extract_features(events_parsed)
+            if df is not None:
+                # Serialize the dataframe into a memory buffer
+                # noinspection PyTypeChecker
+                df.to_feather(buffer)
+                # Get the result bytes
+                result_bytes = buffer.getbuffer()[0:buffer.tell()].tobytes()
+                # Send the result
+                await topic_processed.send(key=None, value=result_bytes, partition=partition)
+
+            if len(errors) > 0:
+                for key, error in errors.items():
+                    log_unhandled_error(error, EXTRACTOR, key)
         except Exception as e:
             keys = [e.key for e in events_seq] if events_seq is not None else None
             log_unhandled_error(e, EXTRACTOR, None, all_keys=keys)
