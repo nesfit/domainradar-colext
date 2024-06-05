@@ -1,3 +1,8 @@
+"""__main__.py: The main module for the feature extractor component. Provides a command-line interface for running
+the Faust app. If a single command-line argument that contains a valid file path is passed, the script will load the
+JSON file, extract features from it and print the result. Otherwise, the Faust app is started."""
+__author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
+
 import json
 import os.path
 import sys
@@ -5,8 +10,8 @@ from pprint import pprint
 
 from common import ensure_data_dir
 from common.audit import log_unhandled_error
-from .app import extractor_app, EXTRACTOR
 from . import extractor
+from .app import extractor_app, EXTRACTOR
 
 
 def extract_one(file):
@@ -21,7 +26,8 @@ def extract_one(file):
         df, errors = extractor.extract_features([data])
 
     pprint(errors)
-    pprint(df.to_dict(orient='records'))
+    if df is not None:
+        pprint(df.to_dict(orient='records'))
 
 
 if __name__ == '__main__':

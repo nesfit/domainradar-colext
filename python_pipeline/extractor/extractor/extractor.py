@@ -9,7 +9,9 @@ from typing import Iterable
 import pandas as pd
 from pandas import DataFrame
 
+from common.audit import log_info
 from .compat import CompatibilityTransformation
+from .incomplete_data_filter import filter_entry as filter_incomplete_data
 from .transformations.base_transformation import Transformation
 from .transformations.dns import DNSTransformation
 from .transformations.drop_columns import DropColumnsTransformation
@@ -55,7 +57,6 @@ def init_transformations(config: dict):
     global _enabled_transformations, _added_columns_names, _added_columns_with_types, _all_columns_with_types
 
     enabled_transformation_ids: Iterable[str] | None = config.get("enabled_transformations", None)
-
     if enabled_transformation_ids is None:
         _enabled_transformations = [trans(config) for trans in _all_transformations.values()]
     else:
@@ -84,13 +85,25 @@ def extract_features(raw_data: Iterable[dict]) -> tuple[DataFrame | None, dict[s
     raw_data_compatible = []
     errors = {}
     for raw_data_entry in raw_data:
+        if raw_data_entry.get("invalid_data"):
+            errors[raw_data_entry.get("domain_name", "?")] = ValueError("Invalid data")
+            continue
+
         try:
+            # Filter out incomplete results
+            filter_result, filter_errors = filter_incomplete_data(raw_data_entry)
+            if not filter_result:
+                log_info("extractor", "Skipping due to incomplete data",
+                         raw_data_entry.get("domain_name", "?"), errors=filter_errors)
+                continue
+
+            # Run the compatibility transformation
             raw_data_compatible.append(_compat_transformation.transform(raw_data_entry))
         except Exception as e:
             errors[raw_data_entry.get("domain_name", "?")] = e
+    # If all entries were filtered out, return None
     if len(raw_data_compatible) == 0:
         return None, errors
-
     # Create a DataFrame where each row is one entry from the raw_data iterable
     data_frame = DataFrame(raw_data_compatible, copy=False)
     # Create new columns
