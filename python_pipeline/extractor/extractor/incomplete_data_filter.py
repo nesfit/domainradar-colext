@@ -40,7 +40,7 @@ def filter_entry(entry: dict) -> tuple[bool, dict | None]:
         else:
             ips_with_some_data += 1
 
-    ips_ready = len(ips) == 0 or ips_with_some_data > len(ips) // 2
+    ips_ready = len(ips) == 0 or ips_with_some_data == len(ips)
     if not ips_ready:
         ret_errors["ip"] = f"only got some data for {ips_with_some_data} out of {len(ips)} IPs"
 
