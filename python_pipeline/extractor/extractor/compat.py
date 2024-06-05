@@ -285,6 +285,19 @@ class CompatibilityTransformation:
     def _parse_rdap_dn(self, dn: str, rdap_data: dict | None, rdap_entities: list | None,
                        whois_parsed: dict | None, whois_raw: str | None) -> dict:
         if rdap_data is not None:
+            if rdap_entities is not None:
+                # Some RDAP servers return (incorrectly) roles as objects
+                # Convert to lists of arrays, as per the RDAP spec (RFC 7483, Sec. 5.1)
+                for entity in rdap_entities:
+                    if "roles" in entity and isinstance(entity["roles"], list):
+                        new_roles = []
+                        for role in entity["roles"]:
+                            if isinstance(role, dict) and "value" in role:
+                                new_roles.append(role["value"])
+                            else:
+                                new_roles.append(role)
+                        entity["roles"] = new_roles
+
             rdap_data["entities"] = rdap_entities or []
             rdap_parser = ParseDomain(self.whoisit_bootstrap, rdap_data, dn, True)
             try:
@@ -326,8 +339,9 @@ class CompatibilityTransformation:
         for ip_obj in ips:
             ip = ip_obj["ip"]
             collectors_results = ip_results.get(ip, {})
-            geo_asn = collectors_results.get("geo_asn", {}).get("data", {})
-            rdap = collectors_results.get("rdap_ip", {}).get("data", {})
+            # the 'data' properties may be null if the collectors failed
+            geo_asn = get_safe(collectors_results, "geo_asn.data") or {}
+            rdap = get_safe(collectors_results, "rdap_ip.data") or {}
             rdap_parsed = {}
             if len(rdap) != 0:
                 rdap_parser = ParseIPNetwork(self.whoisit_bootstrap, rdap, ip, True)
