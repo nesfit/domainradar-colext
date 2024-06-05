@@ -286,9 +286,10 @@ class CompatibilityTransformation:
                        whois_parsed: dict | None, whois_raw: str | None) -> dict:
         if rdap_data is not None:
             if rdap_entities is not None:
-                # Some RDAP servers return (incorrectly) roles as objects
-                # Convert to lists of arrays, as per the RDAP spec (RFC 7483, Sec. 5.1)
+
                 for entity in rdap_entities:
+                    # Some RDAP servers return (incorrectly) roles as objects
+                    # Convert to lists of arrays, as per the RDAP spec (RFC 7483, Sec. 5.1)
                     if "roles" in entity and isinstance(entity["roles"], list):
                         new_roles = []
                         for role in entity["roles"]:
@@ -297,6 +298,18 @@ class CompatibilityTransformation:
                             else:
                                 new_roles.append(role)
                         entity["roles"] = new_roles
+                    # Some RDAP servers don't encapsulate a single link in a list
+                    if "links" in entity and isinstance(entity["links"], dict):
+                        entity["links"] = [entity["links"]]
+
+                # Certain RDAP responses have "EventAction" and "EventDate" instead of "eventAction" and "eventDate"
+                if "events" in rdap_data and isinstance(rdap_data["events"], list):
+                    for event in rdap_data["events"]:
+                        if isinstance(event, dict) and "EventAction" in event:
+                            event["eventAction"] = event["EventAction"]
+                            del event["EventAction"]
+                            event["eventDate"] = event.get("EventDate", event.get("eventDate", None))
+                            del event["EventDate"]
 
             rdap_data["entities"] = rdap_entities or []
             rdap_parser = ParseDomain(self.whoisit_bootstrap, rdap_data, dn, True)
