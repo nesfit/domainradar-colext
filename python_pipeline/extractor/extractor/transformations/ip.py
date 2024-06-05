@@ -59,13 +59,16 @@ def make_asn_features(ip_data):
         if asn is None:
             continue
 
-        asns.append(asn["asn"])
-        dist_asns.add(asn["asn"])
+        if asn["asn"] is not None:
+            asns.append(asn["asn"])
+            dist_asns.add(asn["asn"])
+
         ip = asn["network_address"]
-        if ':' not in ip:
-            prefixes4.append(int.from_bytes(ipaddress.IPv4Address(ip).packed, "big"))
-        else:
-            prefixes6.append(int.from_bytes(ipaddress.IPv6Address(ip).packed, "big"))
+        if ip is not None:
+            if ':' not in ip:
+                prefixes4.append(int.from_bytes(ipaddress.IPv4Address(ip).packed, "big"))
+            else:
+                prefixes6.append(int.from_bytes(ipaddress.IPv6Address(ip).packed, "big"))
 
     if len(asns) == 0:
         return None, None, None
