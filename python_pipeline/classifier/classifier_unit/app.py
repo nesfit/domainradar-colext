@@ -2,17 +2,18 @@
 __author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
 
 import os.path
+from concurrent.futures import ThreadPoolExecutor
 from json import dumps
 
 import pandas as pd
 import pyarrow as pa
 from classifiers.options import PipelineOptions
+from classifiers.pipeline import Pipeline
 from pandas import DataFrame
 
 from common import read_config, make_app
 from common.audit import log_unhandled_error, log_warning
 from common.util import timestamp_now_millis
-from classifiers.pipeline import Pipeline
 
 CLASSIFIER = "classifier-unit"
 
@@ -22,6 +23,7 @@ component_config = config.get(CLASSIFIER, {})
 
 MODEL_PATH = component_config.get("model_path")
 CONCURRENCY = component_config.get("concurrency", 4)
+CLASSIFIER_WORKERS = component_config.get("classifier_workers", 64)
 BATCH_SIZE = component_config.get("batch_size", 1)
 BATCH_TIMEOUT = component_config.get("batch_timeout", 0)
 USE_BATCHING = BATCH_SIZE > 1 and BATCH_TIMEOUT != 0
@@ -46,6 +48,7 @@ topic_processed = classifier_app.topic('classification_results', key_type=str, k
 
 # The classification pipeline
 pipeline = Pipeline(pipeline_options)
+executor = ThreadPoolExecutor(max_workers=CLASSIFIER_WORKERS)
 
 
 # The main loop
@@ -76,7 +79,8 @@ def serialize(value: dict) -> bytes:
 
 async def process_dataframe(dataframe: DataFrame):
     try:
-        results = pipeline.classify_domains(dataframe)
+        # results = pipeline.classify_domains(dataframe)
+        results = await classifier_app.loop.run_in_executor(executor, pipeline.classify_domains, dataframe)
         if not results:
             log_warning(CLASSIFIER, "No classification results were generated.", None)
             return
