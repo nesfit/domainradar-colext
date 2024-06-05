@@ -112,10 +112,10 @@ elif [ "$1" = "-qb" ]; then
   shift 1
 fi
 
-if [ "$1" = "java" ] || [ "$1" = "all" ]; then
+if [ "$1" = "java" ]; then
   shift 1
   build_java "$@"
-elif [ "$1" = "python" ] || [ "$1" = "all" ]; then
+elif [ "$1" = "python" ]; then
   shift 1
   build_python "$@"
 else
