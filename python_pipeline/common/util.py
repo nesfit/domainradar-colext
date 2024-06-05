@@ -1,3 +1,4 @@
+import logging
 import os
 import ssl
 import tomllib
@@ -5,13 +6,11 @@ from datetime import datetime
 from typing import TypeVar, Type, Any
 
 import faust
-import logging
-
 from faust.serializers import codecs
 from pydantic import ValidationError
 
-from . import StringCodec
-from .custom_codecs import PydanticCodec
+from . import audit
+from .custom_codecs import StringCodec, PydanticCodec
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +81,10 @@ def make_app(name: str, config: dict) -> faust.App:
     component_config = config.get(name, {})
     # [component_name.faust] section
     component_faust_config = component_config.get("faust", {})
+
+    audit_log_level = component_config.get("audit_log_level")
+    if audit_log_level is not None:
+        audit.set_log_level(audit_log_level)
 
     # Returns None if SSL is disabled / not configured
     ssl_context = make_ssl_context(config)

@@ -20,10 +20,14 @@ class ExtraFormatter(logging.Formatter):
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 handler = logging.StreamHandler(sys.stderr)
-handler.setLevel(logging.INFO)
+handler.setLevel(logging.DEBUG)
 formatter = ExtraFormatter()
 handler.setFormatter(formatter)
 logger.addHandler(handler)
+
+
+def set_log_level(level: int):
+    logger.setLevel(level)
 
 
 def log_info(component_id: str, message: str, key: str | None = None, **kwargs):
