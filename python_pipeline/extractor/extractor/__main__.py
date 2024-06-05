@@ -16,10 +16,11 @@ def extract_one(file):
     data = json.loads(data)
     extractor.init_transformations({})
     if isinstance(data, list):
-        df, _ = extractor.extract_features(data)
+        df, errors = extractor.extract_features(data)
     else:
-        df, _ = extractor.extract_features([data])
+        df, errors = extractor.extract_features([data])
 
+    pprint(errors)
     pprint(df.to_dict(orient='records'))
 
 
