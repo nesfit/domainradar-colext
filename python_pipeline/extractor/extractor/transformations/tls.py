@@ -238,8 +238,8 @@ def _make_tls_features(tls_data: dict, collection_date: datetime.datetime):
     row["tls_has_tls"] = True
     row["tls_chain_len"] = tls_data['count']
     row["tls_is_self_signed"] = is_self_signed
-    row["tls_root_authority_hash"] = hash_md5(root_cert_organization)
-    row["tls_leaf_authority_hash"] = hash_md5(leaf_cert_organization)
+    row["tls_root_authority_hash"] = hash_md5(root_cert_organization or "")
+    row["tls_leaf_authority_hash"] = hash_md5(leaf_cert_organization or "")
     row["tls_negotiated_version_id"] = tls_version_id
     row["tls_negotiated_cipher_id"] = tls_cipher_id
     row["tls_root_cert_validity_len"] = root_crt_validity_len
