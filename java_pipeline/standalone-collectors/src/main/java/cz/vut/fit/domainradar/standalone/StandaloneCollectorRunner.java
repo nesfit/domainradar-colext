@@ -79,7 +79,8 @@ public class StandaloneCollectorRunner {
 
         try {
             if (useAll || cmd.hasOption("col-dns")) {
-                components.add(new DNSCollector(mapper, appId, properties));
+                Logger.error("The Java-based DNS collector should not be used at the moment. Use the Python one instead.");
+                // components.add(new DNSCollector(mapper, appId, properties));
             }
 
             if (useAll || cmd.hasOption("col-tls")) {

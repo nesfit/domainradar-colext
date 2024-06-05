@@ -208,8 +208,9 @@ class ResultDispatcher implements Runnable {
         var ttlValues = Map.of("A", container.ttlA, "AAAA", container.ttlAAAA, "CNAME", container.ttlCNAME,
                 "MX", container.ttlMX, "NS", container.ttlNS, "TXT", container.ttlTXT);
 
-        var dnsData = new DNSData(ttlValues, container.A, container.AAAA, container.CNAME,
-                container.MX, container.NS, container.TXT, container.recordCollectionErrors.isEmpty() ? null : container.recordCollectionErrors);
+        var dnsData = new DNSData(ttlValues, container.A, container.AAAA, container.CNAME, container.MX, container.NS,
+                container.TXT, container.recordCollectionErrors.isEmpty() ? null : container.recordCollectionErrors,
+                false);
 
         var ips = getIPsToProcess(container);
         var ipForTLS = getIPForTLS(dnsData);

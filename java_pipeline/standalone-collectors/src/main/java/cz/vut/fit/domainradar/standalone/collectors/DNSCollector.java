@@ -21,6 +21,13 @@ import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+/**
+ * @deprecated The Java implementation of the DNS collector is currently not really working reliably – for some reason,
+ * when large amounts of requests are to be handled simultaneously, the collector gets congested and soon begins to
+ * end the requests with timeouts. For the moment, the Python implementation is used instead. It may not offer as much
+ * true parallelization, but it works.
+ */
+@Deprecated
 public class DNSCollector extends BaseStandaloneCollector<String, DNSProcessRequest> {
     public static String NAME = "dns";
 
