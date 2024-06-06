@@ -4,6 +4,7 @@ __author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
 import os.path
 from concurrent.futures import ThreadPoolExecutor
 from json import dumps
+from queue import SimpleQueue
 
 import pandas as pd
 import pyarrow as pa
@@ -46,8 +47,12 @@ topic_to_process = classifier_app.topic('feature_vectors', key_type=None,
 topic_processed = classifier_app.topic('classification_results', key_type=str, key_serializer='str',
                                        value_type=bytes, value_serializer='raw')
 
-# The classification pipeline
-pipeline = Pipeline(pipeline_options)
+# The classification pipelines
+pipelines_queue = SimpleQueue()
+for i in range(CLASSIFIER_WORKERS):
+    classifier_app.log.info(f"Initializing pipeline worker #{i}")
+    pipelines_queue.put(Pipeline(pipeline_options))
+
 executor = ThreadPoolExecutor(max_workers=CLASSIFIER_WORKERS)
 
 
@@ -72,15 +77,32 @@ async def process_entries(stream):
             df = pd.read_feather(pa.BufferReader(value))
             await process_dataframe(df)
 
+    executor.shutdown(True, cancel_futures=True)
+
 
 def serialize(value: dict) -> bytes:
     return dumps(value, indent=None, separators=(',', ':')).encode("utf-8")
 
 
+def pick_classifier_and_classify(queue: SimpleQueue, dataframe: DataFrame):
+    pipeline = queue.get(block=True)
+
+    try:
+        results = pipeline.classify_domains(dataframe)
+    except Exception as e:
+        keys = dataframe["domain_name"].tolist()
+        log_unhandled_error(e, CLASSIFIER, None, all_keys=keys)
+        results = []
+    finally:
+        queue.put(pipeline)
+
+    return results
+
+
 async def process_dataframe(dataframe: DataFrame):
     try:
-        # results = pipeline.classify_domains(dataframe)
-        results = await classifier_app.loop.run_in_executor(executor, pipeline.classify_domains, dataframe)
+        results = await classifier_app.loop.run_in_executor(executor, pick_classifier_and_classify,
+                                                            pipelines_queue, dataframe)
         if not results:
             log_warning(CLASSIFIER, "No classification results were generated.", None)
             return
