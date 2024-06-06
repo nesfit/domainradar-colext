@@ -12,6 +12,11 @@ def filter_entry(entry: dict) -> tuple[bool, dict | None]:
     """
     ret_errors = {}
 
+    # Without zone, nothing else is processed
+    if get_safe(entry, "zone") is None:
+        ret_errors["zone"] = "not found"
+        return False, ret_errors
+
     dns_status = get_safe(entry, "dnsResult.statusCode")
     dns_ready = dns_status == 0
     if not dns_ready:
@@ -21,13 +26,11 @@ def filter_entry(entry: dict) -> tuple[bool, dict | None]:
     if not rdap_dn_ready:
         ret_errors["rdap_dn"] = "null"
 
-    tls_ready = entry.get("tlsResult") is not None
-    if not tls_ready:
-        ret_errors["tls"] = "null"
-
     ips = get_safe(entry, "dnsResult.ips") or []
     ip_data = get_safe(entry, "dnsResult.ipResults") or {}
     ips_with_some_data = 0
+
+    has_ip_for_tls = False
 
     for ip_pair in ips:
         ip = ip_pair.get("ip")
@@ -35,6 +38,7 @@ def filter_entry(entry: dict) -> tuple[bool, dict | None]:
             ret_errors["ip." + str(ip_pair)] = "invalid IP pair"
             continue
 
+        has_ip_for_tls |= ip_pair.get("type") in ("A", "AAAA", "CNAME")
         if ip not in ip_data:
             ret_errors["ip." + ip] = "no data"
         else:
@@ -43,5 +47,10 @@ def filter_entry(entry: dict) -> tuple[bool, dict | None]:
     ips_ready = len(ips) == 0 or ips_with_some_data == len(ips)
     if not ips_ready:
         ret_errors["ip"] = f"only got some data for {ips_with_some_data} out of {len(ips)} IPs"
+
+    # TLS may only exist if there are IPs
+    tls_ready = (not has_ip_for_tls) or entry.get("tlsResult") is not None
+    if not tls_ready:
+        ret_errors["tls"] = "null"
 
     return dns_ready and rdap_dn_ready and tls_ready and ips_ready, ret_errors
