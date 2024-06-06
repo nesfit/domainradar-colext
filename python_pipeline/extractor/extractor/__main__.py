@@ -3,6 +3,7 @@ the Faust app. If a single command-line argument that contains a valid file path
 JSON file, extract features from it and print the result. Otherwise, the Faust app is started."""
 __author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
 
+import importlib.util
 import json
 import os.path
 import sys
@@ -25,9 +26,28 @@ def extract_one(file):
     else:
         df, errors = extractor.extract_features([data])
 
-    pprint(errors)
+    if len(errors) > 0:
+        print("Errors:")
+        pprint(errors)
+        print()
+
     if df is not None:
-        pprint(df.to_dict(orient='records'))
+        print(f"Created {len(df)} feature vectors. Head:")
+        pprint(df.head(n=2).to_dict(orient='records'))
+        print()
+
+        if importlib.util.find_spec("pyarrow") is None:
+            print("The pyarrow library is not installed, the results won't be saved. Run `poetry install -E arrow`.")
+            return
+
+        import pyarrow.parquet as pq
+        import pyarrow as pa
+        table = pa.Table.from_pandas(df)
+        output_file = os.path.splitext(file)[0] + ".parquet"
+        pq.write_table(table, output_file)
+        print("Saved as: " + output_file)
+    else:
+        print("No feature vectors created.")
 
 
 if __name__ == '__main__':
