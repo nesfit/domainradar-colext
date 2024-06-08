@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.net.Inet4Address;
 import java.net.URI;
 import java.net.http.HttpClient;
+import java.net.http.HttpConnectTimeoutException;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.ByteBuffer;
@@ -68,7 +69,7 @@ public class NERDCollector extends IPStandaloneCollector<NERDData> {
                 .executor(_executor)
                 .build();
 
-        final var processingTimeout = (long) (_httpTimeout.toMillis() * 1.1);
+        final var processingTimeout = (long) (_httpTimeout.toMillis() * 1.2);
 
         _parallelProcessor.subscribe(UniLists.of(Topics.IN_IP));
         _parallelProcessor.poll(ctx -> {
@@ -90,7 +91,8 @@ public class NERDCollector extends IPStandaloneCollector<NERDData> {
                 processFuture.join();
             } catch (CompletionException e) {
                 if (e.getCause() instanceof TimeoutException) {
-                    sendAboutAll(entries, errorResult(ResultCodes.CANNOT_FETCH, "Timeout"));
+                    sendAboutAll(entries, errorResult(ResultCodes.TIMEOUT,
+                            "Operation timed out (%d ms)".formatted(processingTimeout)));
                 } else {
                     sendAboutAll(entries, errorResult(ResultCodes.INTERNAL_ERROR, e.getMessage()));
                 }
@@ -126,7 +128,8 @@ public class NERDCollector extends IPStandaloneCollector<NERDData> {
                         var resultData = response.body();
                         if (resultData.length % 8 != 0 || resultData.length / 8 != ips.size()) {
                             Logger.info("Invalid NERD response (batch {})", batch);
-                            sendAboutAll(entries, errorResult(ResultCodes.INVALID_FORMAT, "Invalid NERD response (content length mismatch)"));
+                            sendAboutAll(entries, errorResult(ResultCodes.INVALID_FORMAT,
+                                    "Invalid NERD response (content length mismatch)"));
                             return;
                         }
 
@@ -149,7 +152,12 @@ public class NERDCollector extends IPStandaloneCollector<NERDData> {
                 })
                 .exceptionally(e -> {
                     Logger.debug("Error processing response (batch {})", batch, e);
-                    sendAboutAll(entries, errorResult(ResultCodes.CANNOT_FETCH, e.getMessage()));
+                    if (e.getCause() instanceof HttpConnectTimeoutException) {
+                        sendAboutAll(entries, errorResult(ResultCodes.TIMEOUT,
+                                "Connection timed out (%d ms)".formatted(_httpTimeout.toMillis())));
+                    } else {
+                        sendAboutAll(entries, errorResult(ResultCodes.INTERNAL_ERROR, e.getMessage()));
+                    }
                     return null;
                 });
     }

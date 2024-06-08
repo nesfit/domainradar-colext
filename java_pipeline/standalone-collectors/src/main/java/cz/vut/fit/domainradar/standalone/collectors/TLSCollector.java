@@ -102,7 +102,7 @@ public class TLSCollector extends BaseStandaloneCollector<String, String> {
             } catch (CompletionException e) {
                 if (e.getCause() instanceof TimeoutException) {
                     _producer.send(new ProducerRecord<>(Topics.OUT_TLS, dn,
-                            errorResult(ResultCodes.TIMEOUT, "TLS operation timed out (%d ms)".formatted(_timeout))));
+                            errorResult(ResultCodes.TIMEOUT, "Operation timed out (%d ms)".formatted(_timeout))));
                 } else {
                     _producer.send(new ProducerRecord<>(Topics.OUT_TLS, dn,
                             errorResult(ResultCodes.INTERNAL_ERROR, e.getMessage())));
