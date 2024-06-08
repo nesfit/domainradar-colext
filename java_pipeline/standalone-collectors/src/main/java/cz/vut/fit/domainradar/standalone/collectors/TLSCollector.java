@@ -34,6 +34,23 @@ import java.util.Properties;
 import java.util.concurrent.*;
 
 public class TLSCollector extends BaseStandaloneCollector<String, String> {
+    static class NaiveTrustManager implements X509TrustManager {
+        @Override
+        public X509Certificate[] getAcceptedIssuers() {
+            return new X509Certificate[0];
+        }
+
+        @Override
+        public void checkServerTrusted(X509Certificate[] chain, String authType) {
+            // Never throw -> accept all certificates
+        }
+
+        @Override
+        public void checkClientTrusted(X509Certificate[] chain, String authType) {
+            // Not used
+        }
+    }
+
     public static final String NAME = "tls";
 
     private final KafkaProducer<String, TLSResult> _producer;
@@ -84,7 +101,7 @@ public class TLSCollector extends BaseStandaloneCollector<String, String> {
             SSLContext context;
             try {
                 context = SSLContext.getInstance("TLS");
-                context.init(null, null, null);
+                context.init(null, new TrustManager[]{new NaiveTrustManager()}, null);
             } catch (NoSuchAlgorithmException | KeyManagementException e) {
                 // Should not happen
                 return errorResult(ResultCodes.INTERNAL_ERROR, e.getMessage());
