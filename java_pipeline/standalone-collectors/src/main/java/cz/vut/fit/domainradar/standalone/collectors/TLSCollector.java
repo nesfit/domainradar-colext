@@ -14,6 +14,7 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
 import pl.tlinkowski.unij.api.UniLists;
 
 import javax.net.ssl.*;
@@ -29,11 +30,14 @@ import java.security.cert.CertificateEncodingException;
 import java.security.cert.X509Certificate;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.*;
 
 public class TLSCollector extends BaseStandaloneCollector<String, String> {
+    private static final Logger Logger = org.slf4j.LoggerFactory.getLogger(TLSCollector.class);
+
     static class NaiveTrustManager implements X509TrustManager {
         @Override
         public X509Certificate[] getAcceptedIssuers() {
@@ -66,6 +70,17 @@ public class TLSCollector extends BaseStandaloneCollector<String, String> {
         _executor = Executors.newVirtualThreadPerTaskExecutor();
         _producer = super.createProducer(new StringSerializer(),
                 JsonSerde.of(jsonMapper, TLSResult.class).serializer());
+
+        try {
+            var sslEngine = SSLContext.getDefault().createSSLEngine();
+            var enabledProtocols = Arrays.toString(sslEngine.getEnabledProtocols());
+            var enabledCiphers = Arrays.toString(sslEngine.getEnabledCipherSuites());
+            Logger.info("TLS enabled protocols: {}", enabledProtocols);
+            Logger.info("TLS enabled ciphers: {}", enabledCiphers);
+        } catch (NoSuchAlgorithmException e) {
+            Logger.error("Cannot get the default SSL context", e);
+            throw new RuntimeException(e);
+        }
     }
 
     @Override
