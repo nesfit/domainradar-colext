@@ -17,7 +17,7 @@ from extractor.transformations.base_transformation import Transformation
 from ._helpers import todays_midnight_timestamp, hash_md5
 
 _tls_version_ids = {
-    "TLSv1.0": 0,
+    "TLSv1": 0,
     "TLSv1.1": 1,
     "TLSv1.2": 2,
     "TLSv1.3": 3
