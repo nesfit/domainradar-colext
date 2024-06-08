@@ -1,21 +1,21 @@
 import ipaddress
-from logging import Logger
 import socket
+from logging import Logger
+from typing import Optional, Literal, Any
 
 import dns
 import dns.asyncquery
 import dns.asyncresolver
-import dns.rdatatype as rdt
-
-from typing import Optional, Literal, Any
-import dns.resolver
 import dns.dnssec
+import dns.rdatatype as rdt
+import dns.resolver
 from dns.message import Message
 from dns.name import Name
 from dns.rrset import RRset
 
 from collectors.options import DNSCollectorOptions
-from common.models import DNSData, CNAMERecord, MXRecord, NSRecord, IPFromRecord, DNSRequest
+from common import result_codes as rc
+from common.models import DNSData, CNAMERecord, MXRecord, NSRecord, IPFromRecord, DNSRequest, DNSResult
 
 
 class DNSCollector:
@@ -31,13 +31,19 @@ class DNSCollector:
         self._dns.cache = cache
         self._udp_sock = None
 
-    async def scan_dns(self, domain_name: str, request: DNSRequest) -> tuple[DNSData, list[IPFromRecord]]:
+        self._timeout_error = f"Timeout ({options.timeout} s)"
+
+    async def scan_dns(self, domain_name: str, request: DNSRequest) -> DNSResult:
         if self._options.use_one_socket and self._udp_sock is None:
             self._udp_sock = await dns.asyncbackend.get_default_backend().make_socket(socket.AF_INET, socket.SOCK_DGRAM)
 
         zone = request.zone_info
-        domain = dns.name.from_text(domain_name)
-        authority_dn = dns.name.from_text(zone.zone)
+        try:
+            domain = dns.name.from_text(domain_name)
+            authority_dn = dns.name.from_text(zone.zone)
+        except dns.exception.SyntaxError as e:
+            return DNSResult(status_code=rc.INVALID_DOMAIN_NAME, error=str(e))
+
         primary_ns_ips = list(zone.primary_nameserver_ips)
 
         types = request.dns_types_to_collect
@@ -73,7 +79,20 @@ class DNSCollector:
         if len(ret_errors) == 0:
             ret_errors = None
 
-        return DNSData(
+        if len(ret_errors) == len(types):
+            # All queries failed, return an erroneous result
+            # Check if all errors are timeouts
+            for error_str in ret_errors:
+                if error_str != self._timeout_error:
+                    # At least one error is not a timeout
+                    return DNSResult(status_code=rc.OTHER_DNS_ERROR,
+                                     dns_data=DNSData(errors=ret_errors, has_dnskey=has_dnskey),
+                                     error="All queries failed")
+            else:
+                return DNSResult(status_code=rc.TIMEOUT,
+                                 error=f"All queries timed out ({self._timeout_error} s)")
+
+        dns_data = DNSData(
             a=ret.get('A'),
             aaaa=ret.get('AAAA'),
             cname=ret.get('CNAME'),
@@ -83,7 +102,9 @@ class DNSCollector:
             ttl_values=ret.get('ttls', {}),
             errors=ret_errors,
             has_dnskey=has_dnskey
-        ), ret_ips
+        )
+
+        return DNSResult(dns_data=dns_data, ips=ret_ips)
 
     async def _resolve_a_or_aaaa(self, domain: Name, record_type: Literal['A', 'AAAA'], primary_ns: list[str],
                                  result: dict, ips: list[IPFromRecord], add_ips: bool):
@@ -244,7 +265,7 @@ class DNSCollector:
             except dns.exception.Timeout:
                 retries_left -= 1
                 if retries_left == 0:
-                    return None, None, True, "Timeout"
+                    return None, None, True, self._timeout_error
                 else:
                     self._logger.debug(
                         f"{domain}: {record_type} timeout, {retries_left} retries left (pNS {ns_to_try})")
@@ -266,7 +287,7 @@ class DNSCollector:
             return None, None, False, None
         except dns.exception.Timeout:
             self._logger.debug(f"{domain}: {record_type} timeout (fallback NS)")
-            return None, None, False, "Timeout"
+            return None, None, False, self._timeout_error
         except Exception as e:
             self._logger.info(f"{domain}: {record_type} error (fallback NS): {str(e)}")
             return None, None, False, str(e)

@@ -19,6 +19,9 @@ import pl.tlinkowski.unij.api.UniLists;
 import javax.net.ssl.*;
 import javax.security.auth.x500.X500Principal;
 import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.Certificate;
@@ -35,12 +38,12 @@ public class TLSCollector extends BaseStandaloneCollector<String, String> {
 
     private final KafkaProducer<String, TLSResult> _producer;
     private final ExecutorService _executor;
-    private final long _timeout;
+    private final int _timeout;
 
     public TLSCollector(@NotNull ObjectMapper jsonMapper, @NotNull String appName, @NotNull Properties properties) {
         super(jsonMapper, appName, properties,
                 Serdes.String(), Serdes.String());
-        _timeout = Long.parseLong(properties.getProperty(CollectorConfig.TLS_TIMEOUT_MS_CONFIG,
+        _timeout = Integer.parseInt(properties.getProperty(CollectorConfig.TLS_TIMEOUT_MS_CONFIG,
                 CollectorConfig.TLS_TIMEOUT_MS_DEFAULT));
 
         _executor = Executors.newVirtualThreadPerTaskExecutor();
@@ -51,7 +54,7 @@ public class TLSCollector extends BaseStandaloneCollector<String, String> {
     @Override
     public void run(CommandLine cmd) {
         buildProcessor(0);
-        final long futureTimeout = (long) (_timeout * 1.1);
+        final long futureTimeout = (long) (_timeout * 2.1);
 
         _parallelProcessor.subscribe(UniLists.of(Topics.IN_TLS));
         _parallelProcessor.poll(ctx -> {
@@ -67,7 +70,7 @@ public class TLSCollector extends BaseStandaloneCollector<String, String> {
             } catch (CompletionException e) {
                 if (e.getCause() instanceof TimeoutException) {
                     _producer.send(new ProducerRecord<>(Topics.OUT_TLS, dn,
-                            errorResult(ResultCodes.CANNOT_FETCH, "TLS timeout")));
+                            errorResult(ResultCodes.TIMEOUT, "TLS operation timed out (%d ms)".formatted(_timeout))));
                 } else {
                     _producer.send(new ProducerRecord<>(Topics.OUT_TLS, dn,
                             errorResult(ResultCodes.INTERNAL_ERROR, e.getMessage())));
@@ -87,39 +90,49 @@ public class TLSCollector extends BaseStandaloneCollector<String, String> {
                 return errorResult(ResultCodes.INTERNAL_ERROR, e.getMessage());
             }
 
-            SSLSocketFactory factory = context.getSocketFactory();
-
-            try (SSLSocket socket = (SSLSocket) factory.createSocket(targetIp, 443)) {
-                // Enable timeouts
-                socket.setSoTimeout((int) _timeout);
-
-                // Enable SNI
-                SSLParameters sslParams = new SSLParameters();
-                sslParams.setServerNames(List.of(new SNIHostName(hostName)));
-                socket.setSSLParameters(sslParams);
-
-                // Start handshake to retrieve session details
-                socket.startHandshake();
-
-                SSLSession session = socket.getSession();
-
-                // Extract negotiated protocol and cipher
-                var protocol = session.getProtocol();
-                var cipher = session.getCipherSuite();
-
-                // Extract certificates from the server
-                Certificate[] serverCerts = session.getPeerCertificates();
-                var certificates = new ArrayList<TLSData.Certificate>();
-                for (var cert : serverCerts) {
-                    if (cert instanceof X509Certificate) {
-                        certificates.add(parseCertificate((X509Certificate) cert));
-                    }
+            try (var rawSocket = new Socket()) {
+                try {
+                    rawSocket.connect(new InetSocketAddress(targetIp, 443), _timeout);
+                } catch (SocketTimeoutException e) {
+                    return errorResult(ResultCodes.TIMEOUT, "Connection timed out (%d ms)".formatted(_timeout));
                 }
 
-                final var tlsData = new TLSData(targetIp,
-                        protocol, cipher, certificates);
+                SSLSocketFactory factory = context.getSocketFactory();
 
-                return new TLSResult(ResultCodes.OK, null, Instant.now(), tlsData);
+                try (var socket = (SSLSocket) factory.createSocket(rawSocket, targetIp, 443, false)) {
+                    // Enable timeouts
+                    socket.setSoTimeout(_timeout);
+
+                    // Enable SNI
+                    SSLParameters sslParams = new SSLParameters();
+                    sslParams.setServerNames(List.of(new SNIHostName(hostName)));
+                    socket.setSSLParameters(sslParams);
+
+                    // Start handshake to retrieve session details
+                    socket.startHandshake();
+
+                    SSLSession session = socket.getSession();
+
+                    // Extract negotiated protocol and cipher
+                    var protocol = session.getProtocol();
+                    var cipher = session.getCipherSuite();
+
+                    // Extract certificates from the server
+                    Certificate[] serverCerts = session.getPeerCertificates();
+                    var certificates = new ArrayList<TLSData.Certificate>();
+                    for (var cert : serverCerts) {
+                        if (cert instanceof X509Certificate) {
+                            certificates.add(parseCertificate((X509Certificate) cert));
+                        }
+                    }
+
+                    final var tlsData = new TLSData(targetIp,
+                            protocol, cipher, certificates);
+
+                    return new TLSResult(ResultCodes.OK, null, Instant.now(), tlsData);
+                } catch (SocketTimeoutException e) {
+                    return errorResult(ResultCodes.TIMEOUT, "Socket read timed out (%d ms)".formatted(_timeout));
+                }
             } catch (IOException e) {
                 return errorResult(ResultCodes.CANNOT_FETCH, e.getMessage());
             }

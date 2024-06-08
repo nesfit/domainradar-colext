@@ -1,17 +1,15 @@
 import logging
 import sys
 
-import dns.exception
 from dns.resolver import Cache
 
-import common.result_codes as rc
 from collectors.dns.collector import DNSCollector
-from collectors.util import handle_top_level_component_exception
-from common.util import ensure_model
 from collectors.options import DNSCollectorOptions
+from collectors.util import handle_top_level_component_exception
 from common import read_config, make_app
 from common.audit import log_unhandled_error
 from common.models import DNSRequest, DNSResult, IPToProcess, DNSData
+from common.util import ensure_model
 
 COLLECTOR = "dns"
 
@@ -79,31 +77,18 @@ async def process_entries(stream):
             dns_app.logger.info("%s: Processing DNS", dn)
             req = ensure_model(DNSRequest, req)
 
-            dns_data = ips = None
-            try:
-                scan_res = await collector.scan_dns(dn, req)
-                if scan_res is not None:
-                    dns_data, ips = scan_res
-            except dns.exception.Timeout:
-                dns_app.logger.info("%s: Timeout", dn)
-                result = DNSResult(status_code=rc.CANNOT_FETCH, error="Timeout")
-            else:
-                # if dns_data is None:
-                #     dns_app.logger.info("%s: DNS error", dn)
-                #     result = DNSResult(status_code=rc.OTHER_DNS_ERROR, error="DNS cannot be scanned")
-                # else:
-                dns_app.logger.info("%s: DNS done", dn)
-                result = DNSResult(status_code=0, dns_data=dns_data, ips=ips)
+            result = await collector.scan_dns(dn, req)
+            dns_app.logger.info("%s: DNS done", dn)
 
             await topic_processed_dns.send(key=dn, value=result)
 
             if result.status_code == 0:
-                if ips is not None and len(ips) > 0:
-                    for ip in ips:
+                if result.ips is not None and len(result.ips) > 0:
+                    for ip in result.ips:
                         ip_to_process = IPToProcess(ip=ip.ip, domain_name=dn)
                         await topic_ip_requests.send(key=ip_to_process, value=None)
 
-                ip_for_tls = get_ip_for_tls(dns_data)
+                ip_for_tls = get_ip_for_tls(result.dns_data)
                 if ip_for_tls is not None:
                     await topic_tls_requests.send(key=dn, value=ip_for_tls)
         except Exception as e:

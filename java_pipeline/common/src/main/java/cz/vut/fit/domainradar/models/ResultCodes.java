@@ -12,6 +12,11 @@ public final class ResultCodes {
     public static final int OTHER_EXTERNAL_ERROR = 10;
 
     /**
+     * Timeout while waiting for a response.
+     */
+    public static final int TIMEOUT = 11;
+
+    /**
      * A generic error caused inside the collecting system (e.g. invalid state).
      */
     public static final int INTERNAL_ERROR = 20;

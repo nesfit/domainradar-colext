@@ -2,13 +2,13 @@ import dns.exception
 from dns.resolver import Cache
 
 import common.result_codes as rc
-from collectors.util import handle_top_level_component_exception
-from common.util import ensure_model
-from collectors.zone.collector import ZoneCollector
 from collectors.options import DNSCollectorOptions
+from collectors.util import handle_top_level_component_exception
+from collectors.zone.collector import ZoneCollector
 from common import read_config, make_app
 from common.audit import log_unhandled_error
 from common.models import RDAPRequest, RDAPDomainResult, ZoneRequest, ZoneResult, DNSRequest
+from common.util import ensure_model
 
 COLLECTOR = "zone"
 
@@ -53,7 +53,7 @@ async def process_entries(stream):
                 zone_info = await collector.get_zone_info(dn)
             except dns.exception.Timeout:
                 zone_app.logger.info("%s: Timeout", dn)
-                result = ZoneResult(status_code=rc.CANNOT_FETCH, error="Timeout", zone=None)
+                result = ZoneResult(status_code=rc.TIMEOUT, error=f"Timeout ({TIMEOUT} s)", zone=None)
             else:
                 if zone_info is None:
                     zone_app.logger.info("%s: Zone not found", dn)

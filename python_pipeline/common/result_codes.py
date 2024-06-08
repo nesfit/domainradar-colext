@@ -2,6 +2,8 @@ OK = 0
 """The operation was successful."""
 OTHER_EXTERNAL_ERROR = 10
 """A generic error not caused inside the collecting system."""
+TIMEOUT = 11
+"""Timeout while waiting for a response."""
 INTERNAL_ERROR = 20
 """A generic error caused inside the collecting system (e.g. invalid state)."""
 INVALID_DOMAIN_NAME = 60

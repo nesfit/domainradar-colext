@@ -84,7 +84,7 @@ public class CollectorConfig {
     /* --- TLS collector --- */
     public static final String TLS_TIMEOUT_MS_CONFIG = "collectors.tls.timeout";
     public static final String TLS_TIMEOUT_MS_DOC = "The TLS socket timeout (milliseconds).";
-    public static final String TLS_TIMEOUT_MS_DEFAULT = "10000";
+    public static final String TLS_TIMEOUT_MS_DEFAULT = "3000";
 
     /* --- General settings for the standalone collectors --- */
     public static final String CLOSE_TIMEOUT_SEC_CONFIG = "collectors.kafka.close.timeout";
