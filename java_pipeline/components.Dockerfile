@@ -42,6 +42,8 @@ RUN --mount=type=cache,target=/root/.m2/ --mount=type=cache,target=/src/target m
 FROM eclipse-temurin:21-jre AS runtime
 WORKDIR /app
 COPY --from=build_component /src/target.jar ./domainradar-collector.jar
+COPY ./legacy.security ./legacy.security
+
 ENTRYPOINT ["java", "-cp", "/app/domainradar-collector.jar"]
 
 FROM runtime AS runtime-streams
