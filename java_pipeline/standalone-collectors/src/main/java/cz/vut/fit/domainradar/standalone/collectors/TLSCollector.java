@@ -152,7 +152,13 @@ public class TLSCollector extends BaseStandaloneCollector<String, String> {
                     // Extract certificates from the server
                     Certificate[] serverCerts = session.getPeerCertificates();
                     var certificates = new ArrayList<TLSData.Certificate>();
-                    for (var cert : serverCerts) {
+
+                    for (int i = 0, serverCertsLength = serverCerts.length; i < serverCertsLength; i++) {
+                        var cert = serverCerts[i];
+                        // Sometimes multiple references to the same certificate (object) are present in the array
+                        if (i > 0 && cert == serverCerts[i - 1])
+                            continue;
+
                         if (cert instanceof X509Certificate) {
                             certificates.add(parseCertificate((X509Certificate) cert));
                         }
