@@ -116,8 +116,10 @@ async def process_entry(dn, req, rdap_client, whois_client):
         # (i.e. one level above the public suffix)
         target_parts = tldextract.extract(rdap_target)
         if target_parts.domain != "" and target_parts.suffix != "":
-            rdap_target = target_parts.domain + "." + target_parts.suffix
-            rdap_data, entities, err_code, err_msg = await fetch_rdap(rdap_target, rdap_client)
+            reg_rdap_target = target_parts.domain + "." + target_parts.suffix
+            if reg_rdap_target != rdap_target:
+                rdap_target = reg_rdap_target
+                rdap_data, entities, err_code, err_msg = await fetch_rdap(rdap_target, rdap_client)
 
     if rdap_data is None:
         # Only try WHOIS if no RDAP data is available at any level of the source DN
