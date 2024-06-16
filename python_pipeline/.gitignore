@@ -1,1 +1,8 @@
 config.toml
+
+# Sometimes you want to spawn poetry shells in the respective
+# directories but we don't need these component-wise poetry lockfiles
+# to be consistent across project clones
+collector/poetry.lock
+classifier/poetry.lock
+extractor/poetry.lock
