@@ -115,6 +115,10 @@ public class CollectedDataMergerComponent implements PipelineComponent {
                                 dnsResult, null, null, ipDataMap),
                         namedOp("join_aggregated_IP_data_with_DNS_data"),
                         Materialized.with(Serdes.String(), finalResultSerde))
+                // We don't want to output partial values without responses from the IP collectors.
+                // The hasEnoughIpCollectorResults method implements a decision process that says
+                // whether we have "enough" data on the IPs to pass the output to the next stage
+                // of the pipeline.
                 .filter((dn, result) -> hasEnoughIpCollectorResults(result));
 
         // Now we want to join the DNS/IP data with the data from the other DN-based collectors,
@@ -126,16 +130,17 @@ public class CollectedDataMergerComponent implements PipelineComponent {
         var tlsTable = builder.table(Topics.OUT_TLS,
                 Consumed.with(Serdes.String(), tlsResultSerde));
 
-        // We suppose that without DNS(+IP) data, the domain is not interesting at all, hence the first inner join here
-        // and the left joins with the other tables.
+        // We require results from all collectors in order to output a data object to the final result.
+        // The exception is the TLS collector in case there are no IP addresses in the DNS data.
         var finalResultTable = mergedDnsIpTable
+                .leftJoin(tlsTable, (intermRes, tls) -> new FinalResult(intermRes.zone(), intermRes.dnsResult(),
+                                tls, null, intermRes.ipResults()),
+                        namedOp("join_TLS"),
+                        Materialized.with(Serdes.String(), finalResultSerde))
+                .filter((dn, result) -> hasTlsIfRequired(result))
                 .join(zoneTable, (intermRes, zone) -> new FinalResult(zone.zone(), intermRes.dnsResult(),
                                 null, null, intermRes.ipResults()),
                         namedOp("join_ZONE"),
-                        Materialized.with(Serdes.String(), finalResultSerde))
-                .join(tlsTable, (intermRes, tls) -> new FinalResult(intermRes.zone(), intermRes.dnsResult(),
-                                tls, null, intermRes.ipResults()),
-                        namedOp("join_TLS"),
                         Materialized.with(Serdes.String(), finalResultSerde))
                 .join(rdapDnTable, (intermRes, rdap) -> new FinalResult(intermRes.zone(), intermRes.dnsResult(),
                                 intermRes.tlsResult(), rdap, intermRes.ipResults()),
@@ -149,6 +154,8 @@ public class CollectedDataMergerComponent implements PipelineComponent {
     }
 
     public static boolean hasEnoughIpCollectorResults(FinalResult result) {
+        // Currently, the used decision boundary is simply whether we have at least one
+        // collection result for each IP address passed for processing.
         if (result.dnsResult() == null)
             // Sanity check
             return false;
@@ -163,13 +170,36 @@ public class CollectedDataMergerComponent implements PipelineComponent {
             return false;
 
         for (var ip : ipsFromDns) {
-            // No records collected for a related IP.
-            // We need at least one.
+            // No records collected for a related IP,
+            // we need at least one
             if (!result.ipResults().containsKey(ip.ip()))
                 return false;
         }
 
         return true;
+    }
+
+    public static boolean hasTlsIfRequired(FinalResult result) {
+        if (result.tlsResult() != null)
+            // TLS present, no need to check further
+            return true;
+
+        if (result.dnsResult() == null)
+            // Sanity check
+            return false;
+
+        var dnsData = result.dnsResult().dnsData();
+        if (dnsData == null)
+            // No DNS data -> no TLS expected
+            return true;
+
+        var a = dnsData.A();
+        var aaaa = dnsData.AAAA();
+        var cname = dnsData.CNAME();
+
+        // If no IP data is present, TLS is not required
+        return (a == null || a.isEmpty()) && (aaaa == null || aaaa.isEmpty())
+                && (cname == null || cname.relatedIps() == null || cname.relatedIps().isEmpty());
     }
 
     @Override
