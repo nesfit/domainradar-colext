@@ -1,5 +1,4 @@
 from logging import Logger
-import socket
 
 import dns
 import dns.asyncresolver
@@ -102,9 +101,21 @@ class ZoneCollector:
         # Remove the primary NS IPs from the set of nameserver IPs
         nameserver_ips.difference_update(primary_ns_ips)
 
+        has_dnskey = await self._has_dnskey(zone)
+
         return ZoneInfo(soa=soa_record, zone=zone, primary_nameserver_ips=primary_ns_ips,
                         secondary_nameservers=nameservers, secondary_nameserver_ips=nameserver_ips,
-                        public_suffix=name_parts.suffix, registry_suffix=name_parts.suffix)
+                        public_suffix=name_parts.suffix, registry_suffix=name_parts.suffix,
+                        has_dnskey=has_dnskey)
+
+    async def _has_dnskey(self, domain_name: str) -> bool | None:
+        try:
+            dnskey_rrset = await self._dns.resolve(domain_name, rdt.DNSKEY)
+            return dnskey_rrset is not None and len(dnskey_rrset) != 0 and dnskey_rrset.rdtype == rdt.DNSKEY
+        except dns.resolver.NoAnswer:
+            return False
+        except dns.exception.DNSException:
+            return None
 
     async def _find_nameservers(self, domain_name: str) -> set[str]:
         """

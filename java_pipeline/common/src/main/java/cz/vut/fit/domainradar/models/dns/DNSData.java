@@ -14,8 +14,7 @@ public record DNSData(@NotNull Map<String, Long> ttlValues,
                       @Nullable List<MXRecord> MX,
                       @Nullable List<NSRecord> NS,
                       @Nullable List<String> TXT,
-                      @Nullable Map<String, String> errors,
-                      boolean hasDNSKEY) {
+                      @Nullable Map<String, String> errors) {
 
     public record CNAMERecord(@NotNull String value, @Nullable List<String> relatedIps) {
     }

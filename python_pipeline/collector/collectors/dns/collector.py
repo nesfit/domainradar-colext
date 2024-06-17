@@ -54,9 +54,6 @@ class DNSCollector:
         if adr_types is None:
             adr_types = self._options.types_to_process_IPs_from
 
-        dnskey_rrset, _, _, _ = await self._resolve(authority_dn, 'DNSKEY', primary_ns_ips)
-        has_dnskey = dnskey_rrset is not None and len(dnskey_rrset) != 0
-
         ret = dict()
         ret["ttls"] = dict()
         ret["errors"] = dict()
@@ -86,7 +83,7 @@ class DNSCollector:
                 if error_str != self._timeout_error:
                     # At least one error is not a timeout
                     return DNSResult(status_code=rc.OTHER_DNS_ERROR,
-                                     dns_data=DNSData(errors=ret_errors, has_dnskey=has_dnskey),
+                                     dns_data=DNSData(errors=ret_errors),
                                      error="All queries failed")
             else:
                 return DNSResult(status_code=rc.TIMEOUT,
@@ -100,8 +97,7 @@ class DNSCollector:
             ns=ret.get('NS'),
             txt=ret.get('TXT'),
             ttl_values=ret.get('ttls', {}),
-            errors=ret_errors,
-            has_dnskey=has_dnskey
+            errors=ret_errors
         )
 
         return DNSResult(dns_data=dns_data, ips=ret_ips)

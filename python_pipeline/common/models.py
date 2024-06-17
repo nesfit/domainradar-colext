@@ -1,7 +1,7 @@
 from typing import Optional
 
-from pydantic.alias_generators import to_camel
 from pydantic import BaseModel, Field, ConfigDict, AliasGenerator, AliasChoices
+from pydantic.alias_generators import to_camel
 
 from common import timestamp_now_millis
 
@@ -47,6 +47,7 @@ class ZoneInfo(CustomBaseModel):
     soa: SOARecord
     public_suffix: str = Field(serialization_alias="publicSuffix")
     registry_suffix: str = Field(serialization_alias="registrySuffix")
+    has_dnskey: Optional[bool] = Field(None, serialization_alias="hasDNSKEY")
     primary_nameserver_ips: Optional[set[str]] = Field(None, serialization_alias="primaryNameserverIps")
     secondary_nameservers: Optional[set[str]] = Field(None, serialization_alias="secondaryNameservers")
     secondary_nameserver_ips: Optional[set[str]] = Field(None, serialization_alias="secondaryNameserverIps")
@@ -82,7 +83,6 @@ class DNSData(CustomBaseModel):
     ns: Optional[list[NSRecord]] = Field(None, serialization_alias="NS")
     txt: Optional[list[str]] = Field(None, serialization_alias="TXT")
     errors: Optional[dict[str, str]] = Field(None)
-    has_dnskey: bool = Field(False, serialization_alias="hasDNSKEY")
 
 
 # ---- Requests ---- #
