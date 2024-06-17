@@ -67,6 +67,11 @@ public class GeoIPCollector implements CommonResultIPCollector<GeoIPData> {
                         var inetAddr = InetAddresses.forString(ip.ip());
                         var cityOpt = _cityReader.tryCity(inetAddr);
                         var asnOpt = _asnReader.tryAsn(inetAddr);
+
+                        if (cityOpt.isEmpty() && asnOpt.isEmpty()) {
+                            return errorResult("No GeoIP data found", ResultCodes.NOT_FOUND);
+                        }
+
                         var city = cityOpt.orElse(_emptyCity);
                         var asn = asnOpt.orElse(_emptyAsn);
 
@@ -92,8 +97,9 @@ public class GeoIPCollector implements CommonResultIPCollector<GeoIPData> {
                         );
 
                         return successResult(record);
+                    } catch (IllegalArgumentException e) {
+                        return errorResult(e.getMessage(), ResultCodes.INVALID_ADDRESS);
                     } catch (Exception e) {
-                        // TODO
                         return errorResult(e.getMessage(), ResultCodes.OTHER_EXTERNAL_ERROR);
                     }
 
