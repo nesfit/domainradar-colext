@@ -32,6 +32,11 @@ public final class ResultCodes {
     public static final int INVALID_ADDRESS = 61;
 
     /**
+     * The IP address is valid but the collector cannot process it.
+     */
+    public static final int UNSUPPORTED_ADDRESS = 5;
+
+    /**
      * Object does not exist.
      */
     public static final int NOT_FOUND = 30;

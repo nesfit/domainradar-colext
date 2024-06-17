@@ -18,6 +18,7 @@ import pl.tlinkowski.unij.api.UniLists;
 
 import java.io.IOException;
 import java.net.Inet4Address;
+import java.net.Inet6Address;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpConnectTimeoutException;
@@ -29,6 +30,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.*;
+import java.util.stream.Collectors;
 
 public class NERDCollector extends IPStandaloneCollector<NERDData> {
     private static final org.slf4j.Logger Logger = LoggerFactory.getLogger(NERDCollector.class);
@@ -101,15 +103,30 @@ public class NERDCollector extends IPStandaloneCollector<NERDData> {
     }
 
     private CompletableFuture<Void> processIps(List<IPToProcess> entries, final long batch) {
-        var ips = entries.stream().map(IPToProcess::ip).toList();
-        var bytes = new byte[ips.size() * 4];
+        var allIps = entries.stream()
+                .map(ipToProcess -> {
+                    try {
+                        return InetAddresses.forString(ipToProcess.ip());
+                    } catch (IllegalArgumentException e) {
+                        Logger.debug("Invalid IP address: {}", ipToProcess.ip());
+                        return null;
+                    }
+                }).collect(Collectors.partitioningBy(ip -> ip instanceof Inet4Address));
+
+        for (var invalidIp : allIps.get(false)) {
+            if (invalidIp instanceof Inet6Address) {
+                sendAboutAll(entries, errorResult(ResultCodes.UNSUPPORTED_ADDRESS, null));
+            } else {
+                sendAboutAll(entries, errorResult(ResultCodes.INVALID_ADDRESS, null));
+            }
+        }
+
+        var ips = allIps.get(true);
+        final var ipsLen = ips.size();
+        var bytes = new byte[ipsLen * 4];
         var ptr = 0;
         for (var ip : ips) {
-            var inetAddr = InetAddresses.forString(ip);
-            if (!(inetAddr instanceof Inet4Address))
-                continue;
-
-            System.arraycopy(inetAddr.getAddress(), 0, bytes, ptr, 4);
+            System.arraycopy(ip.getAddress(), 0, bytes, ptr, 4);
             ptr += 4;
         }
 
@@ -126,18 +143,18 @@ public class NERDCollector extends IPStandaloneCollector<NERDData> {
                 .thenAccept(response -> {
                     if (response.statusCode() == 200) {
                         var resultData = response.body();
-                        if (resultData.length % 8 != 0 || resultData.length / 8 != ips.size()) {
+                        if (resultData.length % 8 != 0 || resultData.length / 8 != ipsLen) {
                             Logger.info("Invalid NERD response (batch {})", batch);
                             sendAboutAll(entries, errorResult(ResultCodes.INVALID_FORMAT,
                                     "Invalid NERD response (content length mismatch)"));
                             return;
                         }
 
-                        Logger.trace("Processing {} IPs (batch {})", ips.size(), batch);
+                        Logger.trace("Processing {} IPs (batch {})", ipsLen, batch);
                         var resultDataBuffer = ByteBuffer.wrap(resultData);
                         resultDataBuffer.order(ByteOrder.LITTLE_ENDIAN);
 
-                        for (var i = 0; i < ips.size(); i++) {
+                        for (var i = 0; i < ipsLen; i++) {
                             var value = resultDataBuffer.getDouble(i);
 
                             Logger.trace("DN/IP {} -> {}", entries.get(i), value);
