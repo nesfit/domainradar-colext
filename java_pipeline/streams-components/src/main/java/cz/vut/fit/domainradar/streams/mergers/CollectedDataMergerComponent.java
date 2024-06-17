@@ -47,7 +47,6 @@ public class CollectedDataMergerComponent implements PipelineComponent {
         final var ipToProcessSerde = JsonSerde.of(_jsonMapper, IPToProcess.class);
         final var ipDataPairSerde = JsonSerde.of(_jsonMapper, IPDataPair.class);
         final var dnsResultSerde = JsonSerde.of(_jsonMapper, DNSResult.class);
-        final var extendedDnsResultSerde = JsonSerde.of(_jsonMapper, ExtendedDNSResult.class);
         final var rdapDnSerde = JsonSerde.of(_jsonMapper, RDAPDomainResult.class);
         final var zoneResultSerde = JsonSerde.of(_jsonMapper, ZoneResult.class);
         final var tlsResultSerde = JsonSerde.of(_jsonMapper, TLSResult.class);
@@ -112,9 +111,11 @@ public class CollectedDataMergerComponent implements PipelineComponent {
                 Consumed.with(Serdes.String(), dnsResultSerde),
                 Materialized.with(Serdes.String(), dnsResultSerde));
         var mergedDnsIpTable = processedDnsTable
-                .leftJoin(allIPDataForDomain, ExtendedDNSResult::new,
+                .leftJoin(allIPDataForDomain, (dnsResult, ipDataMap) -> new FinalResult(null,
+                                dnsResult, null, null, ipDataMap),
                         namedOp("join_aggregated_IP_data_with_DNS_data"),
-                        Materialized.with(Serdes.String(), extendedDnsResultSerde));
+                        Materialized.with(Serdes.String(), finalResultSerde))
+                .filter((dn, result) -> hasEnoughIpCollectorResults(result));
 
         // Now we want to join the DNS/IP data with the data from the other DN-based collectors,
         // that is, zone and RDAP-DN.
@@ -128,16 +129,16 @@ public class CollectedDataMergerComponent implements PipelineComponent {
         // We suppose that without DNS(+IP) data, the domain is not interesting at all, hence the first inner join here
         // and the left joins with the other tables.
         var finalResultTable = mergedDnsIpTable
-                .join(zoneTable, (dns, zone) -> new FinalResult(dns,
-                                null, null, zone.zone()),
+                .join(zoneTable, (intermRes, zone) -> new FinalResult(zone.zone(), intermRes.dnsResult(),
+                                null, null, intermRes.ipResults()),
                         namedOp("join_ZONE"),
                         Materialized.with(Serdes.String(), finalResultSerde))
-                .leftJoin(tlsTable, (intermRes, tls) -> new FinalResult(intermRes.dnsResult(), tls,
-                                null, intermRes.zone()),
+                .join(tlsTable, (intermRes, tls) -> new FinalResult(intermRes.zone(), intermRes.dnsResult(),
+                                tls, null, intermRes.ipResults()),
                         namedOp("join_TLS"),
                         Materialized.with(Serdes.String(), finalResultSerde))
-                .leftJoin(rdapDnTable, (intermRes, rdap) -> new FinalResult(intermRes.dnsResult(),
-                                intermRes.tlsResult(), rdap, intermRes.zone()),
+                .join(rdapDnTable, (intermRes, rdap) -> new FinalResult(intermRes.zone(), intermRes.dnsResult(),
+                                intermRes.tlsResult(), rdap, intermRes.ipResults()),
                         namedOp("join_RDAP_DN"),
                         Materialized.with(Serdes.String(), finalResultSerde));
 
@@ -145,6 +146,30 @@ public class CollectedDataMergerComponent implements PipelineComponent {
         finalResultTable.toStream(namedOp("result_to_stream"))
                 .to(Topics.OUT_MERGE_ALL,
                         Produced.with(Serdes.String(), finalResultSerde));
+    }
+
+    public static boolean hasEnoughIpCollectorResults(FinalResult result) {
+        if (result.dnsResult() == null)
+            // Sanity check
+            return false;
+
+        var ipsFromDns = result.dnsResult().ips();
+        if (ipsFromDns == null || ipsFromDns.isEmpty())
+            // No IPs discovered, let the DNS result continue
+            return true;
+
+        // At least one IP present
+        if (result.ipResults() == null || result.ipResults().isEmpty())
+            return false;
+
+        for (var ip : ipsFromDns) {
+            // No records collected for a related IP.
+            // We need at least one.
+            if (!result.ipResults().containsKey(ip.ip()))
+                return false;
+        }
+
+        return true;
     }
 
     @Override
