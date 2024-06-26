@@ -229,7 +229,7 @@ def _apply_static_fields_toml(old_config: dict, new_config: dict) -> list:
 
             new_config[key]["app_id"] = value["app_id"]
 
-    return warns
+    return warns + _remove_nones(new_config)
 
 
 def _sanitize_published_toml_snapshot(config: dict) -> dict:
@@ -252,6 +252,27 @@ def _sanitize_published_properties_snapshot(config: dict):
         if key.startswith("ssl.") or key.startswith("security."):
             del config["system"][key]
     return config
+
+
+def _remove_nones(d: dict | list, prefix: str = "") -> list[_Err]:
+    """Removes all None values from the dictionary (incl. in lists)."""
+    warns = []
+    if isinstance(d, list):
+        while None in d:
+            d.remove(None)
+            warns.append(_error(prefix, codes.INVALID_TYPE,
+                                "The list cannot contain a null value", soft=True))
+    elif isinstance(d, dict):
+        for key in list(d.keys()):
+            target_key = f"{prefix}.{key}" if prefix != "" else key
+
+            if d[key] is None:
+                del d[key]
+                warns.append(_error(target_key, codes.INVALID_TYPE,
+                                    "The value cannot be null", soft=True))
+            elif isinstance(d[key], dict) or isinstance(d[key], list):
+                warns = warns + _remove_nones(d[key], target_key)
+    return warns
 
 
 def _is_toml(component_id: str) -> bool:
