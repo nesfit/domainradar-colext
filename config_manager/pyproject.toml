@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "domrad-config-manager"
+version = "0.1.0"
+description = "The DomainRadar Data Processing Pipeline Config Manager"
+authors = ["Ondřej Ondryáš <xondry02@stud.fit.vut.cz>"]
+license = "MIT"
+repository = "https://github.com/nesfit/domainradar-colext"
+readme = "README.md"
+packages = [
+    { include = "config_manager" }
+]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+confluent-kafka = "^2.4.0"
+dataclasses-json = "^0.6.7"
+tomli-w = "^1.0.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
