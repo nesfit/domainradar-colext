@@ -23,3 +23,5 @@ check_hostname = true
 app_id = "colext-config-manager"
 compose_command = "docker compose -f compose.yml"
 configs_dir = "/path/to/configs"
+use_socket = false
+socket_path = "/path/to/socket"

@@ -4,6 +4,7 @@ __author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
 
 import json
 import logging
+import os
 import sys
 from json import JSONDecodeError
 
@@ -87,14 +88,17 @@ def run():
     c = Consumer(c_settings, logger=logger)
     logger.info("Connected")
 
-    snapshots_to_publish = collect_current_setting(c)
-    for component_id, snapshot in snapshots_to_publish:
-        result_json = snapshot.to_json()
-        result_bytes = result_json.encode("utf-8")
-        p.produce("configuration_states", key=component_id, value=result_bytes)
-    if len(snapshots_to_publish) > 0:
-        logger.info("Published %s snapshots", len(snapshots_to_publish))
-        p.poll(0)
+    if os.environ.get("SKIP_LOAD") == "1":
+        logger.info("Skipping loading of current configuration")
+    else:
+        snapshots_to_publish = collect_current_setting(c)
+        for component_id, snapshot in snapshots_to_publish:
+            result_json = snapshot.to_json()
+            result_bytes = result_json.encode("utf-8")
+            p.produce("configuration_states", key=component_id, value=result_bytes)
+        if len(snapshots_to_publish) > 0:
+            logger.info("Published %s snapshots", len(snapshots_to_publish))
+            p.poll(0)
 
     logger.info("Subscribing to configuration_change_requests")
     c.subscribe(["configuration_change_requests"])

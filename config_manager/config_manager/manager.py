@@ -4,13 +4,15 @@ __author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
 import copy
 import logging
 import os.path
-import subprocess
+import sys
 
 from . import transformers, codes
 from .models import ConfigurationChangeResult as _Res, ConfigurationValidationError as _Err
+from .updown_provider import SocketUpDownProvider, DirectUpDownProvider, BaseUpDownProvider
 
 logger = logging.getLogger(__package__)
 config = {}
+updown_provider: BaseUpDownProvider | None = None
 
 _components = {
     "collector-dns": "dns.toml",
@@ -35,6 +37,7 @@ def apply_all_configs(configs: dict) -> list[tuple[str, _Res]]:
     """
     ret = []
     logger.info("Applying initial configurations")
+    updown_provider.down_all()
     for component_id, file in _components.items():
         if component_id not in configs:
             # Send initial snapshot (sanitized)
@@ -43,6 +46,7 @@ def apply_all_configs(configs: dict) -> list[tuple[str, _Res]]:
             continue
 
         apply_config(component_id, configs[component_id]["currentConfig"], False)
+    updown_provider.up_all()
     return ret
 
 
@@ -113,10 +117,25 @@ def is_known_component(component_id: str) -> bool:
     return component_id in _components
 
 
+def init(app_config: dict):
+    global config, updown_provider
+    config = app_config
+    if config["manager"].get("use_socket"):
+        socket_path = config["manager"]["socket_path"]
+        updown_provider = SocketUpDownProvider(socket_path)
+        try:
+            updown_provider.open_socket()
+        except Exception as e:
+            logger.error("Failed to open the socket, halting", exc_info=e)
+            sys.exit(1)
+    else:
+        compose_cmd = config["manager"]["compose_command"]
+        updown_provider = DirectUpDownProvider(compose_cmd)
+
+
 def _down(component_id: str) -> bool:
     """Stops the specified component."""
-    compose_cmd = config["manager"]["compose_command"]
-    rc = subprocess.Popen(f"{compose_cmd} down {component_id}", shell=True).wait()
+    rc = updown_provider.down(component_id)
     if rc != 0:
         logger.error("Failed to stop %s: %s", component_id or "all services", rc)
         return False
@@ -125,8 +144,7 @@ def _down(component_id: str) -> bool:
 
 def _up(component_id: str) -> bool:
     """Starts the specified component."""
-    compose_cmd = config["manager"]["compose_command"]
-    rc = subprocess.Popen(f"{compose_cmd} up -d {component_id}", shell=True).wait()
+    rc = updown_provider.up(component_id)
     if rc != 0:
         logger.error("Failed to start %s: %s", component_id or "all services", rc)
         return False
