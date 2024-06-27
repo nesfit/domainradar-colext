@@ -1,5 +1,6 @@
 package cz.vut.fit.domainradar.models;
 
+@SuppressWarnings("ALL")
 public final class ResultCodes {
     /**
      * The operation was successful.

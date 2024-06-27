@@ -7,8 +7,6 @@ import java.io.Closeable;
 import java.io.IOException;
 
 public interface PipelineComponent extends Closeable {
-    boolean RANDOM_DELAYS = true;
-
     void use(StreamsBuilder builder);
 
     String getName();

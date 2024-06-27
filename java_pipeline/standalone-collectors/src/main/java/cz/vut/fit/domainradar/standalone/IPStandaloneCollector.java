@@ -15,7 +15,7 @@ import java.util.Properties;
 
 public abstract class IPStandaloneCollector<TData> extends BaseStandaloneCollector<IPToProcess, IPProcessRequest> {
 
-    protected KafkaProducer<IPToProcess, CommonIPResult<TData>> _producer;
+    protected final KafkaProducer<IPToProcess, CommonIPResult<TData>> _producer;
 
     public IPStandaloneCollector(@NotNull ObjectMapper jsonMapper,
                                  @NotNull String appName,

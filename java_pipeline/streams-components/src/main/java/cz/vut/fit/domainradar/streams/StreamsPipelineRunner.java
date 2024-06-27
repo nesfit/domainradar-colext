@@ -116,7 +116,7 @@ public class StreamsPipelineRunner {
     }
 
     private static List<PipelineComponent> populateBuilder(CommandLine cmd, StreamsBuilder builder,
-                                                           ObjectMapper jsonMapper) throws Exception {
+                                                           ObjectMapper jsonMapper) {
         // var useAllCollectors = cmd.hasOption("ac") || cmd.hasOption("a");
         var useAll = cmd.hasOption("a");
         var components = new ArrayList<PipelineComponent>();

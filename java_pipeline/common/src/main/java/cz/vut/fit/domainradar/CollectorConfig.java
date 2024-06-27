@@ -1,5 +1,6 @@
 package cz.vut.fit.domainradar;
 
+@SuppressWarnings("ALL")
 public class CollectorConfig {
     /* --- GeoIP collector --- */
     public static final String GEOIP_DIRECTORY_CONFIG = "collectors.geoip.dir";

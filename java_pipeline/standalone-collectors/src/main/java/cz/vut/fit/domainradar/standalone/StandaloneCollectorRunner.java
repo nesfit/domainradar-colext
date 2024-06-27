@@ -1,7 +1,6 @@
 package cz.vut.fit.domainradar.standalone;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import cz.vut.fit.domainradar.CollectorConfig;
 import cz.vut.fit.domainradar.Common;
 import cz.vut.fit.domainradar.standalone.collectors.*;
 import org.apache.commons.cli.*;
