@@ -31,10 +31,6 @@ public class StandaloneCollectorRunner {
         final ObjectMapper jsonMapper = Common.makeMapper().build();
         final Properties properties = initProperties(cmd);
 
-        if (cmd.hasOption("mc")) {
-            properties.setProperty(CollectorConfig.MAX_CONCURRENCY_CONFIG, cmd.getOptionValue("mc"));
-        }
-
         var toRun = initCollectors(cmd, jsonMapper, properties);
 
         if (toRun.isEmpty()) {
@@ -78,22 +74,16 @@ public class StandaloneCollectorRunner {
         var components = new ArrayList<BaseStandaloneCollector<?, ?>>();
 
         try {
-            if (useAll || cmd.hasOption("col-dns")) {
-                Logger.error("The Java-based DNS collector should not be used at the moment. Use the Python one instead.");
-                // components.add(new DNSCollector(mapper, appId, properties));
-            }
-
             if (useAll || cmd.hasOption("col-tls")) {
                 components.add(new TLSCollector(mapper, appId, properties));
             }
 
-            if (useAll || cmd.hasOption("col-zone")) {
-                Logger.error("The Java-based Zone collector should not be used at the moment. Use the Python one instead.");
-                // components.add(new ZoneCollector(mapper, appId, properties));
-            }
-
             if (useAll || cmd.hasOption("col-nerd")) {
                 components.add(new NERDCollector(mapper, appId, properties));
+            }
+
+            if (useAll || cmd.hasOption("col-geo")) {
+                components.add(new GeoAsnCollector(mapper, appId, properties));
             }
         } catch (Exception e) {
             Logger.error("Failed to initialize a collector", e);
@@ -134,10 +124,9 @@ public class StandaloneCollectorRunner {
         options.addOption("h", "help", false, "Print this help message");
         options.addOption("a", "all", false, "Use all collectors");
 
-        options.addOption(null, "col-dns", false, "Use the DNS collector");
-        options.addOption(null, "col-tls", false, "Use the DNS collector");
-        options.addOption(null, "col-zone", false, "Use the zone collector");
+        options.addOption(null, "col-tls", false, "Use the TLS collector");
         options.addOption(null, "col-nerd", false, "Use the NERD collector");
+        options.addOption(null, "col-geo", false, "Use the GEO-ASN collector");
 
         options.addOption(Option.builder("id")
                 .longOpt("app-id")
@@ -152,13 +141,6 @@ public class StandaloneCollectorRunner {
                 .argName("ip:port")
                 .hasArg()
                 .required()
-                .build());
-        options.addOption(Option.builder("mc")
-                .longOpt("max-concurrency")
-                .desc("Maximum concurrency")
-                .argName("num of concurrent requests")
-                .hasArg()
-                .type(Integer.class)
                 .build());
         options.addOption(Option.builder("p")
                 .longOpt("properties")

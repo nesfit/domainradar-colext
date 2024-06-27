@@ -2,7 +2,6 @@ package cz.vut.fit.domainradar.streams;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import cz.vut.fit.domainradar.Common;
-import cz.vut.fit.domainradar.streams.collectors.GeoIPCollector;
 import cz.vut.fit.domainradar.streams.mergers.CollectedDataMergerComponent;
 import org.apache.commons.cli.*;
 import org.apache.kafka.common.serialization.Serdes;
@@ -65,15 +64,9 @@ public class StreamsPipelineRunner {
             }
         }
 
-        int threads = 4;
-        if (cmd.hasOption("threads")) {
-            threads = Integer.parseInt(cmd.getOptionValue("threads"));
-        }
-
         props.put(StreamsConfig.APPLICATION_ID_CONFIG, cmd.getOptionValue("id"));
         props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, cmd.getOptionValue("bootstrap-server"));
         props.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.StringSerde.class);
-        props.put(StreamsConfig.NUM_STREAM_THREADS_CONFIG, threads);
         props.put(StreamsConfig.DEFAULT_DESERIALIZATION_EXCEPTION_HANDLER_CLASS_CONFIG,
                 "org.apache.kafka.streams.errors.LogAndContinueExceptionHandler");
 
@@ -124,15 +117,9 @@ public class StreamsPipelineRunner {
 
     private static List<PipelineComponent> populateBuilder(CommandLine cmd, StreamsBuilder builder,
                                                            ObjectMapper jsonMapper) throws Exception {
-        var useAllCollectors = cmd.hasOption("ac") || cmd.hasOption("a");
+        // var useAllCollectors = cmd.hasOption("ac") || cmd.hasOption("a");
         var useAll = cmd.hasOption("a");
         var components = new ArrayList<PipelineComponent>();
-
-        if (cmd.hasOption("col-geoip") || useAllCollectors) {
-            var geoIpCollector = new GeoIPCollector(jsonMapper, Properties);
-            geoIpCollector.use(builder);
-            components.add(geoIpCollector);
-        }
 
         if (cmd.hasOption("merger") || useAll) {
             var merger = new CollectedDataMergerComponent(jsonMapper);
@@ -171,18 +158,10 @@ public class StreamsPipelineRunner {
     private static Options makeOptions() {
         final var options = new Options();
         options.addOption("a", "all", false, "Use all pipeline components");
-        options.addOption("ac", "all-collectors", false, "Use all collectors");
+        // options.addOption("ac", "all-collectors", false, "Use all collectors");
 
-        options.addOption(null, "col-geoip", false, "Use the GeoIP collector");
         options.addOption(null, "merger", false, "Use the collected data merger");
-        options.addOption(Option.builder("threads")
-                .option("t")
-                .longOpt("threads")
-                .desc("Number of threads to use")
-                .argName("num of threads")
-                .hasArg()
-                .type(Integer.class)
-                .build());
+
         options.addOption(Option.builder("properties")
                 .longOpt("properties")
                 .option("p")
@@ -206,7 +185,9 @@ public class StreamsPipelineRunner {
                 .required()
                 .build()
         );
+
         options.addOption("h", "help", false, "Print this help message");
+
         return options;
     }
 }
