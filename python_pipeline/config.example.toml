@@ -29,7 +29,8 @@ concurrency = 4
 # RDAP request timeout (seconds)
 http_timeout = 5
 # Allow max `limiter_concurrency` requests in `limiter_window` seconds for a single RDAP endpoint.
-# Uses the leaky bucket algorithm. This is the base setting, it can be overriden per-endpoint.
+# Uses the leaky bucket algorithm. See https://aiolimiter.readthedocs.io/ for details on the limiter.
+# This is the base setting, it can be overriden per-endpoint.
 limiter_concurrency = 10
 limiter_window = 30
 # When true, the input entries will immediately fail with the LOCAL_RATE_LIMIT error if the
