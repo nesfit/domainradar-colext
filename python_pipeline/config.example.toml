@@ -47,6 +47,15 @@ immediate_local_rate_limiter = false
 app_id = "domrad-rdap-ip"
 # RDAP request timeout (seconds)
 http_timeout = 5
+# Same as in rdap_dn.
+limiter_concurrency = 10
+limiter_window = 30
+immediate_local_rate_limiter = false
+
+[rdap_ip.limiter_overrides]
+# Here, the keys must only contain the full URL of the RDAP endpoint.
+# See https://data.iana.org/rdap/ipv4.json and https://data.iana.org/rdap/ipv6.json.
+"https://rdap.lacnic.net/rdap/" = [5, 60]
 
 [rtt]
 app_id = "domrad-rtt"

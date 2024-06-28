@@ -2,20 +2,19 @@ import asyncio
 import ipaddress
 
 import httpx
-
-from asyncwhois.errors import *
-
 import whodap
+from aiolimiter import AsyncLimiter
+from asyncwhois.errors import *
 from whodap import IPv4Client, IPv6Client
-from whodap.response import IPv4Response, IPv6Response
 from whodap.errors import *
+from whodap.response import IPv4Response, IPv6Response
 
-from common import read_config, make_app
-from common.audit import log_unhandled_error
-from common.models import IPToProcess, IPProcessRequest, RDAPIPResult
 import common.result_codes as rc
 from collectors.util import (make_rdap_ssl_context, should_omit_ip,
                              handle_top_level_component_exception, get_ip_safe)
+from common import read_config, make_app
+from common.audit import log_unhandled_error
+from common.models import IPToProcess, IPProcessRequest, RDAPIPResult
 from common.util import ensure_model
 
 COLLECTOR = "rdap_ip"
@@ -24,8 +23,12 @@ COLLECTOR = "rdap_ip"
 config = read_config()
 component_config = config.get(COLLECTOR, {})
 
+LIMITER_CONCURRENCY = component_config.get("limiter_concurrency", 5)
+LIMITER_WINDOW = component_config.get("limiter_window", 60)
+LIMITER_OVERRIDES = component_config.get("limiter_overrides", {})
 HTTP_TIMEOUT = component_config.get("http_timeout", 5)
 CONCURRENCY = component_config.get("concurrency", 4)
+IMMEDIATE_LOCAL_RATE_LIMITER = component_config.get("immediate_local_rate_limiter", False)
 
 # The Faust application
 rdap_ip_app = make_app(COLLECTOR, config)
@@ -34,21 +37,39 @@ rdap_ip_app = make_app(COLLECTOR, config)
 topic_to_process = rdap_ip_app.topic('to_process_IP', allow_empty=True)
 topic_processed = rdap_ip_app.topic('collected_IP_data')
 
+_limiters: dict[str, AsyncLimiter] = {}
+
+
+def get_limiter(endpoint: str) -> AsyncLimiter:
+    if endpoint not in _limiters:
+        settings = [LIMITER_CONCURRENCY, LIMITER_WINDOW]
+        if endpoint in LIMITER_OVERRIDES:
+            settings = LIMITER_OVERRIDES[endpoint]
+        _limiters[endpoint] = AsyncLimiter(settings[0], settings[1])
+    return _limiters[endpoint]
+
 
 async def fetch_ip(address, client_v4: IPv4Client, client_v6: IPv6Client) \
         -> tuple[IPv4Response | IPv6Response | None, int | None, str | None]:
     try:
         ip = ipaddress.ip_address(address)
-        if ip.version == 4:
-            ip_data = await client_v4.aio_lookup(address)
-        else:
-            ip_data = await client_v6.aio_lookup(address)
+        # noinspection PyProtectedMember
+        rdap_target = client_v4._get_rdap_server(ip) if ip.version == 4 else client_v6._get_rdap_server(ip)
 
-        return ip_data, 0, None
+        limiter = get_limiter(rdap_target)
+        if IMMEDIATE_LOCAL_RATE_LIMITER and not limiter.has_capacity():
+            return None, rc.LOCAL_RATE_LIMIT, f"No capacity left in the local rate limiter for {rdap_target}"
+
+        async with limiter:
+            if ip.version == 4:
+                ip_data = await client_v4.aio_lookup(address)
+            else:
+                ip_data = await client_v6.aio_lookup(address)
+            return ip_data, 0, None
     except MalformedQueryError as e:
         return None, rc.INTERNAL_ERROR, str(e)
     except NotFoundError:
-        return None, rc.NOT_FOUND, "RDAP entity not found"
+        return None, rc.NOT_FOUND, None
     except RateLimitError as e:
         return None, rc.RATE_LIMITED, str(e)
     except WhodapError as e:
@@ -60,7 +81,6 @@ async def fetch_ip(address, client_v4: IPv4Client, client_v6: IPv6Client) \
 
 
 async def process_entry(dn_ip, ipv4_client, ipv6_client):
-    # TODO: implement a per-endpoint local rate limiter (see aiolimiter)
     rdap_data, err_code, err_msg = await fetch_ip(dn_ip.ip, ipv4_client, ipv6_client)
     if rdap_data is not None:
         rdap_data = rdap_data.to_dict()
@@ -69,7 +89,6 @@ async def process_entry(dn_ip, ipv4_client, ipv6_client):
                           collector=COLLECTOR,
                           data=rdap_data)
 
-    # (this could probably be send_soon not to block the loop)
     await topic_processed.send(key=dn_ip, value=result)
 
 
