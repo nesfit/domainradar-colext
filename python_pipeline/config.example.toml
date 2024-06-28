@@ -28,10 +28,20 @@ concurrency = 4
 
 # RDAP request timeout (seconds)
 http_timeout = 5
-# Allow max `limiter_concurrency` requests in `limiter_window` seconds
-# for a single RDAP endpoint.
-limiter_concurrency = 5
-limiter_window = 60
+# Allow max `limiter_concurrency` requests in `limiter_window` seconds for a single RDAP endpoint.
+# Uses the leaky bucket algorithm. This is the base setting, it can be overriden per-endpoint.
+limiter_concurrency = 10
+limiter_window = 30
+# When true, the input entries will immediately fail with the LOCAL_RATE_LIMIT error if the
+# local rate limiter is empty. Otherwise, the entries will be queued (indefinitely) until the limiter is free.
+immediate_local_rate_limiter = false
+
+[rdap_dn.limiter_overrides]
+# Example of overriding the limiter settings for a specific RDAP endpoint.
+# The key may be the full URL of the endpoint or the target TLD.
+# The value is an array with two values: [ limiter concurrency, limiter window ]
+"https://rdap.verisign.com/com/v1/" = [10, 120]
+"cz" = [50, 50]
 
 [rdap_ip]
 app_id = "domrad-rdap-ip"

@@ -1,24 +1,22 @@
 import asyncio
 
-from aiolimiter import AsyncLimiter
+import asyncwhois
 import httpx
 import tldextract
-
-import asyncwhois
+import whodap
+from aiolimiter import AsyncLimiter
 from asyncwhois import DomainClient
 from asyncwhois.errors import *
-
-import whodap
 from whodap import DNSClient
-from whodap.response import DomainResponse
 from whodap.errors import *
+from whodap.response import DomainResponse
 
-from common import read_config, make_app
-from common.audit import log_unhandled_error
-from common.models import RDAPRequest, RDAPDomainResult
 import common.result_codes as rc
 from collectors.util import fetch_entities, extract_known_tld, make_rdap_ssl_context, \
     handle_top_level_component_exception
+from common import read_config, make_app
+from common.audit import log_unhandled_error
+from common.models import RDAPRequest, RDAPDomainResult
 from common.util import ensure_model
 
 COLLECTOR = "rdap_dn"
@@ -29,23 +27,29 @@ component_config = config.get(COLLECTOR, {})
 
 LIMITER_CONCURRENCY = component_config.get("limiter_concurrency", 5)
 LIMITER_WINDOW = component_config.get("limiter_window", 60)
+LIMITER_OVERRIDES = component_config.get("limiter_overrides", {})
 HTTP_TIMEOUT = component_config.get("http_timeout", 5)
 CONCURRENCY = component_config.get("concurrency", 4)
+IMMEDIATE_LOCAL_RATE_LIMITER = component_config.get("immediate_local_rate_limiter", False)
 
 # The Faust application
 rdap_dn_app = make_app(COLLECTOR, config)
 
 # The input and output topics
 topic_to_process = rdap_dn_app.topic('to_process_RDAP_DN', key_type=str, key_serializer='str', allow_empty=True)
-
 topic_processed = rdap_dn_app.topic('processed_RDAP_DN', key_type=str, key_serializer='str')
 
 _limiters: dict[str, AsyncLimiter] = {}
 
 
-def get_limiter(endpoint: str) -> AsyncLimiter:
+def get_limiter(endpoint: str, tld: str) -> AsyncLimiter:
     if endpoint not in _limiters:
-        _limiters[endpoint] = AsyncLimiter(LIMITER_CONCURRENCY, LIMITER_WINDOW)
+        settings = [LIMITER_CONCURRENCY, LIMITER_WINDOW]
+        if endpoint in LIMITER_OVERRIDES:
+            settings = LIMITER_OVERRIDES[endpoint]
+        elif tld in LIMITER_OVERRIDES:
+            settings = LIMITER_OVERRIDES[tld]
+        _limiters[endpoint] = AsyncLimiter(settings[0], settings[1])
     return _limiters[endpoint]
 
 
@@ -53,9 +57,12 @@ async def fetch_rdap(domain_name, client: DNSClient) \
         -> tuple[DomainResponse | None, list | None, int | None, str | None]:
     domain, tld, rdap_base = extract_known_tld(domain_name, client)
     if domain is None or tld is None:
-        return None, None, rc.RDAP_NOT_AVAILABLE, "No RDAP endpoint available for the domain name"
+        return None, None, rc.NO_ENDPOINT, None
     try:
-        async with get_limiter(rdap_base):
+        limiter = get_limiter(rdap_base, tld)
+        if IMMEDIATE_LOCAL_RATE_LIMITER and not limiter.has_capacity():
+            return None, None, rc.LOCAL_RATE_LIMIT, f"No capacity left in the local rate limiter for {rdap_base}"
+        async with limiter:
             rdap_data = await client.aio_lookup(domain, tld)
             entities = await fetch_entities(rdap_data, client)
             return rdap_data, entities, 0, None
@@ -136,7 +143,6 @@ async def process_entry(dn, req, rdap_client, whois_client):
                               whois_status_code=whois_err_code, whois_error=whois_err_msg,
                               raw_whois_data=whois_raw, parsed_whois_data=whois_parsed)
 
-    # (this could probably be send_soon not to block the loop)
     await topic_processed.send(key=dn, value=result)
 
 
