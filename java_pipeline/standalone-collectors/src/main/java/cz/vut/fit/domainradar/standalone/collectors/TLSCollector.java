@@ -127,6 +127,8 @@ public class TLSCollector extends BaseStandaloneCollector<String, String> {
                     rawSocket.connect(new InetSocketAddress(targetIp, 443), _timeout);
                 } catch (SocketTimeoutException e) {
                     return errorResult(ResultCodes.TIMEOUT, "Connection timed out (%d ms)".formatted(_timeout));
+                } catch (IllegalArgumentException e) {
+                    return errorResult(ResultCodes.UNSUPPORTED_ADDRESS, "Cannot use this IP version");
                 }
 
                 SSLSocketFactory factory = context.getSocketFactory();

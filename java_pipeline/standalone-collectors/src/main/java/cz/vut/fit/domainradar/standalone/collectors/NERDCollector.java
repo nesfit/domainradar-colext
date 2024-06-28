@@ -145,7 +145,7 @@ public class NERDCollector extends IPStandaloneCollector<NERDData> {
                         var resultData = response.body();
                         if (resultData.length % 8 != 0 || resultData.length / 8 != ipsLen) {
                             Logger.info("Invalid NERD response (batch {})", batch);
-                            sendAboutAll(entries, errorResult(ResultCodes.INVALID_FORMAT,
+                            sendAboutAll(entries, errorResult(ResultCodes.INVALID_RESPONSE,
                                     "Invalid NERD response (content length mismatch)"));
                             return;
                         }

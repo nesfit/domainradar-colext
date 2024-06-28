@@ -52,7 +52,7 @@ async def fetch_ip(address, client_v4: IPv4Client, client_v6: IPv6Client) \
     except RateLimitError as e:
         return None, rc.RATE_LIMITED, str(e)
     except WhodapError as e:
-        return None, rc.OTHER_EXTERNAL_ERROR, str(e)
+        return None, rc.CANNOT_FETCH, str(e)
     except ValueError as e:
         return None, rc.INVALID_ADDRESS, str(e)
     except Exception as e:

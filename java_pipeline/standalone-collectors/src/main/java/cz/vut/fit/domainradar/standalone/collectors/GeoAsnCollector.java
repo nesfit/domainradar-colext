@@ -105,7 +105,7 @@ public class GeoAsnCollector extends IPStandaloneCollector<GeoIPData> {
         } catch (IllegalArgumentException e) {
             return errorResult(ResultCodes.INVALID_ADDRESS, e.getMessage());
         } catch (Exception e) {
-            return errorResult(ResultCodes.OTHER_EXTERNAL_ERROR, e.getMessage());
+            return errorResult(ResultCodes.CANNOT_FETCH, e.getMessage());
         }
     }
 

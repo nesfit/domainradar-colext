@@ -62,12 +62,12 @@ async def fetch_rdap(domain_name, client: DNSClient) \
     except MalformedQueryError as e:
         return None, None, rc.INTERNAL_ERROR, str(e)
     except NotFoundError:
-        return None, None, rc.NOT_FOUND, "RDAP entity not found"
+        return None, None, rc.NOT_FOUND, None
     except RateLimitError as e:
         await get_limiter(rdap_base).acquire(LIMITER_CONCURRENCY)
         return None, None, rc.RATE_LIMITED, str(e)
     except WhodapError as e:
-        return None, None, rc.OTHER_EXTERNAL_ERROR, str(e)
+        return None, None, rc.CANNOT_FETCH, str(e)
     except Exception as e:
         return None, None, rc.INTERNAL_ERROR, str(e)
 
@@ -89,7 +89,7 @@ async def fetch_whois(domain_name, client: DomainClient) -> tuple[str | None, di
             return None, None, rc.RATE_LIMITED, str(e)
         elif "domain not found" in msg:
             return None, None, rc.NOT_FOUND, str(e)
-        return None, None, rc.OTHER_EXTERNAL_ERROR, str(e)
+        return None, None, rc.CANNOT_FETCH, str(e)
 
 
 async def process_entry(dn, req, rdap_client, whois_client):
