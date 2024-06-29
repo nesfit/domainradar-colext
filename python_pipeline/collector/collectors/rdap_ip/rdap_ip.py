@@ -3,13 +3,12 @@ import ipaddress
 
 import httpx
 import whodap
-from aiolimiter import AsyncLimiter
-from asyncwhois.errors import *
 from whodap import IPv4Client, IPv6Client
 from whodap.errors import *
 from whodap.response import IPv4Response, IPv6Response
 
 import common.result_codes as rc
+from collectors.limiter import LimiterProvider
 from collectors.util import (make_rdap_ssl_context, should_omit_ip,
                              handle_top_level_component_exception, get_ip_safe)
 from common import read_config, make_app
@@ -23,12 +22,8 @@ COLLECTOR = "rdap_ip"
 config = read_config()
 component_config = config.get(COLLECTOR, {})
 
-LIMITER_CONCURRENCY = component_config.get("limiter_concurrency", 5)
-LIMITER_WINDOW = component_config.get("limiter_window", 60)
-LIMITER_OVERRIDES = component_config.get("limiter_overrides", {})
 HTTP_TIMEOUT = component_config.get("http_timeout", 5)
 CONCURRENCY = component_config.get("concurrency", 4)
-IMMEDIATE_LOCAL_RATE_LIMITER = component_config.get("immediate_local_rate_limiter", False)
 
 # The Faust application
 rdap_ip_app = make_app(COLLECTOR, config)
@@ -37,16 +32,7 @@ rdap_ip_app = make_app(COLLECTOR, config)
 topic_to_process = rdap_ip_app.topic('to_process_IP', allow_empty=True)
 topic_processed = rdap_ip_app.topic('collected_IP_data')
 
-_limiters: dict[str, AsyncLimiter] = {}
-
-
-def get_limiter(endpoint: str) -> AsyncLimiter:
-    if endpoint not in _limiters:
-        settings = [LIMITER_CONCURRENCY, LIMITER_WINDOW]
-        if endpoint in LIMITER_OVERRIDES:
-            settings = LIMITER_OVERRIDES[endpoint]
-        _limiters[endpoint] = AsyncLimiter(settings[0], settings[1])
-    return _limiters[endpoint]
+limiter_provider = LimiterProvider(component_config)
 
 
 async def fetch_ip(address, client_v4: IPv4Client, client_v6: IPv6Client) \
@@ -56,11 +42,14 @@ async def fetch_ip(address, client_v4: IPv4Client, client_v6: IPv6Client) \
         # noinspection PyProtectedMember
         rdap_target = client_v4._get_rdap_server(ip) if ip.version == 4 else client_v6._get_rdap_server(ip)
 
-        limiter = get_limiter(rdap_target)
-        if IMMEDIATE_LOCAL_RATE_LIMITER and not limiter.has_capacity():
-            return None, rc.LOCAL_RATE_LIMIT, f"No capacity left in the local rate limiter for {rdap_target}"
+        limiter = limiter_provider.get_limiter(rdap_target)
+        limiter_result = await limiter.acquire()
 
-        async with limiter:
+        if limiter_result == limiter.IMMEDIATE_FAIL:
+            return None, rc.LOCAL_RATE_LIMIT, f"No capacity left in the local rate limiter for {rdap_target}"
+        elif limiter_result == limiter.TIMEOUT:
+            return None, rc.LRL_TIMEOUT, f"Could not enter the limiter in {limiter.max_time} s for {rdap_target}"
+        else:
             if ip.version == 4:
                 ip_data = await client_v4.aio_lookup(address)
             else:

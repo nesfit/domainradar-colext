@@ -28,21 +28,23 @@ concurrency = 4
 
 # RDAP request timeout (seconds)
 http_timeout = 5
-# Allow max `limiter_concurrency` requests in `limiter_window` seconds for a single RDAP endpoint.
-# Uses the leaky bucket algorithm. See https://aiolimiter.readthedocs.io/ for details on the limiter.
+
+# See https://asynciolimiter.readthedocs.io/en/latest/ for details on the limiter.
+# When 'immediate' is true, the input entries will immediately fail with the LOCAL_RATE_LIMIT error if the
+# local rate limiter is empty. Otherwise, they will be queued until the limiter is free, up to 'max_wait' seconds.
+# 'rate' is generally the number of allowed requests per second.
 # This is the base setting, it can be overriden per-endpoint.
-limiter_concurrency = 10
-limiter_window = 30
-# When true, the input entries will immediately fail with the LOCAL_RATE_LIMIT error if the
-# local rate limiter is empty. Otherwise, the entries will be queued (indefinitely) until the limiter is free.
-immediate_local_rate_limiter = false
+limiter = { immediate = false, max_wait = -1, type = "limiter", rate = 5, max_burst = 5 }
+# limiter = { immediate = false, max_wait = -1, type = "strict", rate = 2 }
+# limiter = { immediate = false, max_wait = -1, type = "leaky_bucket_meter", rate = 2, capacity = 5 }
 
 [rdap_dn.limiter_overrides]
 # Example of overriding the limiter settings for a specific RDAP endpoint.
+# Note that the values of "immediate", "max_wait" and "type" will be re-used from the base setting if not specified
+# but the limiter-specific keys must always be present!
 # The key may be the full URL of the endpoint or the target TLD.
-# The value is an array with two values: [ limiter concurrency, limiter window ]
-"https://rdap.verisign.com/com/v1/" = [10, 120]
-"cz" = [50, 50]
+"https://rdap.verisign.com/com/v1/" = { type = "leaky_bucket_meter", rate = 2, capacity = 10 }
+"cz" = { max_wait = 10, type = "limiter", rate = 10, max_burst = 10 }
 
 [rdap_ip]
 app_id = "domrad-rdap-ip"
