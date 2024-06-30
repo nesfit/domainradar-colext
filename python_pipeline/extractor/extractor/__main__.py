@@ -9,6 +9,8 @@ import os.path
 import sys
 from pprint import pprint
 
+from pandas import DataFrame
+
 from common import ensure_data_dir
 from common.audit import log_unhandled_error
 from . import extractor
@@ -21,6 +23,7 @@ def extract_one(file):
 
     data = json.loads(data)
     extractor.init_transformations({})
+    df: DataFrame
     if isinstance(data, list):
         df, errors = extractor.extract_features(data)
     else:
@@ -36,15 +39,12 @@ def extract_one(file):
         pprint(df.head(n=2).to_dict(orient='records'))
         print()
 
-        if importlib.util.find_spec("pyarrow") is None:
-            print("The pyarrow library is not installed, the results won't be saved. Run `poetry install -E arrow`.")
+        if importlib.util.find_spec("fastparquet") is None and importlib.util.find_spec("pyarrow") is None:
+            print("The pyarrow library is not installed, the results won't be saved. Run `poetry install -E parquet`.")
             return
 
-        import pyarrow.parquet as pq
-        import pyarrow as pa
-        table = pa.Table.from_pandas(df)
         output_file = os.path.splitext(file)[0] + ".parquet"
-        pq.write_table(table, output_file)
+        df.to_parquet(output_file)
         print("Saved as: " + output_file)
     else:
         print("No feature vectors created.")
