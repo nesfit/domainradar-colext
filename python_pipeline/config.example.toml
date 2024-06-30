@@ -34,7 +34,7 @@ http_timeout = 5
 # local rate limiter is empty. Otherwise, they will be queued until the limiter is free, up to 'max_wait' seconds.
 # 'rate' is generally the number of allowed requests per second.
 # This is the base setting, it can be overriden per-endpoint.
-limiter = { immediate = false, max_wait = -1, type = "limiter", rate = 5, max_burst = 5 }
+limiter = { immediate = false, max_wait = 10, type = "limiter", rate = 5, max_burst = 5 }
 # limiter = { immediate = false, max_wait = -1, type = "strict", rate = 2 }
 # limiter = { immediate = false, max_wait = -1, type = "leaky_bucket_meter", rate = 2, capacity = 5 }
 
@@ -51,9 +51,7 @@ app_id = "domrad-rdap-ip"
 # RDAP request timeout (seconds)
 http_timeout = 5
 # Same as in rdap_dn.
-limiter_concurrency = 10
-limiter_window = 30
-immediate_local_rate_limiter = false
+limiter = { immediate = false, max_wait = 10, type = "limiter", rate = 5, max_burst = 5 }
 
 [rdap_ip.limiter_overrides]
 # Here, the keys must only contain the full URL of the RDAP endpoint.
