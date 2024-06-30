@@ -12,11 +12,11 @@ from classifiers.options import PipelineOptions
 from classifiers.pipeline import Pipeline
 from pandas import DataFrame
 
-from common import read_config, make_app
-from common.audit import log_unhandled_error, log_warning
+from common import read_config, make_app, log
 from common.util import timestamp_now_millis
 
 CLASSIFIER = "classifier-unit"
+logger = log.get(CLASSIFIER)
 
 # Read the config
 config = read_config()
@@ -91,7 +91,7 @@ def pick_classifier_and_classify(queue: SimpleQueue, dataframe: DataFrame):
         results = pipeline.classify_domains(dataframe)
     except Exception as e:
         keys = dataframe["domain_name"].tolist()
-        log_unhandled_error(e, CLASSIFIER, None, all_keys=keys)
+        logger.k_unhandled_error(e, None, all_keys=keys)
         results = []
     finally:
         queue.put(pipeline)
@@ -104,18 +104,18 @@ async def process_dataframe(dataframe: DataFrame):
         results = await classifier_app.loop.run_in_executor(executor, pick_classifier_and_classify,
                                                             pipelines_queue, dataframe)
         if not results:
-            log_warning(CLASSIFIER, "No classification results were generated.", None)
+            logger.k_warning("No classification results were generated.", None)
             return
 
         for result in results:
             if "domain_name" not in result:
-                log_warning(CLASSIFIER, "Missing domain_name in a classification result.", None)
+                logger.k_warning("Missing domain_name in a classification result.", None)
                 continue
 
             await topic_processed.send(key=result["domain_name"], value=serialize(result))
     except Exception as e:
         keys = dataframe["domain_name"].tolist()
-        log_unhandled_error(e, CLASSIFIER, None, all_keys=keys)
+        logger.k_unhandled_error(e, None, all_keys=keys)
 
         for dn in keys:
             result = make_error_result(dn, str(e))

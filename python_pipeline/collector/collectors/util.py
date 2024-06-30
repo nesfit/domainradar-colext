@@ -3,12 +3,12 @@ from typing import List, Optional
 
 from pydantic import ValidationError
 from whodap import DNSClient
-from whodap.response import DomainResponse, RDAPResponse
 from whodap.client import RDAPClient
+from whodap.response import DomainResponse, RDAPResponse
 
-from common.audit import log_unhandled_error
-from common.models import IPProcessRequest, Result
+from common import log
 from common import result_codes as rc
+from common.models import IPProcessRequest, Result
 
 
 async def fetch_entities(response: DomainResponse, client: RDAPClient) -> List[RDAPResponse]:
@@ -24,6 +24,7 @@ async def fetch_entities(response: DomainResponse, client: RDAPClient) -> List[R
 
                 entity_response = None
                 try:
+                    # noinspection PyProtectedMember
                     entity_response = await client._aio_get_authoritative_response(link.href, [link.href])
                 finally:
                     if entity_response is None:
@@ -90,9 +91,9 @@ def get_ip_safe(dn_ip):
 
 
 async def handle_top_level_component_exception(exc_info, component_id, key, result_class, topic):
-    try:
-        error_msg = str(exc_info)
+    error_msg = str(exc_info)
 
+    try:
         try:
             result = result_class(status_code=rc.INTERNAL_ERROR, error=error_msg)
         except ValidationError:
@@ -100,5 +101,5 @@ async def handle_top_level_component_exception(exc_info, component_id, key, resu
 
         await topic.send(key=key, value=result)
     except Exception as e:
-        log_unhandled_error(e, component_id, key, desc="Error sending the error message to the output topic",
-                            original_error=exc_info, topic=topic)
+        log.get(component_id).k_unhandled_error(e, key, desc="Error sending the error message to the output topic",
+                                                original_error=error_msg, topic=topic)

@@ -11,6 +11,7 @@ from .util import (
 )
 
 __all__ = [
+    "main",
     "ensure_data_dir",
     "read_config",
     "make_ssl_context",
@@ -21,3 +22,15 @@ __all__ = [
     "StringCodec",
     "PydanticCodec"
 ]
+
+
+def main(component_id: str, app):
+    from common import ensure_data_dir, log, read_config, util
+    util._logger = log.init(component_id, read_config())
+
+    try:
+        ensure_data_dir()
+        app.main()
+    except Exception as e:
+        log.get(component_id).k_unhandled_error(e, None)
+        raise e

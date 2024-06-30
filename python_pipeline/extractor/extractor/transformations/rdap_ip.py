@@ -34,8 +34,6 @@ def get_rdap_ip_features(ip_data):
     if ip_data is not None:
         ip_count = len(ip_data)
         for ip in ip_data:
-            ip_address = ip["ip"]
-
             if ip["rdap"] is not None:
                 # Examine IP and network information
                 if ip["rdap"]["ip_version"] is not None:

@@ -8,11 +8,11 @@ from typing import Sequence
 import faust.events
 from faust import EventT
 
-from common import read_config, make_app
-from common.audit import log_unhandled_error
+from common import read_config, make_app, log
 from . import extractor
 
 EXTRACTOR = "extractor"
+logger = log.get(EXTRACTOR)
 
 # Read the config
 config = read_config()
@@ -40,16 +40,16 @@ topic_processed = extractor_app.topic('feature_vectors', key_type=None,
 @extractor_app.agent(topic_to_process, concurrency=CONCURRENCY)
 async def process_entries(stream):
     def parse_event(event: faust.events.EventT):
-        key = event.key  # type: str
+        msg_key = event.key  # type: str
         value_bytes = event.value  # type: bytes
 
         try:
             value = loads(value_bytes)
-            value["domain_name"] = key
+            value["domain_name"] = msg_key
             value["invalid_data"] = False
             return value
         except JSONDecodeError:
-            return {"domain_name": key, "invalid_data": True}
+            return {"domain_name": msg_key, "invalid_data": True}
 
     buffer = io.BytesIO()
 
@@ -74,7 +74,7 @@ async def process_entries(stream):
 
             if len(errors) > 0:
                 for key, error in errors.items():
-                    log_unhandled_error(error, EXTRACTOR, key)
+                    logger.k_unhandled_error(error, key)
         except Exception as e:
             keys = [e.key for e in events_seq] if events_seq is not None else None
-            log_unhandled_error(e, EXTRACTOR, None, all_keys=keys)
+            logger.k_unhandled_error(e, None, all_keys=keys)

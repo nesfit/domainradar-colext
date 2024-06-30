@@ -1,17 +1,14 @@
-import logging
-import sys
-
 from dns.resolver import Cache
 
 from collectors.dns.collector import DNSCollector
 from collectors.options import DNSCollectorOptions
 from collectors.util import handle_top_level_component_exception
-from common import read_config, make_app
-from common.audit import log_unhandled_error
+from common import read_config, make_app, log
 from common.models import DNSRequest, DNSResult, IPToProcess, DNSData
 from common.util import ensure_model
 
 COLLECTOR = "dns"
+logger = log.get(COLLECTOR)
 
 # Read the config
 config = read_config()
@@ -57,28 +54,27 @@ def get_ip_for_tls(dns_data: DNSData) -> str | None:
     return None
 
 
-# The Zone processor
+# The DNS processor
 @dns_app.agent(topic_to_process, concurrency=CONCURRENCY)
 async def process_entries(stream):
-    logger = logging.getLogger("dns-scanner")
-    logger.setLevel(SCANNER_LOG_LEVEL)
-    logger.addHandler(logging.StreamHandler(sys.stderr))
+    scanner_child_logger = logger.getChild("scanner")
+    scanner_child_logger.setLevel(SCANNER_LOG_LEVEL)
 
     options = DNSCollectorOptions(dns_servers=DNS_SERVERS, timeout=TIMEOUT, rotate_nameservers=ROTATE_NAMESERVERS,
                                   types_to_scan=TYPES_TO_SCAN, types_to_process_IPs_from=TYPES_TO_PROCESS_IPS_FROM,
                                   max_record_retries=MAX_RECORD_RETRIES, use_one_socket=USE_ONE_SOCKET)
     cache = Cache()
-    collector = DNSCollector(options, logger, cache)
+    collector = DNSCollector(options, scanner_child_logger, cache)
 
     # Main message processing loop
     # dn is the domain name, req is the optional ZoneRequest object
     async for dn, req in stream.items():
         try:
-            dns_app.logger.info("%s: Processing DNS", dn)
+            logger.k_trace("Processing DNS", dn)
             req = ensure_model(DNSRequest, req)
 
             result = await collector.scan_dns(dn, req)
-            dns_app.logger.info("%s: DNS done", dn)
+            logger.k_debug("DNS done", dn)
 
             await topic_processed_dns.send(key=dn, value=result)
 
@@ -86,11 +82,13 @@ async def process_entries(stream):
                 if result.ips is not None and len(result.ips) > 0:
                     for ip in result.ips:
                         ip_to_process = IPToProcess(ip=ip.ip, domain_name=dn)
+                        logger.k_trace("Sending IP %s to process", dn, ip.ip)
                         await topic_ip_requests.send(key=ip_to_process, value=None)
 
                 ip_for_tls = get_ip_for_tls(result.dns_data)
                 if ip_for_tls is not None:
+                    logger.k_trace("Sending TLS request", dn)
                     await topic_tls_requests.send(key=dn, value=ip_for_tls)
         except Exception as e:
-            log_unhandled_error(e, COLLECTOR, dn)
+            logger.k_unhandled_error(e, dn)
             await handle_top_level_component_exception(e, COLLECTOR, dn, DNSResult, topic_processed_dns)

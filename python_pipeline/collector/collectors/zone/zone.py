@@ -5,12 +5,12 @@ import common.result_codes as rc
 from collectors.options import DNSCollectorOptions
 from collectors.util import handle_top_level_component_exception
 from collectors.zone.collector import ZoneCollector
-from common import read_config, make_app
-from common.audit import log_unhandled_error
+from common import read_config, make_app, log
 from common.models import RDAPRequest, RDAPDomainResult, ZoneRequest, ZoneResult, DNSRequest
 from common.util import ensure_model
 
 COLLECTOR = "zone"
+logger = log.get(COLLECTOR)
 
 # Read the config
 config = read_config()
@@ -40,26 +40,26 @@ topic_rdap_requests = zone_app.topic('to_process_RDAP_DN', key_type=str, key_ser
 async def process_entries(stream):
     options = DNSCollectorOptions(dns_servers=DNS_SERVERS, timeout=TIMEOUT, rotate_nameservers=ROTATE_NAMESERVERS)
     cache = Cache()
-    collector = ZoneCollector(options, zone_app.logger, cache)
+    collector = ZoneCollector(options, logger, cache)
 
     # Main message processing loop
     # dn is the domain name, req is the optional ZoneRequest object
     async for dn, req in stream.items():
         try:
-            zone_app.logger.info("%s: Processing zone", dn)
+            logger.k_trace("Processing zone", dn)
             req = ensure_model(ZoneRequest, req)
 
             try:
                 zone_info = await collector.get_zone_info(dn)
             except dns.exception.Timeout:
-                zone_app.logger.info("%s: Timeout", dn)
+                logger.k_info("Timeout", dn)
                 result = ZoneResult(status_code=rc.TIMEOUT, error=f"Timeout ({TIMEOUT} s)", zone=None)
             else:
                 if zone_info is None:
-                    zone_app.logger.info("%s: Zone not found", dn)
+                    logger.k_debug("Zone not found", dn)
                     result = ZoneResult(status_code=rc.NOT_FOUND, error="Zone not found", zone=None)
                 else:
-                    zone_app.logger.info("%s: Zone found: %s", dn, zone_info.zone)
+                    logger.k_debug("Zone found: %s", dn, zone_info.zone)
                     result = ZoneResult(status_code=0, zone=zone_info)
 
             await topic_processed_zone.send(key=dn, value=result)
@@ -78,5 +78,5 @@ async def process_entries(stream):
                     await topic_rdap_requests.send(key=dn, value=rdap_req)
 
         except Exception as e:
-            log_unhandled_error(e, COLLECTOR, dn)
+            logger.k_unhandled_error(e, dn)
             await handle_top_level_component_exception(e, COLLECTOR, dn, RDAPDomainResult, topic_processed_zone)

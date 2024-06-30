@@ -15,12 +15,12 @@ import common.result_codes as rc
 from collectors.limiter import LimiterProvider
 from collectors.util import fetch_entities, extract_known_tld, make_rdap_ssl_context, \
     handle_top_level_component_exception
-from common import read_config, make_app
-from common.audit import log_unhandled_error
+from common import read_config, make_app, log
 from common.models import RDAPRequest, RDAPDomainResult
 from common.util import ensure_model
 
 COLLECTOR = "rdap_dn"
+logger = log.get(COLLECTOR)
 
 # Read the config
 config = read_config()
@@ -121,6 +121,7 @@ async def process_entry(dn, req, rdap_client, whois_client):
         rdap_target = dn
 
     rdap_data, entities, err_code, err_msg = await fetch_rdap(rdap_target, rdap_client)
+    logger.k_trace("Got result %s for target %s", dn, err_code, rdap_target)
 
     if rdap_data is None:
         # If the RDAP data is not available for the source DN, try to get it for the registered domain name
@@ -130,10 +131,12 @@ async def process_entry(dn, req, rdap_client, whois_client):
             reg_rdap_target = target_parts.domain + "." + target_parts.suffix
             if reg_rdap_target != rdap_target:
                 rdap_target = reg_rdap_target
+                logger.k_trace("Retrying on target %s", dn, rdap_target)
                 rdap_data, entities, err_code, err_msg = await fetch_rdap(rdap_target, rdap_client)
 
     if rdap_data is None:
         # Only try WHOIS if no RDAP data is available at any level of the source DN
+        logger.k_trace("Trying WHOIS for %s", dn, zone or dn)
         (whois_raw, whois_parsed,
          whois_err_code, whois_err_msg) = await fetch_whois(zone or dn, whois_client)
     else:
@@ -147,6 +150,7 @@ async def process_entry(dn, req, rdap_client, whois_client):
                               whois_status_code=whois_err_code, whois_error=whois_err_msg,
                               raw_whois_data=whois_raw, parsed_whois_data=whois_parsed)
 
+    logger.k_trace("Sending RDAP result", dn)
     await topic_processed.send(key=dn, value=result)
 
 
@@ -163,18 +167,19 @@ async def process_entries(stream):
             rdap_client = await whodap.DNSClient.new_aio_client(httpx_client=httpx_client)
             break
         except Exception as e:
-            rdap_dn_app.logger.error("Error initializing RDAP client. Retrying in 10 seconds.", exc_info=e)
+            logger.error("Error initializing RDAP client. Retrying in 10 seconds.", exc_info=e)
             await asyncio.sleep(10)
 
     # Main message processing loop
     # dn is the domain name, req is the optional RDAPRequest object
     async for dn, req in stream.items():
+        logger.k_trace("Processing RDAP", dn)
         req = ensure_model(RDAPRequest, req)
 
         try:
             await process_entry(dn, req, rdap_client, whois_client)
         except Exception as e:
-            log_unhandled_error(e, COLLECTOR, dn)
+            logger.k_unhandled_error(e, dn)
             await handle_top_level_component_exception(e, COLLECTOR, dn, RDAPDomainResult, topic_processed)
 
     await rdap_client.aio_close()

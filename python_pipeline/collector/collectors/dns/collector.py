@@ -40,7 +40,7 @@ class DNSCollector:
         zone = request.zone_info
         try:
             domain = dns.name.from_text(domain_name)
-            authority_dn = dns.name.from_text(zone.zone)
+            dns.name.from_text(zone.zone)
         except dns.exception.SyntaxError as e:
             return DNSResult(status_code=rc.INVALID_DOMAIN_NAME, error=str(e))
 

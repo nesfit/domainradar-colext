@@ -9,7 +9,7 @@ from typing import Iterable
 import pandas as pd
 from pandas import DataFrame
 
-from common.audit import log_info
+from common import log
 from .compat import CompatibilityTransformation
 from .incomplete_data_filter import filter_entry as filter_incomplete_data
 from .transformations.base_transformation import Transformation
@@ -93,8 +93,8 @@ def extract_features(raw_data: Iterable[dict]) -> tuple[DataFrame | None, dict[s
             # Filter out incomplete results
             filter_result, filter_errors = filter_incomplete_data(raw_data_entry)
             if not filter_result:
-                log_info("extractor", "Skipping due to incomplete data",
-                         raw_data_entry.get("domain_name", "?"), errors=filter_errors)
+                log.get("extractor").k_info("Skipping due to incomplete data",
+                                            raw_data_entry.get("domain_name", "?"), errors=filter_errors)
                 continue
 
             # Run the compatibility transformation

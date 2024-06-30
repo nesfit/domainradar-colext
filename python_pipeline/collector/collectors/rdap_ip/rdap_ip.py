@@ -11,12 +11,12 @@ import common.result_codes as rc
 from collectors.limiter import LimiterProvider
 from collectors.util import (make_rdap_ssl_context, should_omit_ip,
                              handle_top_level_component_exception, get_ip_safe)
-from common import read_config, make_app
-from common.audit import log_unhandled_error
+from common import read_config, make_app, log
 from common.models import IPToProcess, IPProcessRequest, RDAPIPResult
 from common.util import ensure_model
 
 COLLECTOR = "rdap_ip"
+logger = log.get(COLLECTOR)
 
 # Read the config
 config = read_config()
@@ -94,7 +94,7 @@ async def process_entries(stream):
             ipv6_client = await whodap.IPv6Client.new_aio_client(httpx_client=httpx_client)
             break
         except Exception as e:
-            rdap_ip_app.logger.error("Error initializing RDAP clients. Retrying in 10 seconds.", exc_info=e)
+            logger.error("Error initializing RDAP clients. Retrying in 10 seconds.", exc_info=e)
             await asyncio.sleep(10)
 
     # Main message processing loop
@@ -103,15 +103,20 @@ async def process_entries(stream):
         dn_ip = ensure_model(IPToProcess, dn_ip)
         process_request = ensure_model(IPProcessRequest, process_request)
 
+        if dn_ip is None:
+            continue
+
         try:
             # Omit the DN if the collector is not in the list of collectors to process
             if should_omit_ip(process_request, COLLECTOR):
+                logger.k_trace("Omitting IP %s", dn_ip.domain_name, dn_ip.ip)
                 continue
 
+            logger.k_trace("Processing %s", dn_ip.domain_name, dn_ip.ip)
             await process_entry(dn_ip, ipv4_client, ipv6_client)
         except Exception as e:
             ip = get_ip_safe(dn_ip)
-            log_unhandled_error(e, COLLECTOR, ip, dn_ip=dn_ip)
+            logger.k_unhandled_error(e, ip, dn_ip=dn_ip)
             await handle_top_level_component_exception(e, COLLECTOR, dn_ip,
                                                        RDAPIPResult, topic_processed)
 

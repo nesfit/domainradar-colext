@@ -1,14 +1,14 @@
 from icmplib import async_ping, ICMPSocketError, DestinationUnreachable, TimeExceeded
 
+import common.result_codes as rc
 from collectors.util import (should_omit_ip, get_ip_safe,
                              handle_top_level_component_exception)
-from common.util import ensure_model
-from common import read_config, make_app
-from common.audit import log_unhandled_error
+from common import read_config, make_app, log
 from common.models import IPToProcess, IPProcessRequest, RTTResult, RTTData
-import common.result_codes as rc
+from common.util import ensure_model
 
 COLLECTOR = "rtt"
+logger = log.get(COLLECTOR)
 
 # Read the config
 config = read_config()
@@ -50,12 +50,10 @@ async def process_entry(dn_ip):
 
     # (this could probably be send_soon not to block the loop)
     await topic_processed.send(key=dn_ip,
-                               value=RTTResult(status_code=code, error=err_msg,
-                                               collector=COLLECTOR,
-                                               data=rtt_data))
+                               value=RTTResult(status_code=code, error=err_msg, collector=COLLECTOR, data=rtt_data))
 
 
-# The RDAP-DN processor
+# The RTT processor
 @rtt_app.agent(topic_to_process, concurrency=CONCURRENCY)
 async def process_entries(stream):
     # Main message processing loop
@@ -64,13 +62,18 @@ async def process_entries(stream):
         dn_ip = ensure_model(IPToProcess, dn_ip)
         process_request = ensure_model(IPProcessRequest, process_request)
 
+        if dn_ip is None:
+            continue
+
         try:
             # Omit the DN if the collector is not in the list of collectors to process
             if should_omit_ip(process_request, COLLECTOR):
+                logger.k_trace("Omitting IP %s", dn_ip.domain_name, dn_ip.ip)
                 continue
 
+            logger.k_trace("Processing %s", dn_ip.domain_name, dn_ip.ip)
             await process_entry(dn_ip)
         except Exception as e:
             ip = get_ip_safe(dn_ip)
-            log_unhandled_error(e, COLLECTOR, str(ip), dn_ip=dn_ip)
+            logger.k_unhandled_error(e, ip, dn_ip=dn_ip)
             await handle_top_level_component_exception(e, COLLECTOR, dn_ip, RTTResult, topic_processed)

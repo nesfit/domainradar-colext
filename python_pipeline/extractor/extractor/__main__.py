@@ -11,8 +11,7 @@ from pprint import pprint
 
 from pandas import DataFrame
 
-from common import ensure_data_dir
-from common.audit import log_unhandled_error
+from common import main
 from . import extractor
 from .app import extractor_app, EXTRACTOR
 
@@ -55,9 +54,4 @@ if __name__ == '__main__':
         extract_one(sys.argv[1])
         exit()
 
-    try:
-        ensure_data_dir()
-        extractor_app.main()
-    except Exception as e:
-        log_unhandled_error(e, EXTRACTOR)
-        raise e
+    main(EXTRACTOR, extractor_app)
