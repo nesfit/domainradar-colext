@@ -6,6 +6,7 @@ import tldextract
 import whodap
 from asyncwhois import DomainClient
 from asyncwhois.errors import *
+from asyncwhois.query import DomainQuery
 from whodap import DNSClient
 from whodap.errors import *
 from whodap.response import DomainResponse
@@ -51,25 +52,38 @@ async def fetch_rdap(domain_name, client: DNSClient) \
         return None, None, rc.LOCAL_RATE_LIMIT, f"No capacity left in the limiter for {rdap_base}"
     elif limiter_result == limiter.TIMEOUT:
         return None, None, rc.LRL_TIMEOUT, f"Could not enter the limiter in {limiter.max_time} s for {rdap_base}"
-    else:
-        try:
-            rdap_data = await client.aio_lookup(domain, tld)
-            entities = await fetch_entities(rdap_data, client)
-            return rdap_data, entities, 0, None
-        except MalformedQueryError as e:
-            return None, None, rc.INTERNAL_ERROR, str(e)
-        except NotFoundError:
-            return None, None, rc.NOT_FOUND, None
-        except RateLimitError as e:
-            limiter.fill_on_next()
-            return None, None, rc.RATE_LIMITED, str(e)
-        except WhodapError as e:
-            return None, None, rc.CANNOT_FETCH, str(e)
-        except Exception as e:
-            return None, None, rc.INTERNAL_ERROR, str(e)
+
+    try:
+        rdap_data = await client.aio_lookup(domain, tld)
+        entities = await fetch_entities(rdap_data, client)
+        return rdap_data, entities, 0, None
+    except MalformedQueryError as e:
+        return None, None, rc.INTERNAL_ERROR, str(e)
+    except NotFoundError:
+        return None, None, rc.NOT_FOUND, None
+    except RateLimitError as e:
+        limiter.fill_on_next()
+        return None, None, rc.RATE_LIMITED, str(e)
+    except WhodapError as e:
+        return None, None, rc.CANNOT_FETCH, str(e)
+    except Exception as e:
+        return None, None, rc.INTERNAL_ERROR, str(e)
 
 
 async def fetch_whois(domain_name, client: DomainClient) -> tuple[str | None, dict | None, int | None, str | None]:
+    suffix = tldextract.extract(domain_name).suffix
+    suffix = suffix.split(".")[-1]
+    # noinspection PyProtectedMember
+    endpoint = DomainQuery._get_server_name(suffix) or DomainQuery.iana_server
+
+    limiter = limiter_provider.get_limiter(endpoint, suffix)
+    limiter_result = await limiter.acquire()
+
+    if limiter_result == limiter.IMMEDIATE_FAIL:
+        return None, None, rc.LOCAL_RATE_LIMIT, f"No capacity left in the limiter for {endpoint}"
+    elif limiter_result == limiter.TIMEOUT:
+        return None, None, rc.LRL_TIMEOUT, f"Could not enter the limiter in {limiter.max_time} s for {endpoint}"
+
     try:
         whois_raw, whois_parsed = await client.aio_whois(domain_name)
 
