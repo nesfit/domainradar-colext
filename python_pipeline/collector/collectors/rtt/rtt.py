@@ -39,7 +39,7 @@ async def process_entry(dn_ip):
         code = rc.INTERNAL_ERROR
         err_msg = str(e)
     except DestinationUnreachable as e:
-        code = rc.ICMP_DESTINATION_UNREACHABLE
+        code = rc.ICMP_DEST_UNREACHABLE
         err_msg = str(e)
     except TimeExceeded as e:
         code = rc.ICMP_TIME_EXCEEDED
