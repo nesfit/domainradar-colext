@@ -79,7 +79,8 @@ class RDAPDomainTransformation(Transformation):
 
         return df
 
-    def get_new_column_names(self) -> dict[str, str]:
+    @property
+    def features(self) -> dict[str, str]:
         return {
             "rdap_registration_period": "timedelta64[ms]",
             "rdap_domain_age": "float64",

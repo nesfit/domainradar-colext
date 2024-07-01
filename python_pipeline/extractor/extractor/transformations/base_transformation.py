@@ -23,6 +23,7 @@ class Transformation(abc.ABC):
     def transform(self, df: DataFrame) -> DataFrame:
         raise NotImplementedError("transform method must be implemented in the subclass")
 
+    @property
     @abc.abstractmethod
-    def get_new_column_names(self) -> Mapping[str, str]:
+    def features(self) -> Mapping[str, str]:
         raise NotImplementedError("get_new_column_names method must be implemented in the subclass")

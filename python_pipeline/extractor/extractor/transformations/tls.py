@@ -311,5 +311,6 @@ class TLSTransformation(Transformation):
         df[TLSTransformation.all_columns] = df["tls"].apply(_make_tls_features, args=(date,))
         return df
 
-    def get_new_column_names(self) -> dict[str, str]:
+    @property
+    def features(self) -> dict[str, str]:
         return TLSTransformation._col_names

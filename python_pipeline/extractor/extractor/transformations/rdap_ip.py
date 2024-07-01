@@ -106,7 +106,8 @@ class RDAPAddressTransformation(Transformation):
 
         return df
 
-    def get_new_column_names(self) -> dict[str, str]:
+    @property
+    def features(self) -> dict[str, str]:
         return {
             "rdap_ip_v4_count": "Int64", "rdap_ip_v6_count": "Int64",
             "rdap_ip_shortest_v4_prefix_len": "Int64", "rdap_ip_longest_v4_prefix_len": "Int64",

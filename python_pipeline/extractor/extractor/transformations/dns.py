@@ -183,7 +183,8 @@ class DNSTransformation(Transformation):
 
         return df
 
-    def get_new_column_names(self) -> dict[str, str]:
+    @property
+    def features(self) -> dict[str, str]:
         return {
             "tmp_dns_SOA": "",
             "dns_dnssec_score": "float64",

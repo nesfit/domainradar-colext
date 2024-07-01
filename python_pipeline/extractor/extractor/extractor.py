@@ -67,7 +67,7 @@ def init_transformations(config: dict):
 
     target_features = {}
     for transformation in _enabled_transformations:
-        target_features = target_features | transformation.get_new_column_names()
+        target_features = target_features | transformation.features
 
     _added_columns_names = target_features.keys()
     _added_columns_with_types = {k: v for k, v in target_features.items() if not k.startswith("tmp_")}

@@ -580,7 +580,8 @@ class LexicalTransformation(Transformation):
         df.drop(columns=['tmp_tld', 'tmp_sld', 'tmp_stld', 'tmp_concat_subdomains', 'tmp_part_lengths'], inplace=True)
         return df
 
-    def get_new_column_names(self) -> dict[str, str]:
+    @property
+    def features(self) -> dict[str, str]:
         return {
             "tmp_tld": "",
             "tmp_sld": "",

@@ -205,7 +205,8 @@ class GeoTransformation(Transformation):
 
         return df
 
-    def get_new_column_names(self) -> dict[str, str]:
+    @property
+    def features(self) -> dict[str, str]:
         return {
             'geo_countries_count': "Int64",
             'geo_continents_count': "Int64",

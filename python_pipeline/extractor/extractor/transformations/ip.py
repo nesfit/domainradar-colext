@@ -109,7 +109,8 @@ class IPTransformation(Transformation):
 
         return df
 
-    def get_new_column_names(self) -> dict[str, str]:
+    @property
+    def features(self) -> dict[str, str]:
         return {
             "ip_count": "Int64",
             "ip_mean_average_rtt": "float64",

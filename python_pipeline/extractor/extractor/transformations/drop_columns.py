@@ -38,5 +38,6 @@ class DropColumnsTransformation(Transformation):
         df.drop(columns=_to_drop, errors='ignore', inplace=True)
         return df
 
-    def get_new_column_names(self) -> dict[str, str]:
+    @property
+    def features(self) -> dict[str, str]:
         return {}
