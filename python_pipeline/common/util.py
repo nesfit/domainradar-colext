@@ -123,6 +123,7 @@ def make_app(name: str, config: dict) -> faust.App:
     return app
 
 
+# noinspection PyTypeChecker
 def check_config_changes(component_id: str, app):
     global _last_config_modify_time, _config
     if _config.get(component_id, {}).get("watch_config", False):
@@ -134,7 +135,7 @@ def check_config_changes(component_id: str, app):
     if stamp != _last_config_modify_time:
         _logger.info("Configuration file changed, reloading")
         _last_config_modify_time = stamp
-        _config: dict | None = None
+        _config = None
         read_config()
         log.init(component_id, _config)
         log.inject_handler(log.get(component_id), app.logger, _config.get(component_id, {}))
