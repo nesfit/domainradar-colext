@@ -21,6 +21,9 @@ class IPToProcess(CustomBaseModel):
     domain_name: str = Field(serialization_alias="domainName")
     ip: str
 
+    def __str__(self):
+        return f"{self.domain_name}/{self.ip}"
+
 
 class RTTData(CustomBaseModel):
     min: float

@@ -1,8 +1,7 @@
 from icmplib import async_ping, ICMPSocketError, DestinationUnreachable, TimeExceeded
 
 import common.result_codes as rc
-from collectors.util import (should_omit_ip, get_ip_safe,
-                             handle_top_level_component_exception)
+from collectors.util import should_omit_ip, handle_top_level_component_exception
 from common import read_config, make_app, log
 from common.models import IPToProcess, IPProcessRequest, RTTResult, RTTData
 from common.util import ensure_model
@@ -74,6 +73,5 @@ async def process_entries(stream):
             logger.k_trace("Processing %s", dn_ip.domain_name, dn_ip.ip)
             await process_entry(dn_ip)
         except Exception as e:
-            ip = get_ip_safe(dn_ip)
-            logger.k_unhandled_error(e, ip, dn_ip=dn_ip)
+            logger.k_unhandled_error(e, str(dn_ip))
             await handle_top_level_component_exception(e, COLLECTOR, dn_ip, RTTResult, topic_processed)

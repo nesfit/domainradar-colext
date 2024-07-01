@@ -24,6 +24,15 @@ app_id = "domrad-rdap-dn"
 debug = false
 # The number of worker threads that process input entries (available in all components)
 concurrency = 4
+# The main log level (TRACE/DEBUG/INFO/WARNING/ERROR/CRITICAL)
+log_level = "DEBUG"
+# The log level for sending logs to stderr
+log_level_stderr = "TRACE"
+# The log level for sending logs to Kafka
+# Set to an empty string to disable Kafka logging
+log_level_kafka = "WARNING"
+# If true, Faust logs of the configured level will also be sent to Kafka
+include_faust_logs_in_kafka = false
 # --------------------------------- #
 
 # RDAP request timeout (seconds)

@@ -86,10 +86,6 @@ def should_omit_ip(request: Optional[IPProcessRequest], collector_name: str) -> 
     return request is not None and request.collectors is not None and collector_name not in request.collectors
 
 
-def get_ip_safe(dn_ip):
-    return str(dn_ip.ip) if dn_ip is not None and hasattr(dn_ip, "ip") else None
-
-
 async def handle_top_level_component_exception(exc_info, component_id, key, result_class, topic):
     error_msg = str(exc_info)
 
