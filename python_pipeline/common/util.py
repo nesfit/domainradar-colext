@@ -16,6 +16,8 @@ _logger = logging.getLogger("stub")
 _logger.setLevel(logging.INFO)
 _logger.addHandler(logging.StreamHandler(sys.stderr))
 _config: dict | None = None
+_config_file: str | None = None
+_last_config_modify_time = -1
 
 
 def ensure_data_dir() -> None:
@@ -26,11 +28,10 @@ def ensure_data_dir() -> None:
         os.makedirs(data_dir)
 
 
-def read_config() -> dict:
-    """Reads the configuration file specified by the environment variable APP_CONFIG_FILE."""
-    global _config
-    if _config:
-        return _config
+def get_config_file() -> str:
+    global _config_file, _last_config_modify_time
+    if _config_file:
+        return _config_file
 
     config_file = os.getenv("APP_CONFIG_FILE")
     if config_file is None:
@@ -39,7 +40,18 @@ def read_config() -> dict:
     if not os.path.isfile(config_file):
         raise FileNotFoundError("Configuration file not found: " + config_file)
 
-    with open(config_file, "rb") as f:
+    _config_file = os.path.abspath(config_file)
+    _last_config_modify_time = os.stat(_config_file).st_mtime
+    return _config_file
+
+
+def read_config() -> dict:
+    """Reads the configuration file specified by the environment variable APP_CONFIG_FILE."""
+    global _config
+    if _config:
+        return _config
+
+    with open(get_config_file(), "rb") as f:
         _config = tomllib.load(f)
         return _config
 
@@ -82,6 +94,8 @@ def make_ssl_context(config) -> ssl.SSLContext | None:
 
 
 def make_app(name: str, config: dict) -> faust.App:
+    from . import log
+
     """Creates a Faust application with the specified configuration."""
     # [connection] section
     connection_config = config.get("connection", {})
@@ -96,14 +110,34 @@ def make_app(name: str, config: dict) -> faust.App:
     codecs.register("str", StringCodec())
     codecs.register("pydantic", PydanticCodec())
 
-    return faust.App(component_config.get("app_id", "domrad-" + name),
-                     broker=connection_config.get("brokers", "kafka://localhost:9092"),
-                     broker_credentials=ssl_context,
-                     debug=component_config.get("debug", False),
-                     key_serializer="pydantic",
-                     value_serializer="pydantic",
-                     web_enabled=False,
-                     **component_faust_config)
+    app = faust.App(component_config.get("app_id", "domrad-" + name),
+                    broker=connection_config.get("brokers", "kafka://localhost:9092"),
+                    broker_credentials=ssl_context,
+                    debug=component_config.get("debug", False),
+                    key_serializer="pydantic",
+                    value_serializer="pydantic",
+                    web_enabled=False,
+                    **component_faust_config)
+
+    log.inject_handler(log.get(name), app.logger, component_config)
+    return app
+
+
+def check_config_changes(component_id: str, app):
+    global _last_config_modify_time, _config
+    if _config.get(component_id, {}).get("watch_config", False):
+        return
+
+    from . import log
+
+    stamp = os.stat(_config_file).st_mtime
+    if stamp != _last_config_modify_time:
+        _logger.info("Configuration file changed, reloading")
+        _last_config_modify_time = stamp
+        _config: dict | None = None
+        read_config()
+        log.init(component_id, _config)
+        log.inject_handler(log.get(component_id), app.logger, _config.get(component_id, {}))
 
 
 def get_safe(data: dict, path: str) -> Any | None:
@@ -136,8 +170,8 @@ def ensure_model(model_class: Type[TModel], data: dict | None) -> TModel | None:
     try:
         return model_class.model_validate(data)
     except ValidationError as e:
-        _logger.k_warning("Invalid model", None,
-                          input_data=data, model=model_class.__name__, errors=e.errors())
+        _logger.warning("Invalid model",
+                        extra={"properties": {"input_data": data, "model": model_class.__name__, "errors": e.errors()}})
         return None
     except Exception as e:
         _logger.error("Error validating model", exc_info=e,

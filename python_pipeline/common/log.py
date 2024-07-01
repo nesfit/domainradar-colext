@@ -4,6 +4,9 @@ from pprint import pformat
 
 
 class _CustomLoggerT(logging.Logger):
+    k_stderr_handler: any
+    k_kafka_handler: any
+
     def trace(self, message, *args, **kwargs):
         pass
 
@@ -66,28 +69,60 @@ def init(component_id: str, config: dict) -> _CustomLoggerT:
         self.trace(message, *args, extra={"event_key": key or "no key", "properties": kwargs})
 
     component_config = config.get(component_id, {})
-    audit_log_level = component_config.get("audit_log_level")
 
-    logging.addLevelName(trace_const, 'TRACE')
-    setattr(logging, "TRACE", trace_const)
+    main_log_level = component_config.get("log_level", "INFO")
+    log_level_stderr = component_config.get("log_level_stderr", "INFO")
+    # log_level_kafka = component_config.get("log_level_kafka", "INFO")
+
+    if not hasattr(logging, "TRACE"):
+        logging.addLevelName(trace_const, 'TRACE')
+        setattr(logging, "TRACE", trace_const)
 
     logger_class = logging.getLoggerClass()
-    setattr(logger_class, "trace", trace)
-    setattr(logger_class, "k_trace", k_trace)
-    setattr(logger_class, "k_debug", k_debug)
-    setattr(logger_class, "k_info", k_info)
-    setattr(logger_class, "k_warning", k_warning)
-    setattr(logger_class, "k_unhandled_error", k_unhandled_error)
+    if not hasattr(logger_class, "k_unhandled_error"):
+        setattr(logger_class, "trace", trace)
+        setattr(logger_class, "k_trace", k_trace)
+        setattr(logger_class, "k_debug", k_debug)
+        setattr(logger_class, "k_info", k_info)
+        setattr(logger_class, "k_warning", k_warning)
+        setattr(logger_class, "k_unhandled_error", k_unhandled_error)
 
     logger = logging.getLogger(component_id)
-    logger.setLevel(audit_log_level or logging.INFO)
-    handler = logging.StreamHandler(sys.stderr)
-    handler.setLevel(trace_const)
-    formatter = ExtraFormatter()
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
+    logger.setLevel(main_log_level)
+
+    if hasattr(logger, "k_stderr_handler"):
+        logger.k_stderr_handler.setLevel(log_level_stderr)
+    else:
+        handler = logging.StreamHandler(sys.stderr)
+        handler.setLevel(trace_const)
+        formatter = ExtraFormatter()
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+        setattr(logger, "k_stderr_handler", handler)
+
+    # TODO: Kafka handler
+
     # noinspection PyTypeChecker
     return logger
+
+
+def inject_handler(configured_logger: _CustomLoggerT, faust_logger: logging.Logger,
+                   component_config: dict):
+    should_be_injected = component_config.get("include_faust_logs_in_kafka", False)
+    add = should_be_injected and not hasattr(faust_logger, "k_kafka_handler")
+    remove = not should_be_injected and hasattr(faust_logger, "k_kafka_handler")
+
+    if add:
+        if not hasattr(configured_logger, "k_kafka_handler"):
+            return
+        handler = configured_logger.k_kafka_handler
+        faust_logger.addHandler(handler)
+        setattr(faust_logger, "k_kafka_handler", handler)
+    elif remove:
+        # noinspection PyUnresolvedReferences
+        handler = faust_logger.k_kafka_handler
+        faust_logger.removeHandler(handler)
+        delattr(faust_logger, "k_kafka_handler")
 
 
 def get(component_id: str) -> _CustomLoggerT:
