@@ -38,10 +38,6 @@ def extract_one(file):
         pprint(df.head(n=2).to_dict(orient='records'))
         print()
 
-        if importlib.util.find_spec("fastparquet") is None and importlib.util.find_spec("pyarrow") is None:
-            print("The pyarrow library is not installed, the results won't be saved. Run `poetry install -E parquet`.")
-            return
-
         output_file = os.path.splitext(file)[0] + ".parquet"
         df.to_parquet(output_file)
         print("Saved as: " + output_file)
