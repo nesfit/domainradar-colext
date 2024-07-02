@@ -61,8 +61,6 @@ async def process_entries(stream):
     async for events_seq in stream.take_events(BATCH_SIZE, within=BATCH_TIMEOUT):  # type: Sequence[EventT]
         try:
             events_parsed = (parse_event(e) for e in events_seq)
-            # We'll send the output into the partition of the first event in the batch
-            partition = events_seq[0].message.partition
             # Reset the output buffer position
             buffer.seek(0)
             # Extract features
@@ -81,7 +79,7 @@ async def process_entries(stream):
                 # Get the result bytes
                 result_bytes = buffer.getbuffer()[0:buffer.tell()].tobytes()
                 # Send the result
-                await topic_processed.send(key=None, value=result_bytes, partition=partition)
+                await topic_processed.send(key=None, value=result_bytes)
 
             if len(errors) > 0:
                 for key, error in errors.items():
