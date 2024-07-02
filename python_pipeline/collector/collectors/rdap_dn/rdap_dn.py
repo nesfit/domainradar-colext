@@ -16,7 +16,7 @@ from collectors.limiter import LimiterProvider
 from collectors.util import fetch_entities, extract_known_tld, make_rdap_ssl_context, \
     handle_top_level_component_exception
 from common import read_config, make_app, log
-from common.models import RDAPRequest, RDAPDomainResult
+from common.models import RDAPDomainRequest, RDAPDomainResult
 from common.util import ensure_model
 
 COLLECTOR = "rdap-dn"
@@ -174,7 +174,7 @@ async def process_entries(stream):
     # dn is the domain name, req is the optional RDAPRequest object
     async for dn, req in stream.items():
         logger.k_trace("Processing RDAP", dn)
-        req = ensure_model(RDAPRequest, req)
+        req = ensure_model(RDAPDomainRequest, req)
 
         try:
             await process_entry(dn, req, rdap_client, whois_client)

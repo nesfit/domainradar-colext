@@ -18,7 +18,7 @@ class CustomBaseModel(BaseModel):
 # ---- Plain models ---- #
 
 class IPToProcess(CustomBaseModel):
-    domain_name: str = Field(serialization_alias="domainName")
+    domain_name: str = Field(serialization_alias="dn", validation_alias="dn")
     ip: str
 
     def __str__(self):
@@ -35,7 +35,7 @@ class RTTData(CustomBaseModel):
 
 
 class SOARecord(CustomBaseModel):
-    primary_ns: str = Field(serialization_alias="primaryNs")
+    primary_ns: str = Field(serialization_alias="primaryNS")
     resp_mailbox_dname: str = Field(serialization_alias="respMailboxDname")
     serial: str
     refresh: int
@@ -49,32 +49,31 @@ class ZoneInfo(CustomBaseModel):
     zone: str
     soa: SOARecord
     public_suffix: str = Field(serialization_alias="publicSuffix")
-    registry_suffix: str = Field(serialization_alias="registrySuffix")
     has_dnskey: Optional[bool] = Field(None, serialization_alias="hasDNSKEY")
-    primary_nameserver_ips: Optional[set[str]] = Field(None, serialization_alias="primaryNameserverIps")
-    secondary_nameservers: Optional[set[str]] = Field(None, serialization_alias="secondaryNameservers")
-    secondary_nameserver_ips: Optional[set[str]] = Field(None, serialization_alias="secondaryNameserverIps")
+    primary_nameserver_ips: set[str] = Field(serialization_alias="primaryNameserverIPs")
+    secondary_nameservers: set[str] = Field(serialization_alias="secondaryNameservers")
+    secondary_nameserver_ips: set[str] = Field(serialization_alias="secondaryNameserverIPs")
 
 
 class IPFromRecord(CustomBaseModel):
     ip: str
-    type: str
+    rrType: str
 
 
 class CNAMERecord(CustomBaseModel):
     value: str
-    related_ips: Optional[set[str]] = Field(None, serialization_alias="relatedIps")
+    related_ips: Optional[set[str]] = Field(None, serialization_alias="relatedIPs")
 
 
 class MXRecord(CustomBaseModel):
     value: str
     priority: int
-    related_ips: Optional[set[str]] = Field(None, serialization_alias="relatedIps")
+    related_ips: Optional[set[str]] = Field(None, serialization_alias="relatedIPs")
 
 
 class NSRecord(CustomBaseModel):
     nameserver: str
-    related_ips: Optional[set[str]] = Field(None, serialization_alias="relatedIps")
+    related_ips: Optional[set[str]] = Field(None, serialization_alias="relatedIPs")
 
 
 class DNSData(CustomBaseModel):
@@ -105,7 +104,7 @@ class DNSRequest(CustomBaseModel):
                                                                serialization_alias="typesToProcessIPsFrom")
 
 
-class RDAPRequest(CustomBaseModel):
+class RDAPDomainRequest(CustomBaseModel):
     zone: Optional[str] = None
 
 

@@ -10,12 +10,15 @@ import java.time.Instant;
 public record RDAPDomainResult(int statusCode,
                                @Nullable String error,
                                @NotNull Instant lastAttempt,
+                               @NotNull String rdapTarget,
                                @Nullable JsonNode rdapData,
                                @Nullable JsonNode entities,
-                               boolean forSourceName,
                                int whoisStatusCode,
                                @Nullable String whoisError,
-                               @Nullable String whoisRaw,
+                               // The spec defines whoisRaw as str | list[str]
+                               // Unless the Java components actively work with this type, let's just keep
+                               // it as a JsonNode
+                               @Nullable JsonNode whoisRaw,
                                @Nullable JsonNode whoisParsed
 ) implements Result {
 }

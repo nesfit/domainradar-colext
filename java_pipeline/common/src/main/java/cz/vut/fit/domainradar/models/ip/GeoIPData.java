@@ -16,5 +16,6 @@ public record GeoIPData(@Nullable String continentCode,
                         @Nullable Long asn,
                         @Nullable String asnOrg,
                         @Nullable String networkAddress,
-                        @Nullable Integer prefixLength) {
+                        // Does not have to be long but the spec requires all integers to be 64bit
+                        @Nullable Long prefixLength) {
 }

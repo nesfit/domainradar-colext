@@ -9,10 +9,9 @@ public record ZoneInfo(
         @NotNull String zone,
         @NotNull DNSData.SOARecord soa,
         @NotNull String publicSuffix,
-        @NotNull String registrySuffix,
         @Nullable Boolean hasDNSKEY,
-        @Nullable Set<String> primaryNameserverIps,
-        @Nullable Set<String> secondaryNameservers,
-        @Nullable Set<String> secondaryNameserverIps
+        @NotNull Set<String> primaryNameserverIPs,
+        @NotNull Set<String> secondaryNameservers,
+        @NotNull Set<String> secondaryNameserverIPs
 ) {
 }

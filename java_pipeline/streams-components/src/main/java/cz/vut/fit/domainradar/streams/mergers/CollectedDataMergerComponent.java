@@ -50,7 +50,7 @@ public class CollectedDataMergerComponent implements PipelineComponent {
         final var rdapDnSerde = JsonSerde.of(_jsonMapper, RDAPDomainResult.class);
         final var zoneResultSerde = JsonSerde.of(_jsonMapper, ZoneResult.class);
         final var tlsResultSerde = JsonSerde.of(_jsonMapper, TLSResult.class);
-        final var finalResultSerde = JsonSerde.of(_jsonMapper, FinalResult.class);
+        final var finalResultSerde = JsonSerde.of(_jsonMapper, AllCollectedData.class);
 
         // These two sub-topologies combine the results from the IP collectors per a domain name.
 
@@ -86,7 +86,7 @@ public class CollectedDataMergerComponent implements PipelineComponent {
                 // The stream now contains several (DN;IP) -> Map entries. Group them by the DN.
                 // The result is a grouped stream of DN -> (grouping of) IPDataPair(IP, Map)
                 .groupBy((dnIpPair, ipDataMap) ->
-                                KeyValue.pair(dnIpPair.domainName(), new IPDataPair(dnIpPair.ip(), ipDataMap)),
+                                KeyValue.pair(dnIpPair.dn(), new IPDataPair(dnIpPair.ip(), ipDataMap)),
                         Grouped.with(Serdes.String(), ipDataPairSerde))
                 // Aggregate the group to create a single entry for each DN
                 // The resulting entry (aggregate type) is a Map<IP address, Map<Collector, Data>>
@@ -111,7 +111,7 @@ public class CollectedDataMergerComponent implements PipelineComponent {
                 Consumed.with(Serdes.String(), dnsResultSerde),
                 Materialized.with(Serdes.String(), dnsResultSerde));
         var mergedDnsIpTable = processedDnsTable
-                .leftJoin(allIPDataForDomain, (dnsResult, ipDataMap) -> new FinalResult(null,
+                .leftJoin(allIPDataForDomain, (dnsResult, ipDataMap) -> new AllCollectedData(null,
                                 dnsResult, null, null, ipDataMap),
                         namedOp("join_aggregated_IP_data_with_DNS_data"),
                         Materialized.with(Serdes.String(), finalResultSerde))
@@ -133,16 +133,16 @@ public class CollectedDataMergerComponent implements PipelineComponent {
         // We require results from all collectors in order to output a data object to the final result.
         // The exception is the TLS collector in case there are no IP addresses in the DNS data.
         var finalResultTable = mergedDnsIpTable
-                .leftJoin(tlsTable, (intermRes, tls) -> new FinalResult(intermRes.zone(), intermRes.dnsResult(),
+                .leftJoin(tlsTable, (intermRes, tls) -> new AllCollectedData(intermRes.zone(), intermRes.dnsResult(),
                                 tls, null, intermRes.ipResults()),
                         namedOp("join_TLS"),
                         Materialized.with(Serdes.String(), finalResultSerde))
                 .filter((dn, result) -> hasTlsIfRequired(result))
-                .join(zoneTable, (intermRes, zone) -> new FinalResult(zone.zone(), intermRes.dnsResult(),
+                .join(zoneTable, (intermRes, zone) -> new AllCollectedData(zone.zone(), intermRes.dnsResult(),
                                 null, null, intermRes.ipResults()),
                         namedOp("join_ZONE"),
                         Materialized.with(Serdes.String(), finalResultSerde))
-                .join(rdapDnTable, (intermRes, rdap) -> new FinalResult(intermRes.zone(), intermRes.dnsResult(),
+                .join(rdapDnTable, (intermRes, rdap) -> new AllCollectedData(intermRes.zone(), intermRes.dnsResult(),
                                 intermRes.tlsResult(), rdap, intermRes.ipResults()),
                         namedOp("join_RDAP_DN"),
                         Materialized.with(Serdes.String(), finalResultSerde));
@@ -153,7 +153,7 @@ public class CollectedDataMergerComponent implements PipelineComponent {
                         Produced.with(Serdes.String(), finalResultSerde));
     }
 
-    public static boolean hasEnoughIpCollectorResults(FinalResult result) {
+    public static boolean hasEnoughIpCollectorResults(AllCollectedData result) {
         // Currently, the used decision boundary is simply whether we have at least one
         // collection result for each IP address passed for processing.
         if (result.dnsResult() == null)
@@ -179,7 +179,7 @@ public class CollectedDataMergerComponent implements PipelineComponent {
         return true;
     }
 
-    public static boolean hasTlsIfRequired(FinalResult result) {
+    public static boolean hasTlsIfRequired(AllCollectedData result) {
         if (result.tlsResult() != null)
             // TLS present, no need to check further
             return true;
@@ -199,7 +199,7 @@ public class CollectedDataMergerComponent implements PipelineComponent {
 
         // If no IP data is present, TLS is not required
         return (a == null || a.isEmpty()) && (aaaa == null || aaaa.isEmpty())
-                && (cname == null || cname.relatedIps() == null || cname.relatedIps().isEmpty());
+                && (cname == null || cname.relatedIPs() == null || cname.relatedIPs().isEmpty());
     }
 
     @Override

@@ -9,5 +9,6 @@ import java.time.Instant;
 public record ZoneResult(int statusCode,
                          @Nullable String error,
                          @NotNull Instant lastAttempt,
-                         @Nullable ZoneInfo zone) implements Result {
+                         @Nullable ZoneInfo zone
+) implements Result {
 }

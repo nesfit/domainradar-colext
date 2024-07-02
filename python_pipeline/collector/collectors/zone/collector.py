@@ -105,8 +105,7 @@ class ZoneCollector:
 
         return ZoneInfo(soa=soa_record, zone=zone, primary_nameserver_ips=primary_ns_ips,
                         secondary_nameservers=nameservers, secondary_nameserver_ips=nameserver_ips,
-                        public_suffix=name_parts.suffix, registry_suffix=name_parts.suffix,
-                        has_dnskey=has_dnskey)
+                        public_suffix=name_parts.suffix, has_dnskey=has_dnskey)
 
     async def _has_dnskey(self, domain_name: str) -> bool | None:
         try:

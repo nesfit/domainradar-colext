@@ -6,11 +6,11 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.Map;
 
-public record FinalResult(
+public record AllCollectedData(
         ZoneInfo zone,
         DNSResult dnsResult,
-        TLSResult tlsResult,
-        RDAPDomainResult rdapDomainResult,
+        @Nullable TLSResult tlsResult,
+        @Nullable RDAPDomainResult rdapDomainResult,
         @Nullable Map<String, Map<String, CommonIPResult<JsonNode>>> ipResults
 ) {
 }

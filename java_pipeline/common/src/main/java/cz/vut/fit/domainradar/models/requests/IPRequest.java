@@ -4,7 +4,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 
-public record IPProcessRequest(
+public record IPRequest(
         @Nullable
         List<String> collectors
 ) {

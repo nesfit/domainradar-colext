@@ -32,7 +32,7 @@ public class IPToProcessConverter implements Converter {
         try {
             var ipToProcess = _objectMapper.readValue(value, IPToProcess.class);
             var resultStruct = new Struct(SCHEMA.schema());
-            resultStruct.put("domain_name", ipToProcess.domainName());
+            resultStruct.put("domain_name", ipToProcess.dn());
             resultStruct.put("ip", ipToProcess.ip());
             return new SchemaAndValue(SCHEMA.schema(), resultStruct);
         } catch (IOException e) {

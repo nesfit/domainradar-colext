@@ -4,7 +4,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 
-public record TLSData(@NotNull String fromIp,
+public record TLSData(@NotNull String fromIP,
                       @NotNull String protocol,
                       @NotNull String cipher,
                       @NotNull List<Certificate> certificates) {

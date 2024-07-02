@@ -6,7 +6,7 @@ from collectors.options import DNSCollectorOptions
 from collectors.util import handle_top_level_component_exception
 from collectors.zone.collector import ZoneCollector
 from common import read_config, make_app, log
-from common.models import RDAPRequest, RDAPDomainResult, ZoneRequest, ZoneResult, DNSRequest
+from common.models import RDAPDomainRequest, RDAPDomainResult, ZoneRequest, ZoneResult, DNSRequest
 from common.util import ensure_model
 
 COLLECTOR = "zone"
@@ -74,7 +74,7 @@ async def process_entries(stream):
                     await topic_dns_requests.send(key=dn, value=dns_req)
 
                 if not req or req.collect_RDAP:
-                    rdap_req = RDAPRequest(zone=result.zone.zone)
+                    rdap_req = RDAPDomainRequest(zone=result.zone.zone)
                     await topic_rdap_requests.send(key=dn, value=rdap_req)
 
         except Exception as e:
