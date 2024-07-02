@@ -14,7 +14,7 @@ from common import read_config, make_app, log
 from common.models import IPToProcess, IPProcessRequest, RDAPIPResult
 from common.util import ensure_model
 
-COLLECTOR = "rdap_ip"
+COLLECTOR = "rdap-ip"
 logger = log.get(COLLECTOR)
 
 # Read the config

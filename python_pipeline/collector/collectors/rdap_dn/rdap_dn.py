@@ -19,7 +19,7 @@ from common import read_config, make_app, log
 from common.models import RDAPRequest, RDAPDomainResult
 from common.util import ensure_model
 
-COLLECTOR = "rdap_dn"
+COLLECTOR = "rdap-dn"
 logger = log.get(COLLECTOR)
 
 # Read the config

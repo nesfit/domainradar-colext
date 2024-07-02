@@ -16,7 +16,7 @@ check_hostname = true
 # See https://faust-streaming.github.io/faust/userguide/settings.html#guide-settings
 producer_compression_type = "zstd"
 
-[rdap_dn]
+[rdap-dn]
 # -- Available in all components -- #
 # Faust app ID
 app_id = "domrad-rdap-dn"
@@ -47,7 +47,7 @@ limiter = { immediate = false, max_wait = 10, type = "limiter", rate = 5, max_bu
 # limiter = { immediate = false, max_wait = -1, type = "strict", rate = 2 }
 # limiter = { immediate = false, max_wait = -1, type = "leaky_bucket_meter", rate = 2, capacity = 5 }
 
-[rdap_dn.limiter_overrides]
+[rdap-dn.limiter_overrides]
 # Example of overriding the limiter settings for a specific RDAP or WHOIS endpoint.
 # Note that the values of "immediate", "max_wait" and "type" will be re-used from the base setting if not specified
 # but the limiter-specific keys must always be present!
@@ -58,14 +58,14 @@ limiter = { immediate = false, max_wait = 10, type = "limiter", rate = 5, max_bu
 "cz" = { max_wait = 10, type = "limiter", rate = 10, max_burst = 10 }
 "whois.iana.org" = { max_wait = 5, type = "limiter", rate = 10, max_burst = 5 }
 
-[rdap_ip]
+[rdap-ip]
 app_id = "domrad-rdap-ip"
 # RDAP request timeout (seconds)
 http_timeout = 5
-# Same as in rdap_dn.
+# Same as in rdap-dn.
 limiter = { immediate = false, max_wait = 10, type = "limiter", rate = 5, max_burst = 5 }
 
-[rdap_ip.limiter_overrides]
+[rdap-ip.limiter_overrides]
 # Here, the keys must only contain the full URL of the RDAP endpoint.
 # See https://data.iana.org/rdap/ipv4.json and https://data.iana.org/rdap/ipv6.json.
 "https://rdap.lacnic.net/rdap/" = [5, 60]
