@@ -33,7 +33,7 @@ public class StandaloneCollectorRunner {
         var toRun = initCollectors(cmd, jsonMapper, properties);
 
         if (toRun.isEmpty()) {
-            System.err.println("No collectors selected");
+            Logger.error("No collectors selected");
             printHelpAndExit(options, 1);
             return;
         }
@@ -129,21 +129,20 @@ public class StandaloneCollectorRunner {
 
         options.addOption(Option.builder("id")
                 .longOpt("app-id")
-                .desc("Application ID (required)")
+                .desc("Consumer group ID prefix (required)")
                 .argName("id")
                 .hasArg()
                 .required()
                 .build());
         options.addOption(Option.builder("s")
-                .longOpt("bootstrap-servers")
-                .desc("Kafka bootstrap server IP:port, separated by commas (required)")
+                .longOpt("bootstrap-server")
+                .desc("Kafka bootstrap server(s) IP:port, separated by commas")
                 .argName("ip:port")
                 .hasArg()
-                .required()
                 .build());
         options.addOption(Option.builder("p")
                 .longOpt("properties")
-                .desc("Path to a file with additional properties")
+                .desc("Path to a configuration file")
                 .argName("path")
                 .hasArg()
                 .build());
@@ -160,20 +159,30 @@ public class StandaloneCollectorRunner {
             try (var inStream = new FileInputStream(path)) {
                 props.load(inStream);
             } catch (IOException e) {
-                System.err.println("Failed to load properties: " + e.getMessage());
+                Logger.error("Failed to load properties: {}", e.getMessage());
                 System.exit(2);
                 return null;
             }
         }
 
-        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, cmd.getOptionValue("bootstrap-servers"));
+        final var cmdLineBootstrapServers = cmd.getOptionValue("bootstrap-server");
+        if (cmdLineBootstrapServers != null) {
+            props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, cmdLineBootstrapServers);
+        }
+
+        if (!props.containsKey(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG)) {
+            Logger.error("Bootstrap servers not set. Use the {} property key or the -s option.",
+                    ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG);
+            System.exit(3);
+            return null;
+        }
         return props;
     }
 
     private static void printHelpAndExit(Options options, int exitCode) {
         final var formatter = new HelpFormatter();
         formatter.printHelp(119,
-                "domrad-collector -id <App ID> -s <Kafka bootstrap ip:port> [options]",
+                "domrad-collector -id <consumer group prefix> [options]",
                 "", options, "");
         System.exit(exitCode);
     }

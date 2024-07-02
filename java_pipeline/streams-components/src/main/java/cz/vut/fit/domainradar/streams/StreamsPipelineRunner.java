@@ -58,14 +58,25 @@ public class StreamsPipelineRunner {
             try (var inStream = new FileInputStream(path)) {
                 props.load(inStream);
             } catch (IOException e) {
-                System.err.println("Failed to load properties: " + e.getMessage());
+                Logger.error("Failed to load properties: {}", e.getMessage());
                 System.exit(2);
                 return;
             }
         }
 
+        final var cmdLineBootstrapServers = cmd.getOptionValue("bootstrap-server");
+        if (cmdLineBootstrapServers != null) {
+            props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, cmdLineBootstrapServers);
+        }
+
+        if (!props.containsKey(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG)) {
+            Logger.error("Bootstrap servers not set. Use the {} property key or the -s option.",
+                    StreamsConfig.BOOTSTRAP_SERVERS_CONFIG);
+            System.exit(3);
+            return;
+        }
+
         props.put(StreamsConfig.APPLICATION_ID_CONFIG, cmd.getOptionValue("id"));
-        props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, cmd.getOptionValue("bootstrap-server"));
         props.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.StringSerde.class);
         props.put(StreamsConfig.DEFAULT_DESERIALIZATION_EXCEPTION_HANDLER_CLASS_CONFIG,
                 "org.apache.kafka.streams.errors.LogAndContinueExceptionHandler");
@@ -133,7 +144,7 @@ public class StreamsPipelineRunner {
     private static void printHelpAndExit(Options options, int exitCode) {
         final var formatter = new HelpFormatter();
         formatter.printHelp(119,
-                "domainradar-pipeline -id <Streams app ID> -s <Kafka bootstrap ip:port> [options]",
+                "domainradar-pipeline -id <Streams app ID> [options]",
                 "", options, "");
         System.exit(exitCode);
     }
@@ -165,7 +176,7 @@ public class StreamsPipelineRunner {
         options.addOption(Option.builder("properties")
                 .longOpt("properties")
                 .option("p")
-                .desc("Path to a file with additional properties")
+                .desc("Path to a configuration file")
                 .argName("path")
                 .hasArg()
                 .build());
@@ -179,10 +190,9 @@ public class StreamsPipelineRunner {
         );
         options.addOption(Option.builder("s")
                 .longOpt("bootstrap-server")
-                .desc("Kafka bootstrap server IP:port (required)")
+                .desc("Kafka bootstrap server IP:port")
                 .argName("ip:port")
                 .hasArg()
-                .required()
                 .build()
         );
 
