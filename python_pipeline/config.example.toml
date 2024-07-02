@@ -116,6 +116,15 @@ batch_size = 100
 # In other words, the extractor will always process its current buffer
 # `batch_timeout` seconds after the last processed one, even if it's not full.
 batch_timeout = 5
+# When set to > 1, the extraction process will be executing in a real thread from a thread pool
+# with the specified number of threads. In normal world, this would help in parallelizing the extraction, but here,
+# Python's GIL prevents this from happening, so this setting could only benefit from pandas running
+# its computations in native code. However, the current transformations are dumb and mostly performed using .apply()
+# which is executed under the GIL, so this setting should be probably be left at 1.
+computation_threads = 1
+# This property controls the applied transformations. The order is irelevant, it is set by the code.
+# You probably don't want to change this. Leave the property out to use all available transformations.
+enabled_transformations = ["dns", "ip", "geo", "tls", "lexical", "rdap_dn", "rdap_ip", "drop"]
 
 [classifier-unit]
 app_id = "domrad-classifier-unit"

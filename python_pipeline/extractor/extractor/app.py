@@ -2,6 +2,7 @@
 __author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
 
 import io
+from concurrent.futures import ThreadPoolExecutor
 from json import loads, JSONDecodeError
 from typing import Sequence
 
@@ -21,6 +22,7 @@ component_config = config.get(EXTRACTOR, {})
 CONCURRENCY = component_config.get("concurrency", 4)
 BATCH_SIZE = component_config.get("batch_size", 50)
 BATCH_TIMEOUT = component_config.get("batch_timeout", 5)
+COMPUTATION_THREADS = component_config.get("computation_threads", 1)
 
 # Init the list of transformations
 extractor.init_transformations(component_config)
@@ -39,6 +41,8 @@ topic_processed = extractor_app.topic('feature_vectors', key_type=None,
 
 @extractor_app.agent(topic_to_process, concurrency=CONCURRENCY)
 async def process_entries(stream):
+    executor = ThreadPoolExecutor(COMPUTATION_THREADS) if COMPUTATION_THREADS > 1 else None
+
     def parse_event(event: faust.events.EventT):
         msg_key = event.key  # type: str
         value_bytes = event.value  # type: bytes
@@ -62,7 +66,14 @@ async def process_entries(stream):
             # Reset the output buffer position
             buffer.seek(0)
             # Extract features
-            df, errors = extractor.extract_features(events_parsed)
+            if COMPUTATION_THREADS > 1:
+                # We can run the pandas code in a separate thread, although currently, the code does not really release
+                # the GIL, so it's likely not going to make any difference
+                df, errors = await extractor_app.loop.run_in_executor(
+                    executor, extractor.extract_features, events_parsed)
+            else:
+                df, errors = extractor.extract_features(events_parsed)
+
             if df is not None:
                 # Serialize the dataframe into a memory buffer
                 # noinspection PyTypeChecker
