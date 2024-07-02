@@ -12,12 +12,12 @@ public class JsonSerde<T> implements Serde<T> {
 
     public JsonSerde(ObjectMapper objectMapper, TypeReference<T> typeRef) {
         _serializer = new JsonSerializer<>(objectMapper);
-        _deserializer = new JsonDeserializerTypedByTypeReference<>(objectMapper, typeRef);
+        _deserializer = new JsonDeserializer<>(objectMapper, typeRef);
     }
 
     public JsonSerde(ObjectMapper objectMapper, Class<T> cls) {
         _serializer = new JsonSerializer<>(objectMapper);
-        _deserializer = new JsonDeserializerTypedByClass<>(objectMapper, cls);
+        _deserializer = new JsonDeserializer<>(objectMapper, cls);
     }
 
     public static <T> JsonSerde<T> of(ObjectMapper objectMapper, TypeReference<T> typeRef) {

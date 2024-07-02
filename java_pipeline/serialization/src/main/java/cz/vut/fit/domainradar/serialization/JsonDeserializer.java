@@ -1,6 +1,7 @@
 package cz.vut.fit.domainradar.serialization;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.kafka.common.errors.SerializationException;
 import org.apache.kafka.common.header.Headers;
@@ -9,13 +10,18 @@ import org.apache.kafka.common.utils.ByteBufferInputStream;
 
 import java.nio.ByteBuffer;
 
-public class JsonDeserializerTypedByTypeReference<T> implements Deserializer<T> {
+public class JsonDeserializer<T> implements Deserializer<T> {
     private final ObjectMapper _objectMapper;
-    private final TypeReference<T> _typeRef;
+    private final JavaType _forType;
 
-    public JsonDeserializerTypedByTypeReference(ObjectMapper objectMapper, TypeReference<T> forType) {
+    public JsonDeserializer(ObjectMapper objectMapper, Class<T> forType) {
         _objectMapper = objectMapper;
-        _typeRef = forType;
+        _forType = objectMapper.constructType(forType);
+    }
+
+    public JsonDeserializer(ObjectMapper objectMapper, TypeReference<T> forType) {
+        _objectMapper = objectMapper;
+        _forType = objectMapper.constructType(forType);
     }
 
     @Override
@@ -24,7 +30,7 @@ public class JsonDeserializerTypedByTypeReference<T> implements Deserializer<T> 
             return null;
 
         try {
-            return _objectMapper.readValue(bytes, _typeRef);
+            return _objectMapper.readValue(bytes, _forType);
         } catch (Exception e) {
             throw new SerializationException(e);
         }
@@ -36,7 +42,7 @@ public class JsonDeserializerTypedByTypeReference<T> implements Deserializer<T> 
             return null;
 
         try (var is = new ByteBufferInputStream(data)) {
-            return _objectMapper.readValue(is, _typeRef);
+            return _objectMapper.readValue(is, _forType);
         } catch (Exception e) {
             throw new SerializationException(e);
         }
