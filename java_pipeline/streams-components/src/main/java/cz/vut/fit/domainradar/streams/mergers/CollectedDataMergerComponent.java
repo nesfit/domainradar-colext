@@ -70,9 +70,11 @@ public class CollectedDataMergerComponent implements PipelineComponent {
                 .aggregate(ConcurrentHashMap::new, (dnIpPair, partialData, aggregate) -> {
                             var existingRecord = aggregate.get(partialData.collector());
                             if (existingRecord != null) {
+                                final var oldNOK = existingRecord.statusCode() != ResultCodes.OK;
+                                final var newOK = partialData.statusCode() == ResultCodes.OK;
+                                final var newNewer = existingRecord.lastAttempt().isBefore(partialData.lastAttempt());
                                 // Store the latest successful result.
-                                if (partialData.statusCode() == ResultCodes.OK
-                                        && (existingRecord.lastAttempt().isBefore(partialData.lastAttempt()))) {
+                                if ((oldNOK && newNewer) || (oldNOK && newOK) || (newOK && newNewer)) {
                                     aggregate.put(partialData.collector(), partialData);
                                 }
                             } else {
