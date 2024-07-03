@@ -50,24 +50,32 @@ async def fetch_rdap(domain_name, client: DNSClient) \
     limiter_result = await limiter.acquire()
 
     if limiter_result == limiter.IMMEDIATE_FAIL:
+        logger.k_debug("Local limiter immediate fail: %s", domain_name, rdap_base)
         return None, None, rc.LOCAL_RATE_LIMIT, f"No capacity left in the limiter for {rdap_base}"
     elif limiter_result == limiter.TIMEOUT:
+        logger.k_debug("Local limiter timeout: %s", domain_name, rdap_base)
         return None, None, rc.LRL_TIMEOUT, f"Could not enter the limiter in {limiter.max_time} s for {rdap_base}"
 
     try:
+        logger.k_trace("Fetching RDAP: %s", domain_name, rdap_base)
         rdap_data = await client.aio_lookup(domain, tld)
         entities = await fetch_entities(rdap_data, client)
         return rdap_data, entities, 0, None
     except MalformedQueryError as e:
+        logger.k_warning("Malformed query", domain_name, e=e)
         return None, None, rc.INTERNAL_ERROR, str(e)
     except NotFoundError:
+        logger.k_debug("Not found", domain_name)
         return None, None, rc.NOT_FOUND, None
     except RateLimitError as e:
         limiter.fill_on_next()
+        logger.k_debug("Remote rate limited: %s: %s", domain_name, rdap_base, str(e))
         return None, None, rc.RATE_LIMITED, str(e)
     except WhodapError as e:
+        logger.k_warning("General whodap error", domain_name, e=e)
         return None, None, rc.CANNOT_FETCH, str(e)
     except Exception as e:
+        logger.k_warning("Unhandled exception", domain_name, e=e)
         return None, None, rc.INTERNAL_ERROR, str(e)
 
 
@@ -78,11 +86,14 @@ async def fetch_whois(domain_name, client: DomainClient) -> tuple[str | None, di
     endpoint = DomainQuery._get_server_name(suffix) or DomainQuery.iana_server
 
     limiter = limiter_provider.get_limiter(endpoint, suffix)
+    logger.k_trace("Acquiring limiter", domain_name)
     limiter_result = await limiter.acquire()
 
     if limiter_result == limiter.IMMEDIATE_FAIL:
+        logger.k_debug("Local limiter immediate fail: %s", domain_name, endpoint)
         return None, None, rc.LOCAL_RATE_LIMIT, f"No capacity left in the limiter for {endpoint}"
     elif limiter_result == limiter.TIMEOUT:
+        logger.k_debug("Local limiter timeout: %s", domain_name, endpoint)
         return None, None, rc.LRL_TIMEOUT, f"Could not enter the limiter in {limiter.max_time} s for {endpoint}"
 
     try:
@@ -94,13 +105,18 @@ async def fetch_whois(domain_name, client: DomainClient) -> tuple[str | None, di
 
         return whois_raw, whois_parsed, 0, None
     except NotFoundError as e:
+        logger.k_debug("WHOIS not found", domain_name)
         return None, None, rc.NOT_FOUND, str(e)
     except WhoIsError as e:
         msg = str(e).lower()
         if "rate" in msg or "limit" in msg:
+            logger.k_info("WHOIS remote rate limited: %s: %s", domain_name, endpoint, msg)
             return None, None, rc.RATE_LIMITED, str(e)
         elif "domain not found" in msg:
+            logger.k_debug("WHOIS not found", domain_name)
             return None, None, rc.NOT_FOUND, str(e)
+
+        logger.k_debug("WHOIS other error: %s: %s", domain_name, endpoint, msg)
         return None, None, rc.CANNOT_FETCH, str(e)
 
 
@@ -137,10 +153,11 @@ async def process_entry(dn, req, rdap_client, whois_client):
 
     if rdap_data is None:
         # Only try WHOIS if no RDAP data is available at any level of the source DN
-        logger.k_trace("Trying WHOIS for %s", dn, zone or dn)
+        logger.k_debug("No RDAP, trying WHOIS for %s", dn, zone or dn)
         (whois_raw, whois_parsed,
          whois_err_code, whois_err_msg) = await fetch_whois(zone or dn, whois_client)
     else:
+        logger.k_trace("Got RDAP data for %s", dn, rdap_target)
         # Convert the SimpleNamespace objects to JSON-serializable dictionaries
         rdap_data = rdap_data.to_dict()
         entities = [e.to_dict() for e in entities]

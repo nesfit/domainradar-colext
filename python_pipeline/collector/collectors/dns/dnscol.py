@@ -75,7 +75,7 @@ async def process_entries(stream):
             req = ensure_model(DNSRequest, req)
 
             result = await collector.scan_dns(dn, req)
-            logger.k_debug("DNS done", dn)
+            logger.k_trace("DNS done", dn)
 
             await topic_processed_dns.send(key=dn, value=result)
 

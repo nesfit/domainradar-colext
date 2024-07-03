@@ -60,7 +60,7 @@ async def process_entries(stream):
                     logger.k_debug("Zone not found", dn)
                     result = ZoneResult(status_code=rc.NOT_FOUND, error="Zone not found", zone=None)
                 else:
-                    logger.k_debug("Zone found: %s", dn, zone_info.zone)
+                    logger.k_trace("Zone found: %s", dn, zone_info.zone)
                     result = ZoneResult(status_code=0, zone=zone_info)
 
             await topic_processed_zone.send(key=dn, value=result)

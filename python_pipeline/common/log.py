@@ -1,6 +1,6 @@
+import datetime
 import logging
 import sys
-import datetime
 from pprint import pformat
 from typing import cast
 
@@ -21,7 +21,7 @@ class _CustomLoggerT(logging.Logger):
     def k_info(self, message: str, key: str | None, *args, **kwargs):
         pass
 
-    def k_warning(self, message: str, key: str | None, *args, **kwargs):
+    def k_warning(self, message: str, key: str | None, *args, e: Exception = None, **kwargs):
         pass
 
     def k_unhandled_error(self, e: Exception, key: str | None, **kwargs):
@@ -60,8 +60,9 @@ def init(component_id: str, config: dict) -> _CustomLoggerT:
     def k_info(self, message: str, key: str | None = None, *args, **kwargs):
         self.info(message, *args, extra={"event_key": key or NO_KEY_STR, "properties": kwargs})
 
-    def k_warning(self, message: str, key: str | None = None, *args, **kwargs):
-        self.warning(message, *args, extra={"event_key": key or NO_KEY_STR, "properties": kwargs})
+    def k_warning(self, message: str, key: str | None = None, *args, e: Exception = None, **kwargs):
+        self.warning(message, *args, exc_info=e,
+                     extra={"event_key": key or NO_KEY_STR, "properties": kwargs})
 
     def k_unhandled_error(self, e: Exception, key: str | None = None, **kwargs):
         self.error("Unexpected error!", exc_info=e, stack_info=True,
