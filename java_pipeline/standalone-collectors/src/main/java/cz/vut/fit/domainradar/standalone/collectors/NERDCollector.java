@@ -3,6 +3,7 @@ package cz.vut.fit.domainradar.standalone.collectors;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.net.InetAddresses;
 import cz.vut.fit.domainradar.CollectorConfig;
+import cz.vut.fit.domainradar.Common;
 import cz.vut.fit.domainradar.Topics;
 import cz.vut.fit.domainradar.models.IPToProcess;
 import cz.vut.fit.domainradar.models.ResultCodes;
@@ -13,7 +14,6 @@ import org.apache.commons.cli.CommandLine;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.jetbrains.annotations.NotNull;
-import org.slf4j.LoggerFactory;
 import pl.tlinkowski.unij.api.UniLists;
 
 import java.io.IOException;
@@ -33,9 +33,10 @@ import java.util.concurrent.*;
 import java.util.stream.Collectors;
 
 public class NERDCollector extends IPStandaloneCollector<NERDData> {
-    private static final org.slf4j.Logger Logger = LoggerFactory.getLogger(NERDCollector.class);
-
     public static final String NAME = "nerd";
+    public static final String COMPONENT_NAME = "collector-" + NAME;
+    private static final org.slf4j.Logger Logger = Common.getComponentLogger(NERDCollector.class);
+
     private static final String NERD_BASE = "https://nerd.cesnet.cz/nerd/api/v1/";
 
     private final ExecutorService _executor;
@@ -93,9 +94,11 @@ public class NERDCollector extends IPStandaloneCollector<NERDData> {
                 processFuture.join();
             } catch (CompletionException e) {
                 if (e.getCause() instanceof TimeoutException) {
+                    Logger.debug("Operation timed out (batch {})", batch);
                     sendAboutAll(entries, errorResult(ResultCodes.TIMEOUT,
                             "Operation timed out (%d ms)".formatted(processingTimeout)));
                 } else {
+                    Logger.warn("Unexpected error (batch {})", batch, e);
                     sendAboutAll(entries, errorResult(ResultCodes.INTERNAL_ERROR, e.getMessage()));
                 }
             }
@@ -115,8 +118,10 @@ public class NERDCollector extends IPStandaloneCollector<NERDData> {
 
         for (var invalidIp : allIps.get(false)) {
             if (invalidIp instanceof Inet6Address) {
+                Logger.trace("Discarding IPv6 address: {}", invalidIp.getHostAddress());
                 sendAboutAll(entries, errorResult(ResultCodes.UNSUPPORTED_ADDRESS, null));
             } else {
+                Logger.trace("Invalid IP address: {}", invalidIp.getHostAddress());
                 sendAboutAll(entries, errorResult(ResultCodes.INVALID_ADDRESS, null));
             }
         }
@@ -139,6 +144,7 @@ public class NERDCollector extends IPStandaloneCollector<NERDData> {
                 .POST(HttpRequest.BodyPublishers.ofByteArray(bytes))
                 .build();
 
+        Logger.trace("Sending NERD request (batch {})", batch);
         return _client.sendAsync(listRequest, HttpResponse.BodyHandlers.ofByteArray())
                 .thenAccept(response -> {
                     if (response.statusCode() == 200) {
@@ -168,11 +174,12 @@ public class NERDCollector extends IPStandaloneCollector<NERDData> {
                     }
                 })
                 .exceptionally(e -> {
-                    Logger.debug("Error processing response (batch {})", batch, e);
                     if (e.getCause() instanceof HttpConnectTimeoutException) {
+                        Logger.debug("Connection timeout (batch {})", batch, e);
                         sendAboutAll(entries, errorResult(ResultCodes.TIMEOUT,
                                 "Connection timed out (%d ms)".formatted(_httpTimeout.toMillis())));
                     } else {
+                        Logger.warn("Unexpected error (batch {})", batch, e);
                         sendAboutAll(entries, errorResult(ResultCodes.INTERNAL_ERROR, e.getMessage()));
                     }
                     return null;

@@ -20,6 +20,7 @@
 
         <kafka.version>3.7.0</kafka.version>
         <slf4j.version>2.0.13</slf4j.version>
+        <log4j.version>2.23.1</log4j.version>
         <jackson.version>2.17.1</jackson.version>
         <parallelconsumer.version>0.5.3.0</parallelconsumer.version>
         <jetbrains.annotations.version>24.1.0</jetbrains.annotations.version>
@@ -31,6 +32,7 @@
         <module>streams-components</module>
         <module>connect</module>
         <module>serialization</module>
+        <!--<module>log4j-plugins</module>-->
     </modules>
 
     <dependencyManagement>
@@ -81,9 +83,14 @@
             <version>${slf4j.version}</version>
         </dependency>
         <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-simple</artifactId>
-            <version>${slf4j.version}</version>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-slf4j2-impl</artifactId>
+            <version>${log4j.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-core</artifactId>
+            <version>${log4j.version}</version>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>

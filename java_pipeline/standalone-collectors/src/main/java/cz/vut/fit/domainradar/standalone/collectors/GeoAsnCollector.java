@@ -8,6 +8,7 @@ import com.maxmind.geoip2.model.AsnResponse;
 import com.maxmind.geoip2.model.CityResponse;
 import com.maxmind.geoip2.record.*;
 import cz.vut.fit.domainradar.CollectorConfig;
+import cz.vut.fit.domainradar.Common;
 import cz.vut.fit.domainradar.Topics;
 import cz.vut.fit.domainradar.models.IPToProcess;
 import cz.vut.fit.domainradar.models.ResultCodes;
@@ -26,9 +27,9 @@ import java.util.ArrayList;
 import java.util.Properties;
 
 public class GeoAsnCollector extends IPStandaloneCollector<GeoIPData> {
-    private static final org.slf4j.Logger Logger = LoggerFactory.getLogger(GeoAsnCollector.class);
     public static final String NAME = "geo-asn";
-
+    public static final String COMPONENT_NAME = "collector-geoip"; // weird exception
+    private static final org.slf4j.Logger Logger = Common.getComponentLogger(NERDCollector.class);
 
     private final DatabaseReader _cityReader, _asnReader;
 
@@ -48,6 +49,8 @@ public class GeoAsnCollector extends IPStandaloneCollector<GeoIPData> {
 
         _asnReader = new DatabaseReader.Builder(asnDb).withCache(new CHMCache()).build();
         _cityReader = new DatabaseReader.Builder(cityDb).withCache(new CHMCache()).build();
+
+        Logger.info("GeoIP City+ASN databases loaded");
     }
 
     @Override
@@ -69,11 +72,13 @@ public class GeoAsnCollector extends IPStandaloneCollector<GeoIPData> {
 
     private CommonIPResult<GeoIPData> evaluateIP(IPToProcess ip) {
         try {
+            Logger.trace("Processing IP: {}", ip);
             var inetAddr = InetAddresses.forString(ip.ip());
             var cityOpt = _cityReader.tryCity(inetAddr);
             var asnOpt = _asnReader.tryAsn(inetAddr);
 
             if (cityOpt.isEmpty() && asnOpt.isEmpty()) {
+                Logger.debug("No City or ASN data found for {}", ip.ip());
                 return errorResult(ResultCodes.NOT_FOUND, "No GeoIP data found");
             }
 
@@ -101,10 +106,14 @@ public class GeoAsnCollector extends IPStandaloneCollector<GeoIPData> {
                     network == null ? null : (long) network.getPrefixLength()
             );
 
+            Logger.trace("Success: {}", ip);
             return successResult(record);
         } catch (IllegalArgumentException e) {
+            Logger.debug("Invalid IP address: {}", ip.ip());
             return errorResult(ResultCodes.INVALID_ADDRESS, e.getMessage());
         } catch (Exception e) {
+            // Should not happen
+            Logger.error("Error while reading GeoIP data for {}", ip, e);
             return errorResult(ResultCodes.CANNOT_FETCH, e.getMessage());
         }
     }

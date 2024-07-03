@@ -2,6 +2,7 @@ package cz.vut.fit.domainradar.standalone.collectors;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import cz.vut.fit.domainradar.CollectorConfig;
+import cz.vut.fit.domainradar.Common;
 import cz.vut.fit.domainradar.Topics;
 import cz.vut.fit.domainradar.models.ResultCodes;
 import cz.vut.fit.domainradar.models.results.TLSResult;
@@ -14,7 +15,6 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.jetbrains.annotations.NotNull;
-import org.slf4j.Logger;
 import pl.tlinkowski.unij.api.UniLists;
 
 import javax.net.ssl.*;
@@ -36,7 +36,9 @@ import java.util.Properties;
 import java.util.concurrent.*;
 
 public class TLSCollector extends BaseStandaloneCollector<String, String> {
-    private static final Logger Logger = org.slf4j.LoggerFactory.getLogger(TLSCollector.class);
+    public static final String NAME = "tls";
+    public static final String COMPONENT_NAME = "collector-" + NAME;
+    private static final org.slf4j.Logger Logger = Common.getComponentLogger(NERDCollector.class);
 
     static class NaiveTrustManager implements X509TrustManager {
         @Override
@@ -54,8 +56,6 @@ public class TLSCollector extends BaseStandaloneCollector<String, String> {
             // Not used
         }
     }
-
-    public static final String NAME = "tls";
 
     private final KafkaProducer<String, TLSResult> _producer;
     private final ExecutorService _executor;
@@ -93,6 +93,7 @@ public class TLSCollector extends BaseStandaloneCollector<String, String> {
             final var dn = ctx.key();
             final var ip = ctx.value();
 
+            Logger.trace("Processing DN {} at {}", dn, ip);
             var resultFuture = runTLSResolve(dn, ip).toCompletableFuture()
                     .orTimeout(futureTimeout, TimeUnit.MILLISECONDS);
 
@@ -101,9 +102,11 @@ public class TLSCollector extends BaseStandaloneCollector<String, String> {
                 _producer.send(new ProducerRecord<>(Topics.OUT_TLS, dn, result));
             } catch (CompletionException e) {
                 if (e.getCause() instanceof TimeoutException) {
+                    Logger.debug("Operation timed out: {}", dn);
                     _producer.send(new ProducerRecord<>(Topics.OUT_TLS, dn,
                             errorResult(ResultCodes.TIMEOUT, "Operation timed out (%d ms)".formatted(_timeout))));
                 } else {
+                    Logger.warn("Unexpected error: {}", dn, e);
                     _producer.send(new ProducerRecord<>(Topics.OUT_TLS, dn,
                             errorResult(ResultCodes.INTERNAL_ERROR, e.getMessage())));
                 }
@@ -118,6 +121,7 @@ public class TLSCollector extends BaseStandaloneCollector<String, String> {
                 context = SSLContext.getInstance("TLS");
                 context.init(null, new TrustManager[]{new NaiveTrustManager()}, null);
             } catch (NoSuchAlgorithmException | KeyManagementException e) {
+                Logger.error("TLS context error", e);
                 // Should not happen
                 return errorResult(ResultCodes.INTERNAL_ERROR, e.getMessage());
             }
@@ -126,8 +130,10 @@ public class TLSCollector extends BaseStandaloneCollector<String, String> {
                 try {
                     rawSocket.connect(new InetSocketAddress(targetIp, 443), _timeout);
                 } catch (SocketTimeoutException e) {
+                    Logger.debug("Connection timed out: {}", hostName);
                     return errorResult(ResultCodes.TIMEOUT, "Connection timed out (%d ms)".formatted(_timeout));
                 } catch (IllegalArgumentException e) {
+                    Logger.debug("Cannot use IPv6: {} at {}", hostName, targetIp);
                     return errorResult(ResultCodes.UNSUPPORTED_ADDRESS, "Cannot use this IP version");
                 }
 
@@ -143,6 +149,7 @@ public class TLSCollector extends BaseStandaloneCollector<String, String> {
                     socket.setSSLParameters(sslParams);
 
                     // Start handshake to retrieve session details
+                    Logger.trace("Starting TLS handshake: {}", hostName);
                     socket.startHandshake();
 
                     SSLSession session = socket.getSession();
@@ -169,11 +176,14 @@ public class TLSCollector extends BaseStandaloneCollector<String, String> {
                     final var tlsData = new TLSData(targetIp,
                             protocol, cipher, certificates);
 
+                    Logger.trace("Success: {}", hostName);
                     return new TLSResult(ResultCodes.OK, null, Instant.now(), tlsData);
                 } catch (SocketTimeoutException e) {
+                    Logger.debug("Socket read timed out: {}", hostName);
                     return errorResult(ResultCodes.TIMEOUT, "Socket read timed out (%d ms)".formatted(_timeout));
                 }
             } catch (IOException e) {
+                Logger.debug("Cannot connect to {}: {}", hostName, e.getMessage());
                 return errorResult(ResultCodes.CANNOT_FETCH, e.getMessage());
             }
         }, _executor);
