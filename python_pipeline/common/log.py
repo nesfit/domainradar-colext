@@ -1,5 +1,6 @@
 import logging
 import sys
+import datetime
 from pprint import pformat
 from typing import cast
 
@@ -32,8 +33,12 @@ NO_KEY_STR = "no key"
 
 class ExtraFormatter(logging.Formatter):
     def __init__(self):
-        super().__init__(fmt="[%(asctime)s] [%(levelname)s] [%(name)s#%(threadName)s] {%(event_key)s} %(message)s",
-                         style='%')
+        super().__init__(fmt="[{asctime}] [{levelname}] [{name}#{thread}-{threadName}] {{{event_key}}} {message}",
+                         style='{', datefmt="")
+
+    def formatTime(self, record, datefmt=None):
+        ct = datetime.datetime.fromtimestamp(record.created).astimezone()
+        return f"{ct:%Y-%m-%dT%H:%M:%S},{record.msecs:g}{ct:%z}"
 
     def formatMessage(self, record):
         if not hasattr(record, "event_key"):
