@@ -98,7 +98,7 @@ public class GeoAsnCollector extends IPStandaloneCollector<GeoIPData> {
                     asn.getAutonomousSystemNumber(),
                     asn.getAutonomousSystemOrganization(),
                     network == null ? null : network.getNetworkAddress().toString(),
-                    network == null ? null : network.getPrefixLength()
+                    network == null ? null : (long) network.getPrefixLength()
             );
 
             return successResult(record);
