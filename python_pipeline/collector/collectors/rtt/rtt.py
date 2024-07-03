@@ -7,11 +7,12 @@ from common.models import IPToProcess, IPProcessRequest, RTTResult, RTTData
 from common.util import ensure_model
 
 COLLECTOR = "rtt"
-logger = log.get(COLLECTOR)
+COMPONENT_NAME = "collector-" + COLLECTOR
 
 # Read the config
 config = read_config()
 component_config = config.get(COLLECTOR, {})
+logger = log.init(COMPONENT_NAME, config)
 
 COUNT = component_config.get("ping_count", 5)
 PRIVILEGED = component_config.get("privileged_mode", False)
@@ -74,4 +75,4 @@ async def process_entries(stream):
             await process_entry(dn_ip)
         except Exception as e:
             logger.k_unhandled_error(e, str(dn_ip))
-            await handle_top_level_component_exception(e, COLLECTOR, dn_ip, RTTResult, topic_processed)
+            await handle_top_level_component_exception(e, COMPONENT_NAME, dn_ip, RTTResult, topic_processed)

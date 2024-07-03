@@ -13,11 +13,15 @@ from common import read_config, make_app, log
 from . import extractor
 
 EXTRACTOR = "extractor"
-logger = log.get(EXTRACTOR)
+COMPONENT_NAME = EXTRACTOR
 
 # Read the config
 config = read_config()
 component_config = config.get(EXTRACTOR, {})
+logger = log.init(COMPONENT_NAME, config)
+
+logger.k_warning("Yolo", "key", my="arg")
+
 
 CONCURRENCY = component_config.get("concurrency", 4)
 BATCH_SIZE = component_config.get("batch_size", 50)

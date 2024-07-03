@@ -3,7 +3,6 @@ the Faust app. If a single command-line argument that contains a valid file path
 JSON file, extract features from it and print the result. Otherwise, the Faust app is started."""
 __author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
 
-import importlib.util
 import json
 import os.path
 import sys
@@ -13,7 +12,6 @@ from pandas import DataFrame
 
 from common import main
 from . import extractor
-from .app import extractor_app, EXTRACTOR
 
 
 def extract_one(file):
@@ -50,4 +48,4 @@ if __name__ == '__main__':
         extract_one(sys.argv[1])
         exit()
 
-    main(EXTRACTOR, extractor_app)
+    main("extractor.app")

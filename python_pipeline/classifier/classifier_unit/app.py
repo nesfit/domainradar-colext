@@ -16,11 +16,12 @@ from common import read_config, make_app, log
 from common.util import timestamp_now_millis
 
 CLASSIFIER = "classifier-unit"
-logger = log.get(CLASSIFIER)
+COMPONENT_NAME = CLASSIFIER
 
 # Read the config
 config = read_config()
 component_config = config.get(CLASSIFIER, {})
+logger = log.init(COMPONENT_NAME, config)
 
 MODEL_PATH = component_config.get("model_path")
 CONCURRENCY = component_config.get("concurrency", 4)
@@ -37,27 +38,27 @@ if not os.path.isdir(pipeline_options.boundaries_dir):
     raise ValueError(f"The boundaries directory '{pipeline_options.boundaries_dir}' does not exist.")
 
 # The Faust application
-classifier_app = make_app(CLASSIFIER, config)
+classifier_unit_app = make_app(CLASSIFIER, config)
 
 # The input and output topics
-topic_to_process = classifier_app.topic('feature_vectors', key_type=None,
-                                        value_type=bytes, value_serializer='raw',
-                                        allow_empty=False)
+topic_to_process = classifier_unit_app.topic('feature_vectors', key_type=None,
+                                             value_type=bytes, value_serializer='raw',
+                                             allow_empty=False)
 
-topic_processed = classifier_app.topic('classification_results', key_type=str, key_serializer='str',
-                                       value_type=bytes, value_serializer='raw')
+topic_processed = classifier_unit_app.topic('classification_results', key_type=str, key_serializer='str',
+                                            value_type=bytes, value_serializer='raw')
 
 # The classification pipelines
 pipelines_queue = SimpleQueue()
 for i in range(CLASSIFIER_WORKERS):
-    classifier_app.log.info(f"Initializing pipeline worker #{i}")
+    classifier_unit_app.log.info(f"Initializing pipeline worker #{i}")
     pipelines_queue.put(Pipeline(pipeline_options))
 
 executor = ThreadPoolExecutor(max_workers=CLASSIFIER_WORKERS)
 
 
 # The main loop
-@classifier_app.agent(topic_to_process, concurrency=CONCURRENCY)
+@classifier_unit_app.agent(topic_to_process, concurrency=CONCURRENCY)
 async def process_entries(stream):
     if USE_BATCHING:
         current_df = None
@@ -101,8 +102,8 @@ def pick_classifier_and_classify(queue: SimpleQueue, dataframe: DataFrame):
 
 async def process_dataframe(dataframe: DataFrame):
     try:
-        results = await classifier_app.loop.run_in_executor(executor, pick_classifier_and_classify,
-                                                            pipelines_queue, dataframe)
+        results = await classifier_unit_app.loop.run_in_executor(executor, pick_classifier_and_classify,
+                                                                 pipelines_queue, dataframe)
         if not results:
             logger.k_warning("No classification results were generated.", None)
             return

@@ -15,11 +15,12 @@ from common.models import IPToProcess, IPProcessRequest, RDAPIPResult
 from common.util import ensure_model
 
 COLLECTOR = "rdap-ip"
-logger = log.get(COLLECTOR)
+COMPONENT_NAME = "collector-" + COLLECTOR
 
 # Read the config
 config = read_config()
 component_config = config.get(COLLECTOR, {})
+logger = log.init(COMPONENT_NAME, config)
 
 HTTP_TIMEOUT = component_config.get("http_timeout", 5)
 CONCURRENCY = component_config.get("concurrency", 4)
@@ -115,7 +116,7 @@ async def process_entries(stream):
             await process_entry(dn_ip, ipv4_client, ipv6_client)
         except Exception as e:
             logger.k_unhandled_error(e, str(dn_ip))
-            await handle_top_level_component_exception(e, COLLECTOR, dn_ip,
+            await handle_top_level_component_exception(e, COMPONENT_NAME, dn_ip,
                                                        RDAPIPResult, topic_processed)
 
     await ipv4_client.aio_close()

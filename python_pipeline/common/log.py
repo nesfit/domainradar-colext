@@ -1,6 +1,7 @@
 import logging
 import sys
 from pprint import pformat
+from typing import cast
 
 
 class _CustomLoggerT(logging.Logger):
@@ -127,4 +128,8 @@ def inject_handler(configured_logger: _CustomLoggerT, faust_logger: logging.Logg
 
 def get(component_id: str) -> _CustomLoggerT:
     # noinspection PyTypeChecker
-    return logging.getLogger(component_id)
+    logger = logging.getLogger(component_id)
+    if not hasattr(logger, "k_unhandled_error"):
+        # stub initialization
+        init(component_id, {})
+    return cast(_CustomLoggerT, logger)

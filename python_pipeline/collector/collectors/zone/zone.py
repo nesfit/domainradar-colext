@@ -10,11 +10,12 @@ from common.models import RDAPDomainRequest, RDAPDomainResult, ZoneRequest, Zone
 from common.util import ensure_model
 
 COLLECTOR = "zone"
-logger = log.get(COLLECTOR)
+COMPONENT_NAME = "collector-" + COLLECTOR
 
 # Read the config
 config = read_config()
 component_config = config.get(COLLECTOR, {})
+logger = log.init(COMPONENT_NAME, config)
 
 DNS_SERVERS = component_config.get("dns_servers", ['195.113.144.194', '193.17.47.1',
                                                    '195.113.144.233', '185.43.135.1'])
@@ -79,4 +80,4 @@ async def process_entries(stream):
 
         except Exception as e:
             logger.k_unhandled_error(e, dn)
-            await handle_top_level_component_exception(e, COLLECTOR, dn, RDAPDomainResult, topic_processed_zone)
+            await handle_top_level_component_exception(e, COMPONENT_NAME, dn, RDAPDomainResult, topic_processed_zone)

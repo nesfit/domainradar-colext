@@ -20,11 +20,12 @@ from common.models import RDAPDomainRequest, RDAPDomainResult
 from common.util import ensure_model
 
 COLLECTOR = "rdap-dn"
-logger = log.get(COLLECTOR)
+COMPONENT_NAME = "collector-" + COLLECTOR
 
 # Read the config
 config = read_config()
 component_config = config.get(COLLECTOR, {})
+logger = log.init(COMPONENT_NAME, config)
 
 HTTP_TIMEOUT = component_config.get("http_timeout", 5)
 CONCURRENCY = component_config.get("concurrency", 4)
@@ -180,7 +181,7 @@ async def process_entries(stream):
             await process_entry(dn, req, rdap_client, whois_client)
         except Exception as e:
             logger.k_unhandled_error(e, dn)
-            await handle_top_level_component_exception(e, COLLECTOR, dn, RDAPDomainResult, topic_processed)
+            await handle_top_level_component_exception(e, COMPONENT_NAME, dn, RDAPDomainResult, topic_processed)
 
     await rdap_client.aio_close()
     await httpx_client.aclose()

@@ -24,13 +24,21 @@ __all__ = [
 ]
 
 
-def main(component_id: str, app):
-    from common import ensure_data_dir, log, read_config, util
-    util._logger = log.init(component_id, read_config())
+def main(module: str):
+    from common import ensure_data_dir, log, util
+    import importlib
+
+    app_module = importlib.import_module(module)
+    component_id = app_module.COMPONENT_NAME
+    app_name: str = app_module.COLLECTOR if hasattr(app_module, "COLLECTOR") else app_module.COMPONENT_NAME
+    app_name = app_name.replace('-', '_') + "_app"
+    app_obj = getattr(app_module, app_name)
+
+    util._logger = log.get(component_id)
 
     try:
         ensure_data_dir()
-        app.main()
+        app_obj.main()
     except Exception as e:
         log.get(component_id).k_unhandled_error(e, None)
         raise e
