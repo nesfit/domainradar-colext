@@ -1,0 +1,18 @@
+[tool.poetry]
+package-mode = false
+description = "The DomainRadar standalone input controller."
+authors = ["Ondřej Ondryáš <xondry02@stud.fit.vut.cz>"]
+license = "MIT"
+repository = "https://github.com/nesfit/domainradar-colext"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.9,<4.0"
+confluent-kafka = "^2.4.0"
+pymisp = "^2.4.194"
+click = "^8.1.7"
+pymongo = "^4.8.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

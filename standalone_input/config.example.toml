@@ -1,0 +1,33 @@
+[connection]
+brokers = ["localhost:9092"]
+use_ssl = false
+
+[connection.ssl]
+ca_file = "/path/to/ca.pem"
+client_cert_file = "/path/to/client_certificate.pem"
+client_key_file = "/path/to/client_key.pem"
+client_key_password = "password for the private key"
+check_hostname = true
+
+[producer]
+# Options passed directly to confluent-kafka and its underlying librdkafka library
+# The dotted keys must be enclosed in ""
+# See: https://github.com/confluentinc/librdkafka/blob/master/CONFIGURATION.md
+"compression.codec" = "zstd"
+
+[mongo]
+uri = "mongodb://[mongo URI]"
+db = "database name"
+write_batch_size = 100
+read_batch_size = 100
+
+[misp]
+url = "MISP API URL"
+key = "MISP API key"
+verify_certificate = true
+debug = false
+username = "MISP username"
+password = "MISP password"
+
+[misp.feeds]
+"feed-name-for-CLI" = ["MISP feed ID", "custom category (label)"]
