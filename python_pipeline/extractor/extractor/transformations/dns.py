@@ -188,6 +188,7 @@ class DNSTransformation(Transformation):
         return {
             "tmp_dns_SOA": "",
             "dns_dnssec_score": "float64",
+            "dns_has_dnskey": "Int64",  # FIXME
             "dns_zone_level": "Int64",
             "dns_zone_digit_count": "Int64",
             "dns_zone_len": "Int64",
@@ -219,5 +220,5 @@ class DNSTransformation(Transformation):
             "dns_txt_spf_exists": "Int64",  # FIXME
             "dns_txt_dkim_exists": "Int64",  # FIXME
             "dns_txt_dmarc_exists": "Int64",  # FIXME
-            **{f'dns_{c}_count': "Int64" for c in ['A', 'AAAA', 'MX', 'NS', 'TXT']}
+            **{f'dns_{c}_count': "Int64" for c in ['A', 'AAAA', 'MX', 'NS', 'TXT', 'CNAME', 'SOA']}
         }
