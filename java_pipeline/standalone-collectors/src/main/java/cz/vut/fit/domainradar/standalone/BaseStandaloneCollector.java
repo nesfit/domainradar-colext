@@ -29,6 +29,7 @@ public abstract class BaseStandaloneCollector<KIn, VIn> implements Closeable {
     protected final Duration _closeTimeout;
     private final Duration _commitInterval;
     private final int _maxConcurrency;
+    private final ParallelConsumerOptions.CommitMode _commitMode;
 
     protected final ObjectMapper _jsonMapper;
     protected final KafkaConsumer<KIn, VIn> _consumer;
@@ -56,6 +57,8 @@ public abstract class BaseStandaloneCollector<KIn, VIn> implements Closeable {
                 CollectorConfig.CLOSE_TIMEOUT_SEC_CONFIG, CollectorConfig.CLOSE_TIMEOUT_SEC_DEFAULT)));
         _commitInterval = Duration.ofMillis(Long.parseLong(_properties.getProperty(
                 CollectorConfig.COMMIT_INTERVAL_MS_CONFIG, CollectorConfig.COMMIT_INTERVAL_MS_DEFAULT)));
+        _commitMode = ParallelConsumerOptions.CommitMode.valueOf(_properties.getProperty(
+                CollectorConfig.COMMIT_MODE_CONFIG, CollectorConfig.COMMIT_MODE_DEFAULT));
 
         _consumer = createConsumer(keyInSerde.deserializer(), valueInSerde.deserializer());
     }
@@ -77,7 +80,8 @@ public abstract class BaseStandaloneCollector<KIn, VIn> implements Closeable {
                 .ordering(ParallelConsumerOptions.ProcessingOrder.KEY)
                 .consumer(_consumer)
                 .maxConcurrency(_maxConcurrency)
-                .thresholdForTimeSpendInQueueWarning(Duration.ofSeconds(30)) // TODO
+                .thresholdForTimeSpendInQueueWarning(Duration.ofSeconds(5)) // TODO: make configurable?
+                .commitMode(_commitMode)
                 .commitInterval(_commitInterval);
 
         if (batchSize > 0)
