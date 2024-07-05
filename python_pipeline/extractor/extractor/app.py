@@ -2,6 +2,7 @@
 __author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
 
 import io
+import json
 from concurrent.futures import ThreadPoolExecutor
 from json import loads, JSONDecodeError
 from typing import Sequence
@@ -22,11 +23,11 @@ logger = log.init(COMPONENT_NAME, config)
 
 logger.k_warning("Yolo", "key", my="arg")
 
-
 CONCURRENCY = component_config.get("concurrency", 4)
 BATCH_SIZE = component_config.get("batch_size", 50)
 BATCH_TIMEOUT = component_config.get("batch_timeout", 5)
 COMPUTATION_THREADS = component_config.get("computation_threads", 1)
+STANDALONE_MODE = component_config.get("standalone_mode", False)
 
 # Init the list of transformations
 extractor.init_transformations(component_config)
@@ -77,13 +78,21 @@ async def process_entries(stream):
                 df, errors = extractor.extract_features(events_parsed)
 
             if df is not None:
-                # Serialize the dataframe into a memory buffer
-                # noinspection PyTypeChecker
-                df.to_feather(buffer)
-                # Get the result bytes
-                result_bytes = buffer.getbuffer()[0:buffer.tell()].tobytes()
-                # Send the result
-                await topic_processed.send(key=None, value=result_bytes)
+                if STANDALONE_MODE:
+                    # In standalone mode, each feature vector will be serialized into JSON and produced individually
+                    df_dict = df.to_dict(orient='records')
+                    for row in df_dict:
+                        row_json = json.dumps(row, indent=None, separators=(',', ':'))
+                        await topic_processed.send(key=row["domain_name"].encode("utf-8"),
+                                                   value=row_json.encode("utf-8"))
+                else:
+                    # Serialize the dataframe into a memory buffer
+                    # noinspection PyTypeChecker
+                    df.to_feather(buffer)
+                    # Get the result bytes
+                    result_bytes = buffer.getbuffer()[0:buffer.tell()].tobytes()
+                    # Send the result
+                    await topic_processed.send(key=None, value=result_bytes)
 
             if len(errors) > 0:
                 for key, error in errors.items():
