@@ -38,7 +38,7 @@ import java.util.concurrent.*;
 public class TLSCollector extends BaseStandaloneCollector<String, String> {
     public static final String NAME = "tls";
     public static final String COMPONENT_NAME = "collector-" + NAME;
-    private static final org.slf4j.Logger Logger = Common.getComponentLogger(NERDCollector.class);
+    private static final org.slf4j.Logger Logger = Common.getComponentLogger(TLSCollector.class);
 
     static class NaiveTrustManager implements X509TrustManager {
         @Override
