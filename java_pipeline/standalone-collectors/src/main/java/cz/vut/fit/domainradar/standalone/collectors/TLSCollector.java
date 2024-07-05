@@ -94,7 +94,7 @@ public class TLSCollector extends BaseStandaloneCollector<String, String> {
             final var ip = ctx.value();
 
             Logger.trace("Processing DN {} at {}", dn, ip);
-            var resultFuture = runTLSResolve(dn, ip).toCompletableFuture()
+            var resultFuture = runTLSResolve(dn, ip)
                     .orTimeout(futureTimeout, TimeUnit.MILLISECONDS);
 
             try {
