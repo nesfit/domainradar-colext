@@ -22,7 +22,7 @@ icmplib = "^3.0.4"
 tldextract = "^5.1.2"
 asynciolimiter = "^1.0.0"
 dnspython = "^2.6.1"
-pydantic = "^2.7.1"
+pydantic = "^2.8.2"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0.0"
