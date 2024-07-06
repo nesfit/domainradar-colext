@@ -27,7 +27,12 @@ CONCURRENCY = component_config.get("concurrency", 4)
 BATCH_SIZE = component_config.get("batch_size", 50)
 BATCH_TIMEOUT = component_config.get("batch_timeout", 5)
 COMPUTATION_THREADS = component_config.get("computation_threads", 1)
-STANDALONE_MODE = component_config.get("standalone_mode", False)
+PRODUCE_JSONS = component_config.get("produce_jsons", False)
+PRODUCE_DFS = not component_config.get("only_produce_jsons", False)
+
+if not PRODUCE_JSONS and not PRODUCE_DFS:
+    logger.error("The 'only_produce_jsons' option is set, but 'produce_jsons' is not. Refusing to operate.")
+    exit(1)
 
 # Init the list of transformations
 extractor.init_transformations(component_config)
@@ -40,8 +45,12 @@ extractor_app = make_app(EXTRACTOR, config)
 topic_to_process = extractor_app.topic('all_collected_data', key_type=str, key_serializer='str',
                                        value_type=bytes, value_serializer='raw', allow_empty=True)
 
-topic_processed = extractor_app.topic('feature_vectors', key_type=None,
-                                      value_type=bytes, value_serializer='raw')
+if PRODUCE_DFS:
+    topic_processed = extractor_app.topic('feature_vectors', key_type=None,
+                                          value_type=bytes, value_serializer='raw')
+if PRODUCE_JSONS:
+    topic_processed_jsons = extractor_app.topic('feature_vectors_json', key_type=str, key_serializer='str',
+                                                value_type=bytes, value_serializer='raw')
 
 
 @extractor_app.agent(topic_to_process, concurrency=CONCURRENCY)
@@ -78,14 +87,14 @@ async def process_entries(stream):
                 df, errors = extractor.extract_features(events_parsed)
 
             if df is not None:
-                if STANDALONE_MODE:
-                    # In standalone mode, each feature vector will be serialized into JSON and produced individually
+                if PRODUCE_JSONS:
+                    # Serialize the dataframe into a JSON array and produce the vectors as individual messages
                     df_dict = df.to_dict(orient='records')
                     for row in df_dict:
                         row_json = json.dumps(row, indent=None, separators=(',', ':'))
-                        await topic_processed.send(key=row["domain_name"].encode("utf-8"),
-                                                   value=row_json.encode("utf-8"))
-                else:
+                        await topic_processed_jsons.send(key=row["domain_name"].encode("utf-8"),
+                                                         value=row_json.encode("utf-8"))
+                if PRODUCE_DFS:
                     # Serialize the dataframe into a memory buffer
                     # noinspection PyTypeChecker
                     df.to_feather(buffer)
