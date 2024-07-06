@@ -1,6 +1,5 @@
 package cz.vut.fit.domainradar.connect;
 
-import org.apache.kafka.clients.producer.internals.BuiltInPartitioner;
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.connect.connector.ConnectRecord;
 import org.apache.kafka.connect.data.Schema;
