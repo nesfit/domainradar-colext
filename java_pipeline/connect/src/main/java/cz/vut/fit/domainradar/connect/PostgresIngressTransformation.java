@@ -1,5 +1,6 @@
 package cz.vut.fit.domainradar.connect;
 
+import org.apache.kafka.clients.producer.internals.BuiltInPartitioner;
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.connect.connector.ConnectRecord;
 import org.apache.kafka.connect.data.Schema;
@@ -29,7 +30,9 @@ public class PostgresIngressTransformation<R extends ConnectRecord<R>> implement
         if (dn == null)
             throw new DataException("Domain name is null");
 
-        return r.newRecord(r.topic(), r.kafkaPartition(), Schema.STRING_SCHEMA, dn,
+        // Set partition to null to enforce the default hash-based partitioning
+        // It is not required for the input topics but why not keep it all co-partitioned
+        return r.newRecord(r.topic(), null, Schema.STRING_SCHEMA, dn,
                 null, null, r.timestamp());
     }
 
