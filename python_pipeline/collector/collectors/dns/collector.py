@@ -75,8 +75,7 @@ class DNSCollector:
         ret_errors = ret['errors']
         if len(ret_errors) == 0:
             ret_errors = None
-
-        if len(ret_errors) == len(types):
+        elif len(ret_errors) == len(types):
             # All queries failed, return an erroneous result
             # Check if all errors are timeouts
             for error_str in ret_errors:
@@ -85,9 +84,8 @@ class DNSCollector:
                     return DNSResult(status_code=rc.OTHER_DNS_ERROR,
                                      dns_data=DNSData(errors=ret_errors),
                                      error="All queries failed")
-            else:
-                return DNSResult(status_code=rc.TIMEOUT,
-                                 error=f"All queries timed out ({self._timeout_error} s)")
+            return DNSResult(status_code=rc.TIMEOUT,
+                             error=f"All queries timed out ({self._timeout_error} s)")
 
         dns_data = DNSData(
             a=ret.get('A'),
@@ -100,7 +98,7 @@ class DNSCollector:
             errors=ret_errors
         )
 
-        return DNSResult(dns_data=dns_data, ips=ret_ips)
+        return DNSResult(status_code=0, dns_data=dns_data, ips=ret_ips)
 
     async def _resolve_a_or_aaaa(self, domain: Name, record_type: Literal['A', 'AAAA'], primary_ns: list[str],
                                  result: dict, ips: list[IPFromRecord], add_ips: bool):
