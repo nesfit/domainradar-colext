@@ -116,7 +116,7 @@ class IPProcessRequest(CustomBaseModel):
 # ---- Results ---- #
 
 class Result(CustomBaseModel):
-    status_code: int = Field(alias="statusCode")
+    status_code: int = Field(0, alias="statusCode")
     error: Optional[str] = None
     last_attempt: int = Field(alias="lastAttempt", default_factory=lambda: timestamp_now_millis())
 
