@@ -4,7 +4,7 @@ import ssl
 import sys
 import tomllib
 from datetime import datetime
-from typing import TypeVar, Type, Any
+from typing import TypeVar, Type, Any, cast
 
 import faust
 from faust.serializers import codecs
@@ -126,7 +126,8 @@ def make_app(name: str, config: dict) -> faust.App:
 # noinspection PyTypeChecker
 def check_config_changes(component_id: str, app):
     global _last_config_modify_time, _config
-    if _config.get(component_id, {}).get("watch_config", False):
+    config = cast(dict, _config)
+    if config.get(component_id, {}).get("watch_config", False):
         return
 
     from . import log
@@ -136,9 +137,9 @@ def check_config_changes(component_id: str, app):
         _logger.info("Configuration file changed, reloading")
         _last_config_modify_time = stamp
         _config = None
-        read_config()
-        log.init(component_id, _config)
-        log.inject_handler(log.get(component_id), app.logger, _config.get(component_id, {}))
+        config = read_config()
+        log.init(component_id, config)
+        log.inject_handler(log.get(component_id), app.logger, config.get(component_id, {}))
 
 
 def get_safe(data: dict, path: str) -> Any | None:
