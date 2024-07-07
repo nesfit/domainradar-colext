@@ -11,7 +11,6 @@ from pandas import DataFrame
 
 from common import log
 from .compat import CompatibilityTransformation
-from .incomplete_data_filter import filter_entry as filter_incomplete_data
 from .transformations.base_transformation import Transformation
 from .transformations.dns import DNSTransformation
 from .transformations.drop_columns import DropColumnsTransformation
@@ -90,13 +89,6 @@ def extract_features(raw_data: Iterable[dict]) -> tuple[DataFrame | None, dict[s
             continue
 
         try:
-            # Filter out incomplete results
-            filter_result, filter_errors = filter_incomplete_data(raw_data_entry)
-            if not filter_result:
-                log.get("extractor").k_info("Skipping due to incomplete data",
-                                            raw_data_entry.get("domain_name", "?"), errors=filter_errors)
-                continue
-
             # Run the compatibility transformation
             raw_data_compatible.append(_compat_transformation.transform(raw_data_entry))
         except Exception as e:
