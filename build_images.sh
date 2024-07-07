@@ -1,12 +1,13 @@
 #!/bin/bash
 
-# Usage: ./build_images.sh [-q|-qb] [java|python [<single component tag>|all]] [additional docker build options]"
+# Usage: ./build_images.sh [-q|-qb] [java|python [<component tag>|all]] [additional docker build options]"
 #   -q: quiet mode, suppresses all output"
 #   -qb: quiet build mode, suppresses Docker build output"
 #
 # Builds container images for the Java and Python pipeline components.
-# If no component type is specified, it builds all components.
-# For Python images, you can build a single image by specifying the tag.
+# If no component type is specified, builds all components.
+# The tag prefix is '$TAG_PREFIX/'.
+# For Python images, you can build a single image by specifying the tag (without the tag prefix).
 
 TAG_PREFIX="domrad"
 
@@ -110,13 +111,21 @@ build_python() {
 }
 
 if [ "$1" = "help" ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
-  echo "Usage: $0 [-q|-qb] [java|python [<single component tag>|all]] [additional docker build options]"
+  echo "Usage: $0 [-q|-qb] [java|python [<component tag>|all]] [additional docker build options]"
   echo "  -q: quiet mode, suppresses all output"
   echo "  -qb: quiet build mode, suppresses Docker build output"
   echo ""
   echo "Builds container images for the Java and Python pipeline components."
-  echo "If no component type is specified, it builds all components."
-  echo "For Python images, you can build a single image by specifying the tag."
+  echo "If no component type is specified, builds all components."
+  echo "The tag prefix is '$TAG_PREFIX/'."
+  echo "For Python images, you can build a single image by specifying the tag (without the tag prefix)."
+  echo ""
+  echo "Available Python component tags:"
+  for i in "${!py_packages[@]}"; do
+    echo "- ${py_tags[i]}"
+  done
+  echo "- $STANDALONE_INPUT_TAG"
+  echo "- $CONFIG_MANAGER_TAG"
   exit 0
 fi
 
