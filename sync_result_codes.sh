@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # Filename of the Java class to be converted
-JAVA_FILE="../java_pipeline/common/src/main/java/cz/vut/fit/domainradar/models/ResultCodes.java"
+JAVA_FILE="./java_pipeline/common/src/main/java/cz/vut/fit/domainradar/models/ResultCodes.java"
 # Output filename for the Python file
-PYTHON_FILE="../python_pipeline/common/result_codes.py"
+PYTHON_FILE="./python_pipeline/common/result_codes.py"
 
 # Start with an empty Python file
 true > "$PYTHON_FILE"
