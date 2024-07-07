@@ -45,13 +45,7 @@ COPY ${TARGET_UNIT}/pyproject.toml ./
 
 # Install runtime deps (uses $POETRY_VIRTUALENVS_IN_PROJECT internally)
 RUN --mount=type=cache,target=$POETRY_CACHE_DIR  \
-    --mount=type=secret,id=github \
-    if read -r REPO_USERNAME REPO_PASSWORD < /run/secrets/github; then \
-        poetry config repositories.classifiers https://github.com/nesfit/domainradar-clf.git && \
-        poetry config http-basic.classifiers $REPO_USERNAME $REPO_PASSWORD; \
-    fi && \
-    poetry install --without=dev --no-directory --no-root && \
-    poetry config http-basic.classifiers "-" "-"  # Do not store the credentials in the layer
+    poetry install --without=dev --no-directory --no-root
 
 FROM python-base AS production
 # Consume the build argument
