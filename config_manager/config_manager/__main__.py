@@ -22,7 +22,7 @@ err_h.setLevel(logging.WARN)
 logger.addHandler(err_h)
 
 config = read_config()
-manager.config = config
+manager.init(config)
 
 p_settings = make_producer_settings(config)
 c_settings = make_consumer_settings(config)

@@ -3,6 +3,7 @@
 import os
 import socket
 import subprocess
+import sys
 
 
 def _down(component_id: str) -> int:
@@ -16,8 +17,8 @@ def _up(component_id: str) -> int:
 
 
 # Set the path for the Unix socket
-socket_path = '/tmp/domrad_control.sock'
-compose_cmd = 'echo'
+socket_path = sys.argv[1] if len(sys.argv) > 1 and len(sys.argv[1]) > 0 else '/tmp/domrad_control.sock'
+compose_cmd = sys.argv[2] if len(sys.argv) > 2 else 'docker compose -f compose.yml'
 
 # remove the socket file if it already exists
 try:
@@ -36,7 +37,7 @@ sock.bind(socket_path)
 sock.listen(1)
 
 # accept connections
-print('The config_manager daemon is listening')
+print(f'The config_manager daemon is listening on {socket_path}')
 
 while True:
     try:

@@ -8,25 +8,12 @@ import sys
 
 from . import transformers, codes
 from .models import ConfigurationChangeResult as _Res, ConfigurationValidationError as _Err
+from .pipeline_components import components as _components
 from .updown_provider import SocketUpDownProvider, DirectUpDownProvider, BaseUpDownProvider
 
 logger = logging.getLogger(__package__)
 config = {}
 updown_provider: BaseUpDownProvider | None = None
-
-_components = {
-    "collector-dns": "dns.toml",
-    "collector-zone": "zone.toml",
-    "collector-tls": "tls.properties",
-    "collector-nerd": "nerd.properties",
-    "collector-geoip": "geoip.properties",
-    "collector-rdap-dn": "rdap_dn.toml",
-    "collector-rdap-ip": "rdap_ip.toml",
-    "collector-rtt": "rtt.toml",
-    "merger": "mergers.properties",
-    "extractor": "extractor.toml",
-    "classifier-unit": "classifier_unit.toml",
-}
 
 
 def apply_all_configs(configs: dict) -> list[tuple[str, _Res]]:
@@ -122,7 +109,7 @@ def init(app_config: dict):
     config = app_config
     if config["manager"].get("use_socket"):
         socket_path = config["manager"]["socket_path"]
-        updown_provider = SocketUpDownProvider(socket_path)
+        updown_provider = SocketUpDownProvider(socket_path, logger)
         try:
             updown_provider.open_socket()
         except Exception as e:

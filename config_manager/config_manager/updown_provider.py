@@ -2,7 +2,7 @@ import abc
 import logging
 import socket
 import subprocess
-
+from .pipeline_components import components
 
 class BaseUpDownProvider(abc.ABC):
     @abc.abstractmethod
@@ -14,10 +14,10 @@ class BaseUpDownProvider(abc.ABC):
         pass
 
     def up_all(self) -> int:
-        return self.up('')
+        return self.up(" ".join(components.keys()))
 
     def down_all(self) -> int:
-        return self.down('')
+        return self.down(" ".join(components.keys()))
 
 
 class DirectUpDownProvider(BaseUpDownProvider):
@@ -55,12 +55,15 @@ class SocketUpDownProvider(BaseUpDownProvider):
             if not self.sock:
                 self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
                 self.sock.connect(self.socket_path)
-        except IOError:
+        except IOError as e:
+            self.logger.warning("Socket open error: %s", str(e))
             self.sock.close()
             self.sock = None
 
     def _send(self, data: bytes) -> int:
         self.open_socket()
+        if not self.sock:
+            return -1
 
         try:
             self.sock.sendall(data)
