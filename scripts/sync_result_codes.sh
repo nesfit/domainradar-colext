@@ -6,7 +6,7 @@ JAVA_FILE="../java_pipeline/common/src/main/java/cz/vut/fit/domainradar/models/R
 PYTHON_FILE="../python_pipeline/common/result_codes.py"
 
 # Start with an empty Python file
-> "$PYTHON_FILE"
+true > "$PYTHON_FILE"
 
 # Flag to indicate if we are inside a block comment
 inside_comment=0
