@@ -37,7 +37,8 @@ topic_processed_dns = dns_app.topic('processed_DNS', key_type=str, key_serialize
 topic_tls_requests = dns_app.topic('to_process_TLS', key_type=str, key_serializer='str',
                                    value_type=str, value_serializer='str')
 
-topic_ip_requests = dns_app.topic('to_process_IP', allow_empty=True)
+topic_ip_requests = dns_app.topic('to_process_IP', value_type=bytes, value_serializer='raw',
+                                  allow_empty=True)
 
 
 def get_ip_for_tls(dns_data: DNSData) -> str | None:
