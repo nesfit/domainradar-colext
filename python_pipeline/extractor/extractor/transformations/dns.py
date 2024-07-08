@@ -188,7 +188,6 @@ class DNSTransformation(Transformation):
         return {
             "tmp_dns_SOA": "",
             "dns_dnssec_score": "float64",
-            "dns_has_dnskey": "Int64",  # FIXME
             "dns_zone_level": "Int64",
             "dns_zone_digit_count": "Int64",
             "dns_zone_len": "Int64",
