@@ -87,6 +87,9 @@ def extract_features(raw_data: Iterable[dict]) -> tuple[DataFrame | None, dict[s
         if raw_data_entry.get("invalid_data"):
             errors[raw_data_entry.get("domain_name", "?")] = ValueError("Invalid data")
             continue
+        if len(raw_data_entry.get("domain_name", "")) == 0:
+            errors[raw_data_entry.get("domain_name", "?")] = ValueError("Missing domain name")
+            continue
 
         try:
             # Run the compatibility transformation
