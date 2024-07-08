@@ -87,13 +87,6 @@ async def process_entries(stream):
                 df, errors = extractor.extract_features(events_parsed)
 
             if df is not None:
-                if PRODUCE_JSONS:
-                    # Serialize the dataframe into a JSON array and produce the vectors as individual messages
-                    df_dict = df.to_dict(orient='records')
-                    for row in df_dict:
-                        row_json = json.dumps(row, indent=None, separators=(',', ':'))
-                        await topic_processed_jsons.send(key=row["domain_name"].encode("utf-8"),
-                                                         value=row_json.encode("utf-8"))
                 if PRODUCE_DFS:
                     # Serialize the dataframe into a memory buffer
                     # noinspection PyTypeChecker
@@ -102,6 +95,16 @@ async def process_entries(stream):
                     result_bytes = buffer.getbuffer()[0:buffer.tell()].tobytes()
                     # Send the result
                     await topic_processed.send(key=None, value=result_bytes)
+
+                if PRODUCE_JSONS:
+                    # Serialize the dataframe into a JSON array and produce the vectors as individual messages
+                    df_dict = df.to_dict(orient='records')
+                    for row in df_dict:
+                        # Get rid of the only Timedelta object in the vector (temporary, will be addressed globally)
+                        row["rdap_registration_period"] = row["rdap_registration_period"].total_seconds() / 60
+                        row_json = json.dumps(row, indent=None, separators=(',', ':'))
+                        await topic_processed_jsons.send(key=row["domain_name"].encode("utf-8"),
+                                                         value=row_json.encode("utf-8"))
 
             if len(errors) > 0:
                 for key, error in errors.items():
