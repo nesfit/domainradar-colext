@@ -168,7 +168,7 @@ class CompatibilityTransformation:
             return None, None
 
         soa = {
-            "primary_ns": soa["primaryNs"],
+            "primary_ns": soa["primaryNS"],
             "resp_mailbox_dname": soa["respMailboxDname"],
             "serial": soa["serial"],
             "refresh": soa["refresh"],
@@ -347,7 +347,7 @@ class CompatibilityTransformation:
             return "6" if ver == "v6" else ("4" if ver == "v4" else ver)
 
         ips = get_safe(data, "dnsResult.ips") or []
-        ip_results = get_safe(data, "dnsResult.ipResults") or {}
+        ip_results = get_safe(data, "ipResults") or {}
         ret = []
         for ip_obj in ips:
             ip = ip_obj["ip"]
