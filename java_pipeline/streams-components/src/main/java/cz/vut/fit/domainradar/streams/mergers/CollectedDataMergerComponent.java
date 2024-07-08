@@ -32,6 +32,14 @@ public class CollectedDataMergerComponent implements PipelineComponent {
         _jsonMapper = jsonMapper;
     }
 
+    public static boolean isMoreUseful(final CommonIPResult<?> a, final CommonIPResult<?> b) {
+        final var oldNOK = a.statusCode() != ResultCodes.OK;
+        final var newOK = b.statusCode() == ResultCodes.OK;
+        final var newNewer = a.lastAttempt().isBefore(b.lastAttempt());
+        // Store the latest successful result.
+        return (oldNOK && newNewer) || (oldNOK && newOK) || (newOK && newNewer);
+    }
+
     @Override
     public void use(StreamsBuilder builder) {
         final var commonIpResultOfNodeTypeRef = new TypeReference<CommonIPResult<JsonNode>>() {
@@ -70,11 +78,8 @@ public class CollectedDataMergerComponent implements PipelineComponent {
                 .aggregate(ConcurrentHashMap::new, (dnIpPair, partialData, aggregate) -> {
                             var existingRecord = aggregate.get(partialData.collector());
                             if (existingRecord != null) {
-                                final var oldNOK = existingRecord.statusCode() != ResultCodes.OK;
-                                final var newOK = partialData.statusCode() == ResultCodes.OK;
-                                final var newNewer = existingRecord.lastAttempt().isBefore(partialData.lastAttempt());
                                 // Store the latest successful result.
-                                if ((oldNOK && newNewer) || (oldNOK && newOK) || (newOK && newNewer)) {
+                                if (isMoreUseful(existingRecord, partialData)) {
                                     aggregate.put(partialData.collector(), partialData);
                                 }
                             } else {
