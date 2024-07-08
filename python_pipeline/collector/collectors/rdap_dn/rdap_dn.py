@@ -61,6 +61,12 @@ async def fetch_rdap(domain_name, client: DNSClient) \
         rdap_data = await client.aio_lookup(domain, tld)
         entities = await fetch_entities(rdap_data, client)
         return rdap_data, entities, 0, None
+    except httpx.TimeoutException:
+        logger.k_debug("HTTP timeout", domain_name)
+        return None, None, rc.TIMEOUT, None
+    except httpx.NetworkError as e:
+        logger.k_warning("Network error", domain_name, e=e)
+        return None, None, rc.INTERNAL_ERROR, "Network error: " + str(e)
     except MalformedQueryError as e:
         logger.k_warning("Malformed query", domain_name, e=e)
         return None, None, rc.INTERNAL_ERROR, str(e)

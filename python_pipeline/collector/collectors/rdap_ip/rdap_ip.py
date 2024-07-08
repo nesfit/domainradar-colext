@@ -62,6 +62,12 @@ async def fetch_ip(dn, address, client_v4: IPv4Client, client_v6: IPv6Client) \
             logger.k_trace("Fetching for IPv6: %s / %s", dn, address, rdap_target)
             ip_data = await client_v6.aio_lookup(address)
         return ip_data, 0, None
+    except httpx.TimeoutException:
+        logger.k_debug("HTTP timeout", dn)
+        return None, rc.TIMEOUT, None
+    except httpx.NetworkError as e:
+        logger.k_warning("Network error", dn, e=e)
+        return None, rc.INTERNAL_ERROR, "Network error: " + str(e)
     except MalformedQueryError as e:
         logger.k_warning("Malformed query: %s", dn, address, e=e)
         return None, rc.INTERNAL_ERROR, str(e)
