@@ -369,7 +369,7 @@ class CompatibilityTransformation:
 
             new_ip = {
                 "ip": ip,
-                "from_record": ip_obj["type"],
+                "from_record": ip_obj["rrType"],
                 "asn": {
                     "asn": geo_asn.get("asn", None),
                     "as_org": geo_asn.get("asnOrg", None),
