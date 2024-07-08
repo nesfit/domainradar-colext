@@ -168,12 +168,26 @@ public class CollectedDataMergerComponent implements PipelineComponent {
             return true;
 
         // At least one IP present
-        if (result.ipResults() == null || result.ipResults().isEmpty())
+        var ipResults = result.ipResults();
+        if (ipResults == null || ipResults.isEmpty())
             return false;
 
+        for (var ip : ipResults.keySet()) {
+            var forIp = ipResults.get(ip);
+            if (forIp == null || forIp.isEmpty())
+                return false;
+
+            if (!forIp.containsKey("geo-asn"))
+                return false;
+            if (!forIp.containsKey("rdap-ip"))
+                return false;
+            if (!forIp.containsKey("rtt"))
+                return false;
+            // add NERD?
+        }
+
         for (var ip : ipsFromDns) {
-            // No records collected for a related IP,
-            // we need at least one
+            // No records collected for a related IP
             if (!result.ipResults().containsKey(ip.ip()))
                 return false;
         }
