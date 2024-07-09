@@ -62,7 +62,7 @@ public class GeoAsnCollector extends IPStandaloneCollector<GeoIPData> {
 
             var ip = entry.key();
             var request = entry.value();
-            if (request == null || request.collectors() == null || request.collectors().contains(NAME))
+            if (request != null && request.collectors() != null && !request.collectors().contains(NAME))
                 return;
 
             var result = this.evaluateIP(ip);
