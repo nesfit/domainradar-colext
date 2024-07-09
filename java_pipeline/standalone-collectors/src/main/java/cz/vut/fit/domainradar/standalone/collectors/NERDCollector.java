@@ -27,10 +27,11 @@ import java.net.http.HttpResponse;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.*;
-import java.util.stream.Collectors;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class NERDCollector extends IPStandaloneCollector<NERDData> {
     public static final String NAME = "nerd";
@@ -73,6 +74,7 @@ public class NERDCollector extends IPStandaloneCollector<NERDData> {
                 .build();
 
         final var processingTimeout = (long) (_httpTimeout.toMillis() * 1.2);
+        AtomicLong batchCounter = new AtomicLong(0);
 
         _parallelProcessor.subscribe(UniLists.of(Topics.IN_IP));
         _parallelProcessor.poll(ctx -> {
@@ -85,7 +87,7 @@ public class NERDCollector extends IPStandaloneCollector<NERDData> {
                     .map(ConsumerRecord::key)
                     .toList();
 
-            final var batch = System.nanoTime() % 1000000;
+            final var batch = batchCounter.getAndIncrement();
             Logger.trace("Processing batch {}: {}", batch, entries);
             var processFuture = this.processIps(entries, batch)
                     .orTimeout(processingTimeout, TimeUnit.MILLISECONDS);
@@ -106,31 +108,36 @@ public class NERDCollector extends IPStandaloneCollector<NERDData> {
     }
 
     private CompletableFuture<Void> processIps(List<IPToProcess> entries, final long batch) {
-        var allIps = entries.stream()
-                .map(ipToProcess -> {
-                    try {
-                        return InetAddresses.forString(ipToProcess.ip());
-                    } catch (IllegalArgumentException e) {
-                        Logger.debug("Invalid IP address: {}", ipToProcess.ip());
-                        return null;
-                    }
-                }).collect(Collectors.partitioningBy(ip -> ip instanceof Inet4Address));
-
-        for (var invalidIp : allIps.get(false)) {
-            if (invalidIp instanceof Inet6Address) {
-                Logger.trace("Discarding IPv6 address: {}", invalidIp.getHostAddress());
-                sendAboutAll(entries, errorResult(ResultCodes.UNSUPPORTED_ADDRESS, null));
-            } else {
-                Logger.trace("Invalid IP address: {}", invalidIp.getHostAddress());
-                sendAboutAll(entries, errorResult(ResultCodes.INVALID_ADDRESS, null));
+        var toProcess = new ArrayList<Inet4Address>(entries.size());
+        for (var inputIpToProcess : entries) {
+            try {
+                final var ip = InetAddresses.forString(inputIpToProcess.ip());
+                if (ip instanceof Inet4Address ip4) {
+                    toProcess.add(ip4);
+                    continue;
+                } else if (ip instanceof Inet6Address) {
+                    Logger.trace("Discarding IPv6 address: {}", inputIpToProcess.ip());
+                    _producer.send(new ProducerRecord<>(Topics.OUT_IP, inputIpToProcess,
+                            errorResult(ResultCodes.UNSUPPORTED_ADDRESS, null)));
+                    continue;
+                }
+            } catch (IllegalArgumentException e) {
+                // Invalid IP address
             }
+            Logger.debug("Invalid IP address: {}", inputIpToProcess);
+            _producer.send(new ProducerRecord<>(Topics.OUT_IP, inputIpToProcess,
+                    errorResult(ResultCodes.INVALID_ADDRESS, null)));
         }
 
-        var ips = allIps.get(true);
-        final var ipsLen = ips.size();
+        if (toProcess.isEmpty()) {
+            Logger.trace("No IPs left in batch {}", batch);
+            return CompletableFuture.completedFuture(null);
+        }
+
+        final var ipsLen = toProcess.size();
         var bytes = new byte[ipsLen * 4];
         var ptr = 0;
-        for (var ip : ips) {
+        for (var ip : toProcess) {
             System.arraycopy(ip.getAddress(), 0, bytes, ptr, 4);
             ptr += 4;
         }
