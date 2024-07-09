@@ -76,6 +76,18 @@ public class StreamsPipelineRunner {
             return;
         }
 
+        var cmdLineProperties = cmd.getOptionValues("option");
+        if (cmdLineProperties != null) {
+            for (var option : cmdLineProperties) {
+                if (option.contains("=")) {
+                    var parts = option.split("=", 2);
+                    props.put(parts[0], parts[1]);
+                } else {
+                    Logger.warn("Invalid command-line option: {}", option);
+                }
+            }
+        }
+
         props.put(StreamsConfig.APPLICATION_ID_CONFIG, cmd.getOptionValue("id"));
         props.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.StringSerde.class);
         props.put(StreamsConfig.DEFAULT_DESERIALIZATION_EXCEPTION_HANDLER_CLASS_CONFIG,
@@ -192,6 +204,13 @@ public class StreamsPipelineRunner {
                 .longOpt("bootstrap-server")
                 .desc("Kafka bootstrap server IP:port")
                 .argName("ip:port")
+                .hasArg()
+                .build()
+        );
+        options.addOption(Option.builder("o")
+                .longOpt("option")
+                .desc("A properties key/value to add to the configuration")
+                .argName("key=value")
                 .hasArg()
                 .build()
         );
