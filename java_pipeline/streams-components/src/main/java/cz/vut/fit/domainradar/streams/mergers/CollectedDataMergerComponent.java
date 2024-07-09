@@ -12,12 +12,10 @@ import cz.vut.fit.domainradar.streams.PipelineComponent;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.StreamsBuilder;
-import org.apache.kafka.streams.kstream.Consumed;
-import org.apache.kafka.streams.kstream.Grouped;
-import org.apache.kafka.streams.kstream.Materialized;
-import org.apache.kafka.streams.kstream.Produced;
+import org.apache.kafka.streams.kstream.*;
 import org.slf4j.LoggerFactory;
 
+import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -32,16 +30,19 @@ public class CollectedDataMergerComponent implements PipelineComponent {
         _jsonMapper = jsonMapper;
     }
 
-    public static boolean isMoreUseful(final CommonIPResult<?> a, final CommonIPResult<?> b) {
-        final var oldNOK = a.statusCode() != ResultCodes.OK;
-        final var newOK = b.statusCode() == ResultCodes.OK;
-        final var newNewer = a.lastAttempt().isBefore(b.lastAttempt());
+    public static boolean isMoreUseful(final Result previous, final Result current) {
+        final var oldNOK = previous.statusCode() != ResultCodes.OK;
+        final var newOK = current.statusCode() == ResultCodes.OK;
+        final var newNewer = previous.lastAttempt().isBefore(current.lastAttempt());
         // Store the latest successful result.
         return (oldNOK && newNewer) || (oldNOK && newOK) || (newOK && newNewer);
     }
 
     @Override
     public void use(StreamsBuilder builder) {
+        // TODO: configurable
+        final var ipAggregationInactivityGap = Duration.ofMinutes(30);
+
         final var commonIpResultOfNodeTypeRef = new TypeReference<CommonIPResult<JsonNode>>() {
         };
         final var commonIpResultSerde = JsonSerde.of(_jsonMapper, commonIpResultOfNodeTypeRef);
@@ -71,6 +72,9 @@ public class CollectedDataMergerComponent implements PipelineComponent {
                         Consumed.with(ipToProcessSerde, commonIpResultSerde))
                 // Group by the (DN;IP) pairs - the grouping contains results from several collectors for the same DN-IP.
                 .groupByKey(Grouped.with(ipToProcessSerde, commonIpResultSerde))
+                // Window the results by inactivity gap and grace period to reduce the amount of data in the state store.
+                .windowedBy(SessionWindows.ofInactivityGapWithNoGrace(ipAggregationInactivityGap))
+                .emitStrategy(EmitStrategy.onWindowUpdate())
                 // Aggregate the results from the collectors to a HashMap keyed by the collector name.
                 // If there are multiple results from the same collector, the last successful one wins.
                 // TODO: Determine whether a concurrent hashmap must really be used.
@@ -88,12 +92,29 @@ public class CollectedDataMergerComponent implements PipelineComponent {
                             }
 
                             return aggregate;
+                        }, (key, aggOne, aggTwo) -> {
+                            for (var colName : aggOne.keySet()) {
+                                if (aggTwo.containsKey(colName)) {
+                                    var one = aggOne.get(colName);
+                                    var two = aggTwo.get(colName);
+
+                                    if (isMoreUseful(two, one)) {
+                                        aggTwo.put(colName, one);
+                                    }
+                                } else {
+                                    aggTwo.put(colName, aggOne.get(colName));
+                                }
+                            }
+
+                            return aggTwo;
                         }, namedOp("aggregate_data_per_IP"),
                         Materialized.with(ipToProcessSerde, hashMapWithIpResultsSerde))
+                // Filter the results to keep only those that have all the required data.
+                .filter((dnIpPair, ipDataMap) -> hasResultFromAllIpCollectors(ipDataMap))
                 // The stream now contains several (DN;IP) -> Map entries. Group them by the DN.
                 // The result is a grouped stream of DN -> (grouping of) IPDataPair(IP, Map)
                 .groupBy((dnIpPair, ipDataMap) ->
-                                KeyValue.pair(dnIpPair.dn(), new IPDataPair(dnIpPair.ip(), ipDataMap)),
+                                KeyValue.pair(dnIpPair.key().dn(), new IPDataPair(dnIpPair.key().ip(), ipDataMap)),
                         Grouped.with(Serdes.String(), ipDataPairSerde))
                 // Aggregate the group to create a single entry for each DN
                 // The resulting entry (aggregate type) is a Map<IP address, Map<Collector, Data>>
@@ -109,7 +130,8 @@ public class CollectedDataMergerComponent implements PipelineComponent {
                             aggregate.remove(ipDataMap.ip);
                             return aggregate;
                         }, namedOp("aggregate_IP_data_per_DN"),
-                        Materialized.with(Serdes.String(), hashMapWithAllIpResultsSerde));
+                        Materialized.with(Serdes.String(), hashMapWithAllIpResultsSerde))
+                .filter((dn, map) -> !dn.isEmpty());
 
         // The second topology materializes the "processed DNS" stream as a KTable - this is fine, we only care about
         // the last observed DNS data. Then it joins with the IP data per domain generated above to output a single
@@ -160,6 +182,11 @@ public class CollectedDataMergerComponent implements PipelineComponent {
                         Produced.with(Serdes.String(), finalResultSerde));
     }
 
+    public static boolean hasResultFromAllIpCollectors(Map<String, ?> resultsPerIp) {
+        return resultsPerIp.containsKey("geo-asn") && resultsPerIp.containsKey("rdap-ip")
+                && resultsPerIp.containsKey("rtt");
+    }
+
     public static boolean hasEnoughIpCollectorResults(AllCollectedData result) {
         // Currently, the used decision boundary is simply whether we have at least one
         // collection result for each IP address passed for processing.
@@ -182,11 +209,7 @@ public class CollectedDataMergerComponent implements PipelineComponent {
             if (forIp == null || forIp.isEmpty())
                 return false;
 
-            if (!forIp.containsKey("geo-asn"))
-                return false;
-            if (!forIp.containsKey("rdap-ip"))
-                return false;
-            if (!forIp.containsKey("rtt"))
+            if (!hasResultFromAllIpCollectors(forIp))
                 return false;
             // add NERD?
         }
