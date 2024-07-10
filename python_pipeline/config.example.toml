@@ -10,7 +10,7 @@ client_key_file = "/path/to/client_key.pem"
 client_key_password = "password for the private key"
 check_hostname = true
 
-[faust]
+[rdap-dn.faust]
 # All keys from this section will be passed directly to the faust.App constructor
 # See common/util.py:make_app for keys that cannot be set from this configuration
 # See https://faust-streaming.github.io/faust/userguide/settings.html#guide-settings

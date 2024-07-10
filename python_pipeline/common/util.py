@@ -101,13 +101,14 @@ def make_app(name: str, config: dict, logger_name: str = None) -> faust.App:
     connection_config = config.get("connection", {})
     # [component_name] section
     component_config = config.get(name, {})
-    # [component_name.faust] section
-    component_faust_config = component_config.get("faust", {})
 
     # Returns None if SSL is disabled / not configured
     ssl_context = make_ssl_context(config)
 
     if component_config.get("use_faust", True):
+        # [component_name.faust] section
+        component_faust_config = component_config.get("faust", {})
+
         codecs.register("str", StringCodec())
         codecs.register("pydantic", PydanticCodec())
 
@@ -124,12 +125,16 @@ def make_app(name: str, config: dict, logger_name: str = None) -> faust.App:
     else:
         from .loop import FaustLikeApp
 
+        producer_config = component_config.get("producer", {})
+        consumer_config = component_config.get("consumer", {})
+
         brokers = [x.replace("aiokafka://", "") for x in connection_config.get("brokers")]
         app = FaustLikeApp(component_config.get("app_id", "domrad-" + name),
                            brokers,
                            connection_config.get("debug", False),
                            "SSL" if ssl_context else "PLAINTEXT",
-                           ssl_context, logger=log.get(logger_name or "collector-" + name))
+                           ssl_context, logger=log.get(logger_name or "collector-" + name),
+                           producer_args=producer_config, consumer_args=consumer_config)
 
     return app
 
