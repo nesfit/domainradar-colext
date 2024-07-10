@@ -38,7 +38,7 @@ if not PRODUCE_JSONS and not PRODUCE_DFS:
 extractor.init_transformations(component_config)
 
 # The Faust application
-extractor_app = make_app(EXTRACTOR, config)
+extractor_app = make_app(EXTRACTOR, config, COMPONENT_NAME)
 
 # The input and output topics
 # Let's deserialize the result into a dict manually

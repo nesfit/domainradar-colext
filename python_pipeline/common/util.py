@@ -93,7 +93,7 @@ def make_ssl_context(config) -> ssl.SSLContext | None:
     return ssl_context
 
 
-def make_app(name: str, config: dict) -> faust.App:
+def make_app(name: str, config: dict, logger_name: str = None) -> faust.App:
     from . import log
 
     """Creates a Faust application with the specified configuration."""
@@ -107,19 +107,30 @@ def make_app(name: str, config: dict) -> faust.App:
     # Returns None if SSL is disabled / not configured
     ssl_context = make_ssl_context(config)
 
-    codecs.register("str", StringCodec())
-    codecs.register("pydantic", PydanticCodec())
+    if component_config.get("use_faust", True):
+        codecs.register("str", StringCodec())
+        codecs.register("pydantic", PydanticCodec())
 
-    app = faust.App(component_config.get("app_id", "domrad-" + name),
-                    broker=connection_config.get("brokers", "kafka://localhost:9092"),
-                    broker_credentials=ssl_context,
-                    debug=component_config.get("debug", False),
-                    key_serializer="pydantic",
-                    value_serializer="pydantic",
-                    web_enabled=False,
-                    **component_faust_config)
+        app = faust.App(component_config.get("app_id", "domrad-" + name),
+                        broker=connection_config.get("brokers", "kafka://localhost:9092"),
+                        broker_credentials=ssl_context,
+                        debug=component_config.get("debug", False),
+                        key_serializer="pydantic",
+                        value_serializer="pydantic",
+                        web_enabled=False,
+                        **component_faust_config)
 
-    log.inject_handler(log.get(name), app.logger, component_config)
+        log.inject_handler(log.get(name), app.logger, component_config)
+    else:
+        from .loop import FaustLikeApp
+
+        brokers = [x.replace("aiokafka://", "") for x in connection_config.get("brokers")]
+        app = FaustLikeApp(component_config.get("app_id", "domrad-" + name),
+                           brokers,
+                           connection_config.get("debug", False),
+                           "SSL" if ssl_context else "PLAINTEXT",
+                           ssl_context, logger=log.get(logger_name or "collector-" + name))
+
     return app
 
 

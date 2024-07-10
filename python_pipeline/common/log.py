@@ -101,7 +101,7 @@ def init(component_id: str, config: dict) -> _CustomLoggerT:
         logger.k_stderr_handler.setLevel(log_level_stderr)
     else:
         handler = logging.StreamHandler(sys.stderr)
-        handler.setLevel(trace_const)
+        handler.setLevel(log_level_stderr)
         formatter = ExtraFormatter()
         handler.setFormatter(formatter)
         logger.addHandler(handler)

@@ -38,7 +38,7 @@ if not os.path.isdir(pipeline_options.boundaries_dir):
     raise ValueError(f"The boundaries directory '{pipeline_options.boundaries_dir}' does not exist.")
 
 # The Faust application
-classifier_unit_app = make_app(CLASSIFIER, config)
+classifier_unit_app = make_app(CLASSIFIER, config, COMPONENT_NAME)
 
 # The input and output topics
 topic_to_process = classifier_unit_app.topic('feature_vectors', key_type=None,
