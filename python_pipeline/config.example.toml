@@ -116,12 +116,6 @@ batch_size = 100
 # In other words, the extractor will always process its current buffer
 # `batch_timeout` seconds after the last processed one, even if it's not full.
 batch_timeout = 5
-# When set to > 1, the extraction process will be executing in a real thread from a thread pool
-# with the specified number of threads. In normal world, this would help in parallelizing the extraction, but here,
-# Python's GIL prevents this from happening, so this setting could only benefit from pandas running
-# its computations in native code. However, the current transformations are dumb and mostly performed using .apply()
-# which is executed under the GIL, so this setting should be probably be left at 1.
-computation_threads = 1
 # This property controls the applied transformations. The order is irelevant, it is set by the code.
 # You probably don't want to change this. Leave the property out to use all available transformations.
 enabled_transformations = ["dns", "ip", "geo", "tls", "lexical", "rdap_dn", "rdap_ip", "drop"]
@@ -131,6 +125,17 @@ enabled_transformations = ["dns", "ip", "geo", "tls", "lexical", "rdap_dn", "rda
 produce_jsons = false
 # When set to true, the feature extractor won't produce the binary-serialised dataframes to the feature_vectors topic.
 only_produce_jsons = false
+# == Experimental == #
+# When set to > 1, the extraction process will be executing in a real thread from a thread pool with the specified
+# number of threads, or in another process from a process pool. In normal world, threading would help in parallelizing
+# the extraction, but here, Python's GIL prevents this from happening, so this setting could only benefit from pandas
+# running its computations in native code. However, the current transformations are dumb and mostly performed using
+# .apply() which is executed under the GIL. Using multiprocessing instead may help in large throughputs, though it has
+# not been tested whether the overhead is worth it.
+computation_workers = 1
+# One of 'spawn' / 'fork' / 'forkserver' (uses ProcessPoolExecutor) or 'thread' (uses ThreadPoolExecutor).
+# Refer to https://docs.python.org/3/library/multiprocessing.html#multiprocessing-start-methods
+worker_spawn_method = "spawn"
 
 [classifier-unit]
 app_id = "domrad-classifier-unit"

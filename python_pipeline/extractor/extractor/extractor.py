@@ -9,7 +9,6 @@ from typing import Iterable
 import pandas as pd
 from pandas import DataFrame
 
-from common import log
 from .compat import CompatibilityTransformation
 from .transformations.base_transformation import Transformation
 from .transformations.dns import DNSTransformation

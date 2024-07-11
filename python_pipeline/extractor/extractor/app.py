@@ -3,7 +3,9 @@ __author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
 
 import io
 import json
-from concurrent.futures import ThreadPoolExecutor
+import multiprocessing
+import sys
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from json import loads, JSONDecodeError
 from typing import Sequence
 
@@ -26,7 +28,8 @@ logger.k_warning("Yolo", "key", my="arg")
 CONCURRENCY = component_config.get("concurrency", 4)
 BATCH_SIZE = component_config.get("batch_size", 50)
 BATCH_TIMEOUT = component_config.get("batch_timeout", 5)
-COMPUTATION_THREADS = component_config.get("computation_threads", 1)
+COMPUTATION_WORKERS = component_config.get("computation_workers", 1)
+WORKER_SPAWN_METHOD = component_config.get("worker_spawn_method", "fork")
 PRODUCE_JSONS = component_config.get("produce_jsons", False)
 PRODUCE_DFS = not component_config.get("only_produce_jsons", False)
 
@@ -53,9 +56,27 @@ if PRODUCE_JSONS:
                                                 value_type=bytes, value_serializer='raw')
 
 
+def init_process_in_pool(the_config):
+    import os
+    from extractor import extractor
+
+    pid = os.getpid()
+    print(f"initializing worker ({pid})", file=sys.stderr)
+    extractor.init_transformations(the_config)
+
+
 @extractor_app.agent(topic_to_process, concurrency=CONCURRENCY)
 async def process_entries(stream):
-    executor = ThreadPoolExecutor(COMPUTATION_THREADS) if COMPUTATION_THREADS > 1 else None
+    if COMPUTATION_WORKERS > 1:
+        if WORKER_SPAWN_METHOD == "thread":
+            executor = ThreadPoolExecutor(COMPUTATION_WORKERS)
+        else:
+
+            context = multiprocessing.get_context(WORKER_SPAWN_METHOD)
+            executor = ProcessPoolExecutor(COMPUTATION_WORKERS, mp_context=context,
+                                           initializer=init_process_in_pool, initargs=(component_config,))
+    else:
+        executor = None
 
     def parse_event(event: faust.events.EventT):
         msg_key = event.key  # type: str
@@ -78,11 +99,10 @@ async def process_entries(stream):
             # Reset the output buffer position
             buffer.seek(0)
             # Extract features
-            if COMPUTATION_THREADS > 1:
-                # We can run the pandas code in a separate thread, although currently, the code does not really release
-                # the GIL, so it's likely not going to make any difference
+            if COMPUTATION_WORKERS > 1:
+                # Run the extraction in a separate thread or process
                 df, errors = await extractor_app.loop.run_in_executor(
-                    executor, extractor.extract_features, events_parsed)
+                    executor, extractor.extract_features, list(events_parsed))
             else:
                 df, errors = extractor.extract_features(events_parsed)
 
