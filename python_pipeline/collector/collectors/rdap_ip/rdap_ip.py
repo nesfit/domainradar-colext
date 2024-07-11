@@ -68,6 +68,9 @@ async def fetch_ip(dn, address, client_v4: IPv4Client, client_v6: IPv6Client) \
     except httpx.NetworkError as e:
         logger.k_warning("Network error", dn, e=e)
         return None, rc.INTERNAL_ERROR, "Network error: " + str(e)
+    except BadStatusCode as e:
+        logger.k_debug("RDAP weird status code - %s", str(e))
+        return None, rc.CANNOT_FETCH, str(e)
     except MalformedQueryError as e:
         logger.k_warning("Malformed query: %s", dn, address, e=e)
         return None, rc.INTERNAL_ERROR, str(e)

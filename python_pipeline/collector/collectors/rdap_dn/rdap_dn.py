@@ -67,6 +67,9 @@ async def fetch_rdap(domain_name, client: DNSClient) \
     except httpx.NetworkError as e:
         logger.k_warning("Network error", domain_name, e=e)
         return None, None, rc.INTERNAL_ERROR, "Network error: " + str(e)
+    except BadStatusCode as e:
+        logger.k_debug("RDAP weird status code - %s", str(e))
+        return None, None, rc.CANNOT_FETCH, str(e)
     except MalformedQueryError as e:
         logger.k_warning("Malformed query", domain_name, e=e)
         return None, None, rc.INTERNAL_ERROR, str(e)
