@@ -67,7 +67,8 @@ class RDAPDomainTransformation(Transformation):
         df['rdap_time_from_last_change'] = df['rdap_last_changed_date'].apply(
             lambda x: (extraction_ts - x).total_seconds() / (60 * 60 * 24))
         df["rdap_domain_active_time"] = (df["rdap_expiration_date"].apply(
-            lambda x: min(extraction_ts, x)) - df['rdap_registration_date']).apply(
+            lambda x: min(extraction_ts, extraction_ts if x is None else x)).astype("datetime64[ms, UTC]")
+                                         - df['rdap_registration_date']).apply(
             lambda x: x.total_seconds() / (60 * 60 * 24))
         df["rdap_has_dnssec"] = df["rdap_dnssec"].astype("bool")
         df["rdap_registrar_name_len"], df["rdap_registrar_name_entropy"], df["rdap_registrar_name_hash"], \
