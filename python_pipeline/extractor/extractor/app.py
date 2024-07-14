@@ -82,6 +82,9 @@ async def process_entries(stream):
         msg_key = event.key  # type: str
         value_bytes = event.value  # type: bytes
 
+        if value_bytes is None:
+            # Empty entries will be ignored
+            return None
         try:
             value = loads(value_bytes)
             value["domain_name"] = msg_key

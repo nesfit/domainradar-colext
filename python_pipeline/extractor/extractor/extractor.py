@@ -83,6 +83,9 @@ def extract_features(raw_data: Iterable[dict]) -> tuple[DataFrame | None, dict[s
     raw_data_compatible = []
     errors = {}
     for raw_data_entry in raw_data:
+        if raw_data_entry is None:
+            # Ignore empty entries
+            continue
         if raw_data_entry.get("invalid_data"):
             errors[raw_data_entry.get("domain_name", "?")] = ValueError("Invalid data")
             continue
