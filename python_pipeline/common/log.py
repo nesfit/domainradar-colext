@@ -100,6 +100,7 @@ def init(component_id: str, config: dict) -> _CustomLoggerT:
     if hasattr(logger, "k_stderr_handler"):
         logger.k_stderr_handler.setLevel(log_level_stderr)
     else:
+        logger.handlers.clear()  # TODO: the field should not be modified directly
         handler = logging.StreamHandler(sys.stderr)
         handler.setLevel(log_level_stderr)
         formatter = ExtraFormatter()
