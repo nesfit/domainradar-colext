@@ -254,7 +254,7 @@ class DNSCollector:
                 res_data, res_sig = get_response_pair(response)
                 return res_data, res_sig, True, None
             except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer, KeyError):
-                self._logger.debug(f"{domain}: {record_type} not found (primary NS {ns_to_try})")
+                self._logger.debug(f"{domain}: {record_type} not found (pNS {ns_to_try})")
                 fallback = True
             except dns.exception.Timeout:
                 retries_left -= 1
@@ -296,10 +296,11 @@ class DNSCollector:
             try:
                 answer = await self._dns.resolve(domain_name, rtype)
                 ips.update(x.address for x in answer if x.rdtype == rtype)
-            except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN):
-                pass
             except dns.exception.Timeout:
                 self._logger.debug(f"{domain_name}: IP resolution timeout (fallback NS)")
+                pass
+            except dns.exception.DNSException as e:
+                self._logger.debug(f"{domain_name}: IP resolution error (fallback NS): %s", str(e))
                 pass
 
         return ips

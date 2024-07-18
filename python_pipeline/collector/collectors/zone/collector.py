@@ -124,9 +124,7 @@ class ZoneCollector:
         try:
             answer = await self._dns.resolve(domain_name, rdt.NS)
             return set(x.target.to_text(True) for x in answer if x.rdtype == rdt.NS)
-        except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN):
-            return set()
-        except dns.exception.Timeout:
+        except dns.exception.DNSException:
             return set()
 
     async def _resolve_ips(self, domain_name: str) -> set[str]:
@@ -139,9 +137,7 @@ class ZoneCollector:
             try:
                 answer = await self._dns.resolve(domain_name, rtype)
                 ips.update(x.address for x in answer if x.rdtype == rtype)
-            except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN):
-                pass
-            except dns.exception.Timeout:
+            except dns.exception.DNSException:
                 pass
 
         return ips
