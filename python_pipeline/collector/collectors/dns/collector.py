@@ -78,7 +78,7 @@ class DNSCollector:
         elif len(ret_errors) == len(types):
             # All queries failed, return an erroneous result
             # Check if all errors are timeouts
-            for error_str in ret_errors:
+            for error_str in ret_errors.values():
                 if error_str != self._timeout_error:
                     # At least one error is not a timeout
                     return DNSResult(status_code=rc.OTHER_DNS_ERROR,
