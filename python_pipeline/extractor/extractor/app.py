@@ -23,8 +23,6 @@ config = read_config()
 component_config = config.get(EXTRACTOR, {})
 logger = log.init(COMPONENT_NAME, config)
 
-logger.k_warning("Yolo", "key", my="arg")
-
 CONCURRENCY = component_config.get("concurrency", 4)
 BATCH_SIZE = component_config.get("batch_size", 50)
 BATCH_TIMEOUT = component_config.get("batch_timeout", 5)
@@ -71,7 +69,6 @@ async def process_entries(stream):
         if WORKER_SPAWN_METHOD == "thread":
             executor = ThreadPoolExecutor(COMPUTATION_WORKERS)
         else:
-
             context = multiprocessing.get_context(WORKER_SPAWN_METHOD)
             executor = ProcessPoolExecutor(COMPUTATION_WORKERS, mp_context=context,
                                            initializer=init_process_in_pool, initargs=(component_config,))
