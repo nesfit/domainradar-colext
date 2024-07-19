@@ -141,7 +141,3 @@ worker_spawn_method = "spawn"
 app_id = "domrad-classifier-unit"
 # If not set, the directory embedded with the "domainradar-clf" project will be used
 model_path = "/path/to/models"
-# This controls the "batching of batches" coming from the feature extractor.
-# It is recommended to only batch the data on the feature extractor level.
-batch_size = 1
-batch_timeout = 0
