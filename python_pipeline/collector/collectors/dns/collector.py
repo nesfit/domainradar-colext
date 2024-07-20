@@ -173,7 +173,10 @@ class DNSCollector:
         result['TXT'] = []
         for txt_record in data:  # type: dns.rdtypes.ANY.TXT.TXT
             for string in txt_record.strings:
-                text_orig = string.decode()
+                try:
+                    text_orig = string.decode('utf-8')
+                except UnicodeDecodeError:
+                    text_orig = string.decode('ascii', errors='backslashreplace')
                 result['TXT'].append(text_orig)
 
     async def _resolve_record_base(self, domain: Name, record_type: str, primary_ns: list[str],
