@@ -4,7 +4,7 @@ __author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
 import asyncio
 import multiprocessing
 import os.path
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, Executor
 from json import dumps
 
 import pandas as pd
@@ -23,7 +23,6 @@ component_config = config.get(CLASSIFIER, {})
 logger = log.init(COMPONENT_NAME, config)
 
 MODEL_PATH = component_config.get("model_path")
-CONCURRENCY = component_config.get("concurrency", 1)
 CLASSIFIER_WORKERS = component_config.get("classifier_workers", 8)
 WORKER_SPAWN_METHOD = component_config.get("worker_spawn_method", "fork")
 
@@ -70,19 +69,35 @@ topic_to_process = classifier_unit_app.topic('feature_vectors', key_type=None,
 topic_processed = classifier_unit_app.topic('classification_results', key_type=str, key_serializer='str',
                                             value_type=bytes, value_serializer='raw')
 
+_pool_semaphore = asyncio.Semaphore()
+_executor: Executor | None = None
+
+
+async def ensure_pool() -> Executor:
+    global _executor
+    await _pool_semaphore.acquire()
+    if CLASSIFIER_WORKERS > 1:
+        if _executor is not None:
+            _pool_semaphore.release()
+            return _executor
+        logger.info("Initializing the classifier workers")
+        context = multiprocessing.get_context(WORKER_SPAWN_METHOD)
+        _executor = ProcessPoolExecutor(max_workers=CLASSIFIER_WORKERS, mp_context=context,
+                                        initializer=init_classifier, initargs=(pipeline_options,))
+
+        wait_futures = [classifier_unit_app.loop.run_in_executor(_executor, process_input_value, None) for _ in
+                        range(CLASSIFIER_WORKERS)]
+        await asyncio.wait(wait_futures)
+        logger.info("Classifiers initialized")
+    else:
+        _executor = None
+    _pool_semaphore.release()
+    return _executor
+
 
 # The main loop
-@classifier_unit_app.agent(topic_to_process, concurrency=CONCURRENCY)
+@classifier_unit_app.agent(topic_to_process, concurrency=CLASSIFIER_WORKERS)
 async def process_entries(stream):
-    context = multiprocessing.get_context(WORKER_SPAWN_METHOD)
-    executor = ProcessPoolExecutor(max_workers=CLASSIFIER_WORKERS, mp_context=context,
-                                   initializer=init_classifier, initargs=(pipeline_options,))
-
-    wait_futures = [classifier_unit_app.loop.run_in_executor(executor, process_input_value, None) for _ in
-                    range(CLASSIFIER_WORKERS)]
-    await asyncio.wait(wait_futures)
-    logger.info("Classifiers initialized")
-
     async def do_error(value: bytes):
         try:
             df = pd.read_feather(pa.BufferReader(value))
@@ -95,10 +110,14 @@ async def process_entries(stream):
         except Exception as internal_e:
             logger.error("An error occurred while handling an error...", exc_info=internal_e)
 
+    executor = await ensure_pool()
     value: bytes
     async for value in stream:
         try:
-            results = await classifier_unit_app.loop.run_in_executor(executor, process_input_value, value)
+            if executor:
+                results = await classifier_unit_app.loop.run_in_executor(executor, process_input_value, value)
+            else:
+                results = process_input_value(value)
 
             if isinstance(results, str):
                 logger.error("An error occurred while processing the input: %s", results)
@@ -114,7 +133,8 @@ async def process_entries(stream):
         except Exception as e:
             await do_error(value)
 
-    executor.shutdown(True, cancel_futures=True)
+    if executor:
+        executor.shutdown(True, cancel_futures=True)
 
 
 def serialize(value: dict) -> bytes:

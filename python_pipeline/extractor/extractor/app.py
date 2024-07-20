@@ -1,11 +1,11 @@
 """app.py: The main module for the feature extractor component. Defines the Faust application."""
 __author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
 
+import asyncio
 import io
 import json
 import multiprocessing
-import sys
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, Executor
 from json import loads, JSONDecodeError
 from typing import Sequence
 
@@ -23,7 +23,6 @@ config = read_config()
 component_config = config.get(EXTRACTOR, {})
 logger = log.init(COMPONENT_NAME, config)
 
-CONCURRENCY = component_config.get("concurrency", 4)
 BATCH_SIZE = component_config.get("batch_size", 50)
 BATCH_TIMEOUT = component_config.get("batch_timeout", 5)
 COMPUTATION_WORKERS = component_config.get("computation_workers", 1)
@@ -56,24 +55,41 @@ if PRODUCE_JSONS:
 
 def init_process_in_pool(the_config):
     import os
+    import sys
     from extractor import extractor
 
     pid = os.getpid()
-    print(f"initializing worker ({pid})", file=sys.stderr)
+    print(f"Initializing worker ({pid})", file=sys.stderr)
     extractor.init_transformations(the_config)
 
 
-@extractor_app.agent(topic_to_process, concurrency=CONCURRENCY)
-async def process_entries(stream):
+_pool_semaphore = asyncio.Semaphore()
+_executor = None
+
+
+async def ensure_pool() -> Executor:
+    global _executor
+    await _pool_semaphore.acquire()
     if COMPUTATION_WORKERS > 1:
+        if _executor is not None:
+            _pool_semaphore.release()
+            return _executor
+        logger.info("Initializing the extractor workers")
         if WORKER_SPAWN_METHOD == "thread":
-            executor = ThreadPoolExecutor(COMPUTATION_WORKERS)
+            _executor = ThreadPoolExecutor(COMPUTATION_WORKERS)
         else:
             context = multiprocessing.get_context(WORKER_SPAWN_METHOD)
-            executor = ProcessPoolExecutor(COMPUTATION_WORKERS, mp_context=context,
-                                           initializer=init_process_in_pool, initargs=(component_config,))
+            _executor = ProcessPoolExecutor(COMPUTATION_WORKERS, mp_context=context,
+                                            initializer=init_process_in_pool, initargs=(component_config,))
     else:
-        executor = None
+        _executor = None
+    _pool_semaphore.release()
+    return _executor
+
+
+@extractor_app.agent(topic_to_process, concurrency=COMPUTATION_WORKERS)
+async def process_entries(stream):
+    executor = await ensure_pool()
 
     def parse_event(event: faust.events.EventT):
         msg_key = event.key  # type: str
@@ -132,3 +148,6 @@ async def process_entries(stream):
         except Exception as e:
             keys = [e.key for e in events_seq] if events_seq is not None else None
             logger.k_unhandled_error(e, None, all_keys=keys)
+
+    if executor:
+        executor.shutdown(True, cancel_futures=True)
