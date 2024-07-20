@@ -64,9 +64,9 @@ async def fetch_rdap(domain_name, client: DNSClient) \
     except httpx.TimeoutException:
         logger.k_debug("HTTP timeout", domain_name)
         return None, None, rc.TIMEOUT, None
-    except httpx.NetworkError as e:
+    except (httpx.NetworkError, IOError) as e:
         logger.k_warning("Network error", domain_name, e=e)
-        return None, None, rc.INTERNAL_ERROR, "Network error: " + str(e)
+        return None, None, rc.CANNOT_FETCH, "Network error: " + str(e)
     except BadStatusCode as e:
         logger.k_debug("RDAP weird status code - %s", str(e))
         return None, None, rc.CANNOT_FETCH, str(e)

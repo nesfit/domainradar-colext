@@ -65,9 +65,9 @@ async def fetch_ip(dn, address, client_v4: IPv4Client, client_v6: IPv6Client) \
     except httpx.TimeoutException:
         logger.k_debug("HTTP timeout", dn)
         return None, rc.TIMEOUT, None
-    except httpx.NetworkError as e:
+    except (httpx.NetworkError, IOError) as e:
         logger.k_warning("Network error", dn, e=e)
-        return None, rc.INTERNAL_ERROR, "Network error: " + str(e)
+        return None, rc.CANNOT_FETCH, "Network error: " + str(e)
     except BadStatusCode as e:
         logger.k_debug("RDAP weird status code - %s", str(e))
         return None, rc.CANNOT_FETCH, str(e)
