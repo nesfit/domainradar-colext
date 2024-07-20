@@ -58,6 +58,7 @@ class ZoneCollector:
             # Neither domain nor suffix found, invalid input
             return None
 
+        input_name = dns.name.from_text(domain_name)
         zone = None
         while True:
             domain_to_check = domain[from_dot_index + 1:]
@@ -65,13 +66,15 @@ class ZoneCollector:
                 answer = await self._dns.resolve(domain_to_check, rdt.SOA)
                 if len(answer) == 0 or answer[0].rdtype != rdt.SOA:
                     break
-
-                soa = answer[0]  # type: dns.rdtypes.ANY.SOA.SOA
-                soa_record = SOARecord(primary_ns=soa.mname.to_text(True),
-                                       resp_mailbox_dname=soa.rname.to_text(True),
-                                       serial=str(soa.serial), refresh=soa.refresh,
-                                       retry=soa.retry, expire=soa.expire, min_ttl=soa.minimum)
-                zone = domain_to_check
+                # Some unicorn DNS servers return a SOA in the Answer section even for CNAMEs... and it points
+                # to the SOA of the CNAME target. We need to check if the SOA is for the correct domain.
+                if input_name.is_subdomain(answer.rrset.name):
+                    soa = answer[0]  # type: dns.rdtypes.ANY.SOA.SOA
+                    soa_record = SOARecord(primary_ns=soa.mname.to_text(True),
+                                           resp_mailbox_dname=soa.rname.to_text(True),
+                                           serial=str(soa.serial), refresh=soa.refresh,
+                                           retry=soa.retry, expire=soa.expire, min_ttl=soa.minimum)
+                    zone = domain_to_check
             except dns.resolver.NoAnswer:
                 pass
             except dns.resolver.Timeout:
