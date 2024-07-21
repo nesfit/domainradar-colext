@@ -286,7 +286,6 @@ class CompatibilityTransformation:
                        whois_parsed: dict | None, whois_raw: str | None) -> dict:
         if rdap_data is not None:
             if rdap_entities is not None:
-
                 for entity in rdap_entities:
                     # Some RDAP servers return (incorrectly) roles as objects
                     # Convert to lists of arrays, as per the RDAP spec (RFC 7483, Sec. 5.1)
@@ -311,11 +310,22 @@ class CompatibilityTransformation:
                             event["eventDate"] = event.get("EventDate", event.get("eventDate", None))
                             del event["EventDate"]
 
+            if "events" in rdap_data:
+                # Fix the event date and action keys having invalid casing in some responses
+                for event in rdap_data["events"]:
+                    if "eventdate" in event:
+                        event["eventDate"] = event["eventdate"]
+                    if "eventaction" in event:
+                        event["eventAction"] = event["eventaction"]
+
             rdap_data["entities"] = rdap_entities or []
-            rdap_parser = ParseDomain(self.whoisit_bootstrap, rdap_data, dn, True)
+            # noinspection PyBroadException
             try:
+                # The parser actually does some parsing in the constructor
+                rdap_parser = ParseDomain(self.whoisit_bootstrap, rdap_data, dn, True)
                 return rdap_parser.parse()
-            except ParseError:
+            except (ParseError, AttributeError, KeyError):
+                # Some responses are not spec-compliant, leading to weird errors
                 return self._parse_rdap_backup(rdap_data)
         elif whois_parsed is not None or whois_raw is not None:
             return self._parse_whois_to_rdap_equivalent(dn, whois_parsed, whois_raw or "")
