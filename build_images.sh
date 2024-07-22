@@ -7,7 +7,7 @@
 # Builds container images for the Java and Python pipeline components.
 # If no component type is specified, builds all components.
 # The tag prefix is '$TAG_PREFIX/'.
-# For Python images, you can build a single image by specifying the tag (without the tag prefix).
+# You can build a single image by specifying the tag (without the tag prefix).
 
 TAG_PREFIX="domrad"
 
@@ -30,20 +30,46 @@ build_java() {
   echo ">>> Building images for Java-based pipeline components <<<" >"$OUT_MSG"
   cd java_pipeline || return 1
 
-  echo "  > Building Kafka Streams components <  "
-  echo "    > Tag: '$TAG_PREFIX/$STREAMS_TAG' < "
+  local build_streams=1
+  local build_parcon=1
+  local build_connect=1
 
-  docker build -f components.Dockerfile --build-arg TARGET_PKG=streams-components --target runtime-streams -t "$TAG_PREFIX/$STREAMS_TAG" "$@" . 2>"$OUT_BUILD"
+  if [ -n "$1" ]; then
+    if [ "$1" == "$STREAMS_TAG" ]; then
+      build_parcon=0
+      build_connect=0
+      shift 1
+    elif [ "$1" == "$PARCON_TAG" ]; then
+      build_streams=0
+      build_connect=0
+      shift 1
+    elif [ "$1" == "$CONNECT_TAG" ]; then
+      build_streams=0
+      build_parcon=0
+      shift 1
+    fi
+  fi
 
-  echo "  > Building Parallel Consumer components <  " >"$OUT_MSG"
-  echo "    > Tag: '$TAG_PREFIX/$PARCON_TAG' < " >"$OUT_MSG"
+  if [ "$build_streams" == 1 ]; then
+    echo "  > Building Kafka Streams components <  "
+    echo "    > Tag: '$TAG_PREFIX/$STREAMS_TAG' < "
 
-  docker build -f components.Dockerfile --build-arg TARGET_PKG=standalone-collectors --target runtime-standalone -t "$TAG_PREFIX/$PARCON_TAG" "$@" . 2>"$OUT_BUILD"
+    docker build -f streams.Dockerfile -t "$TAG_PREFIX/$STREAMS_TAG" "$@" . 2>"$OUT_BUILD"
+  fi
 
-  echo "  > Building Kafka Connect base image <  " >"$OUT_MSG"
-  echo "    > Tag: '$TAG_PREFIX/$CONNECT_TAG' < " >"$OUT_MSG"
+  if [ "$build_parcon" == 1 ]; then
+    echo "  > Building Parallel Consumer components <  " >"$OUT_MSG"
+    echo "    > Tag: '$TAG_PREFIX/$PARCON_TAG' < " >"$OUT_MSG"
 
-  docker build -f connect.Dockerfile --target runtime-connect -t "$TAG_PREFIX/$CONNECT_TAG" "$@" . 2>"$OUT_BUILD"
+    docker build -f standalone.Dockerfile -t "$TAG_PREFIX/$PARCON_TAG" "$@" . 2>"$OUT_BUILD"
+  fi
+
+  if [ "$build_connect" == 1 ]; then
+    echo "  > Building Kafka Connect base image <  " >"$OUT_MSG"
+    echo "    > Tag: '$TAG_PREFIX/$CONNECT_TAG' < " >"$OUT_MSG"
+
+    docker build -f connect.Dockerfile --target runtime-connect -t "$TAG_PREFIX/$CONNECT_TAG" "$@" . 2>"$OUT_BUILD"
+  fi
 
   cd ..
 }
@@ -118,7 +144,7 @@ if [ "$1" = "help" ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
   echo "Builds container images for the Java and Python pipeline components."
   echo "If no component type is specified, builds all components."
   echo "The tag prefix is '$TAG_PREFIX/'."
-  echo "For Python images, you can build a single image by specifying the tag (without the tag prefix)."
+  echo "You can build a single image by specifying the tag (without the tag prefix)."
   echo ""
   echo "Available Python component tags:"
   for i in "${!py_packages[@]}"; do
@@ -126,6 +152,10 @@ if [ "$1" = "help" ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
   done
   echo "- $STANDALONE_INPUT_TAG"
   echo "- $CONFIG_MANAGER_TAG"
+  echo "Available Java component tags:"
+  echo "- $STREAMS_TAG"
+  echo "- $PARCON_TAG"
+  echo "- $CONNECT_TAG"
   exit 0
 fi
 

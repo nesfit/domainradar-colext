@@ -19,14 +19,14 @@ COPY serialization/pom.xml ./serialization/
 COPY connect/pom.xml ./connect/
 
 # Resolve dependencies
-RUN --mount=type=cache,target=/root/.m2/ mvn clean -pl '-:connect' && \
-    mvn dependency:go-offline -DexcludeGroupIds=cz.vut.fit.domainradar -pl '-:connect'
+RUN --mount=type=cache,target=/root/.m2/ mvn clean -pl '-:connect,-:streams-components' && \
+    mvn dependency:go-offline -DexcludeGroupIds=cz.vut.fit.domainradar -pl '-:connect,-:streams-components'
 
 # Copy the source files
 COPY ./ .
 
 FROM build AS build_component
-ARG TARGET_PKG=streams-components
+ARG TARGET_PKG=standalone-collectors
 ENV TARGET_PKG=${TARGET_PKG}
 
 # Build the JAR with dependencies
@@ -44,10 +44,4 @@ WORKDIR /app
 COPY --from=build_component /src/target.jar ./domainradar-collector.jar
 COPY ./legacy.security ./legacy.security
 
-ENTRYPOINT ["java", "-cp", "/app/domainradar-collector.jar"]
-
-FROM runtime AS runtime-streams
-ENTRYPOINT ["java", "-cp", "/app/domainradar-collector.jar", "cz.vut.fit.domainradar.streams.StreamsPipelineRunner"]
-
-FROM runtime AS runtime-standalone
 ENTRYPOINT ["java", "-cp", "/app/domainradar-collector.jar", "cz.vut.fit.domainradar.standalone.StandaloneCollectorRunner"]
