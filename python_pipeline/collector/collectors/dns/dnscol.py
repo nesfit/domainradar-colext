@@ -1,8 +1,11 @@
+"""dnscol.py: The Faust application for the DNS collector."""
+__author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
+
 from dns.resolver import Cache
 
-from collectors.dns.collector import DNSCollector
-from collectors.options import DNSCollectorOptions
-from collectors.util import handle_top_level_component_exception
+from collectors.dns.scanner import DNSScanner
+from collectors.dns_options import DNSCollectorOptions
+from collectors.util import handle_top_level_exception
 from common import read_config, make_app, log
 from common.models import DNSRequest, DNSResult, IPToProcess, DNSData
 from common.util import ensure_model
@@ -15,14 +18,7 @@ config = read_config()
 component_config = config.get(COLLECTOR, {})
 logger = log.init(COMPONENT_NAME, config)
 
-DNS_SERVERS = component_config.get("dns_servers", ['195.113.144.194', '193.17.47.1',
-                                                   '195.113.144.233', '185.43.135.1'])
-TIMEOUT = component_config.get("timeout", 5)
-ROTATE_NAMESERVERS = component_config.get("rotate_nameservers", False)
-TYPES_TO_SCAN = component_config.get("types_to_scan", ['A', 'AAAA', 'CNAME', 'MX', 'NS', 'TXT'])
-TYPES_TO_PROCESS_IPS_FROM = component_config.get("types_to_process_IPs_from", ['A', 'AAAA', 'CNAME'])
-MAX_RECORD_RETRIES = component_config.get("max_record_retries", 2)
-USE_ONE_SOCKET = component_config.get("use_one_socket", True)
+DNS_OPTIONS = DNSCollectorOptions.from_config(component_config)
 SCANNER_LOG_LEVEL = component_config.get("scanner_log_level", "INFO")
 CONCURRENCY = component_config.get("concurrency", 16)
 
@@ -62,11 +58,8 @@ async def process_entries(stream):
     scanner_child_logger = logger.getChild("scanner")
     scanner_child_logger.setLevel(SCANNER_LOG_LEVEL)
 
-    options = DNSCollectorOptions(dns_servers=DNS_SERVERS, timeout=TIMEOUT, rotate_nameservers=ROTATE_NAMESERVERS,
-                                  types_to_scan=TYPES_TO_SCAN, types_to_process_IPs_from=TYPES_TO_PROCESS_IPS_FROM,
-                                  max_record_retries=MAX_RECORD_RETRIES, use_one_socket=USE_ONE_SOCKET)
     cache = Cache()
-    collector = DNSCollector(options, scanner_child_logger, cache)
+    collector = DNSScanner(DNS_OPTIONS, scanner_child_logger, cache)
 
     # Main message processing loop
     # dn is the domain name, req is the optional ZoneRequest object
@@ -93,4 +86,4 @@ async def process_entries(stream):
                     await topic_tls_requests.send(key=dn, value=ip_for_tls)
         except Exception as e:
             logger.k_unhandled_error(e, dn)
-            await handle_top_level_component_exception(e, COMPONENT_NAME, dn, DNSResult, topic_processed_dns)
+            await handle_top_level_exception(e, COMPONENT_NAME, dn, DNSResult, topic_processed_dns)

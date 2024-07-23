@@ -1,3 +1,6 @@
+"""models.py: Pydantic models for the common data structures used in the components."""
+__author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
+
 from typing import Optional
 
 from pydantic import BaseModel, Field, ConfigDict, AliasGenerator

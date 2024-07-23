@@ -1,3 +1,6 @@
+"""util.py: A collection of shared utility functions for all the components."""
+__author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
+
 import logging
 import os
 import ssl
@@ -29,6 +32,19 @@ def ensure_data_dir() -> None:
 
 
 def get_config_file() -> str:
+    """
+    Retrieves the path to the configuration file.
+
+    The function retrieves the path from the environment variable APP_CONFIG_FILE.
+    If the environment variable is not set, it defaults to './config.toml'. The function checks if the file
+    exists and raises a FileNotFoundError if it does not.
+
+    Returns:
+        str: The path to the configuration file.
+
+    Raises:
+        FileNotFoundError: If the configuration file does not exist.
+    """
     global _config_file, _last_config_modify_time
     if _config_file:
         return _config_file
@@ -93,10 +109,24 @@ def make_ssl_context(config) -> ssl.SSLContext | None:
     return ssl_context
 
 
-def make_app(name: str, config: dict, logger_name: str = None) -> faust.App:
+def make_app(name: str, config: dict, component_id: str = None) -> faust.App:
+    """
+    Creates a Faust application with the specified configuration.
+
+    This function takes a name, a configuration dictionary, and the component ID as input. It uses these inputs
+    to create a Faust application. The function also registers custom codecs for the Faust application and injects
+    a logger into the application.
+
+    Args:
+        name (str): The name of the application (the collector ID or the component ID for non-collector components).
+        config (dict): The configuration dictionary.
+        component_id (str, optional): The component ID.
+
+    Returns:
+        faust.App: The created Faust application.
+    """
     from . import log
 
-    """Creates a Faust application with the specified configuration."""
     # [connection] section
     connection_config = config.get("connection", {})
     # [component_name] section
@@ -123,6 +153,8 @@ def make_app(name: str, config: dict, logger_name: str = None) -> faust.App:
 
         log.inject_handler(log.get(name), app.logger, component_config)
     else:
+        # An experimental wrapper around aiokafka that provides the same interface as Faust
+        # Cannot be used in the feature extractor
         from .loop import FaustLikeApp
 
         producer_config = component_config.get("producer", {})
@@ -133,14 +165,30 @@ def make_app(name: str, config: dict, logger_name: str = None) -> faust.App:
                            brokers,
                            connection_config.get("debug", False),
                            "SSL" if ssl_context else "PLAINTEXT",
-                           ssl_context, logger=log.get(logger_name or "collector-" + name),
+                           ssl_context, logger=log.get(component_id or "collector-" + name),
                            producer_args=producer_config, consumer_args=consumer_config)
-
     return app
 
 
 # noinspection PyTypeChecker
 def check_config_changes(component_id: str, app):
+    """
+    Checks if the configuration file has changed and reloads it if necessary.
+
+    This function takes a component ID and a Faust application as input. It checks if the configuration file has
+    changed since the last time it was loaded. If the file has changed, the function reloads the configuration and
+    re-initializes the logger.
+
+    The function only checks for configuration changes if the 'watch_config' option is set to True in the configuration
+    for the specified component. It should be called after each processed event.
+
+    Args:
+        component_id (str): The ID of the component.
+        app (faust.App): The Faust application.
+
+    Raises:
+        FileNotFoundError: If the configuration file does not exist.
+    """
     global _last_config_modify_time, _config
     config = cast(dict, _config)
     if config.get(component_id, {}).get("watch_config", False):
@@ -182,6 +230,22 @@ TModel = TypeVar('TModel')
 
 
 def ensure_model(model_class: Type[TModel], data: dict | None) -> TModel | None:
+    """
+    Validates the provided data against the specified Pydantic model class.
+
+    This function takes a model class and a dictionary of data as input. It attempts to validate the data against
+    the model class using the model's `model_validate` method. If the data is valid, the function returns the validated
+    model. If the data is not valid, the function logs a warning and returns None.
+
+    If an exception occurs during the validation process, the function logs an error and returns None.
+
+    Args:
+        model_class (Type[TModel]): The class of the model against which to validate the data.
+        data (dict | None): The data to validate. If None, the function immediately returns None.
+
+    Returns:
+        TModel | None: The validated model if the data is valid, None otherwise.
+    """
     if data is None:
         return None
 

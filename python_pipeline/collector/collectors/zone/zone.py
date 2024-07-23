@@ -1,10 +1,13 @@
+"""zone.py: The Faust application for the zone collector."""
+__author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
+
 import dns.exception
 from dns.resolver import Cache
 
 import common.result_codes as rc
-from collectors.options import DNSCollectorOptions
-from collectors.util import handle_top_level_component_exception
-from collectors.zone.collector import ZoneCollector
+from collectors.dns_options import DNSCollectorOptions
+from collectors.util import handle_top_level_exception
+from collectors.zone.resolver import ZoneResolver
 from common import read_config, make_app, log
 from common.models import RDAPDomainRequest, RDAPDomainResult, ZoneRequest, ZoneResult, DNSRequest
 from common.util import ensure_model
@@ -17,10 +20,7 @@ config = read_config()
 component_config = config.get(COLLECTOR, {})
 logger = log.init(COMPONENT_NAME, config)
 
-DNS_SERVERS = component_config.get("dns_servers", ['195.113.144.194', '193.17.47.1',
-                                                   '195.113.144.233', '185.43.135.1'])
-TIMEOUT = component_config.get("timeout", 5)
-ROTATE_NAMESERVERS = component_config.get("rotate_nameservers", False)
+DNS_OPTIONS = DNSCollectorOptions.from_config(component_config)
 CONCURRENCY = component_config.get("concurrency", 16)
 
 # The Faust application
@@ -39,9 +39,8 @@ topic_rdap_requests = zone_app.topic('to_process_RDAP_DN', key_type=str, key_ser
 # The Zone processor
 @zone_app.agent(topic_to_process, concurrency=CONCURRENCY)
 async def process_entries(stream):
-    options = DNSCollectorOptions(dns_servers=DNS_SERVERS, timeout=TIMEOUT, rotate_nameservers=ROTATE_NAMESERVERS)
     cache = Cache()
-    collector = ZoneCollector(options, logger, cache)
+    collector = ZoneResolver(DNS_OPTIONS, logger, cache)
 
     # Main message processing loop
     # dn is the domain name, req is the optional ZoneRequest object
@@ -80,4 +79,4 @@ async def process_entries(stream):
 
         except Exception as e:
             logger.k_unhandled_error(e, dn)
-            await handle_top_level_component_exception(e, COMPONENT_NAME, dn, RDAPDomainResult, topic_processed_zone)
+            await handle_top_level_exception(e, COMPONENT_NAME, dn, RDAPDomainResult, topic_processed_zone)

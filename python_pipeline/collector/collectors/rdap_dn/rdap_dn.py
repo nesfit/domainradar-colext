@@ -1,3 +1,6 @@
+"""rdap_dn.py: The Faust application for the RDAP-DN collector."""
+__author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
+
 import asyncio
 
 import asyncwhois
@@ -13,8 +16,8 @@ from whodap.response import DomainResponse
 
 import common.result_codes as rc
 from collectors.limiter import LimiterProvider
-from collectors.util import fetch_entities, extract_known_tld, make_rdap_ssl_context, \
-    handle_top_level_component_exception
+from collectors.util import handle_top_level_exception
+from collectors.rdap_util import fetch_entities, make_rdap_ssl_context, extract_known_tld
 from common import read_config, make_app, log
 from common.models import RDAPDomainRequest, RDAPDomainResult
 from common.util import ensure_model
@@ -207,7 +210,7 @@ async def process_entries(stream):
             await process_entry(dn, req, rdap_client, whois_client)
         except Exception as e:
             logger.k_unhandled_error(e, dn)
-            await handle_top_level_component_exception(e, COMPONENT_NAME, dn, RDAPDomainResult, topic_processed)
+            await handle_top_level_exception(e, COMPONENT_NAME, dn, RDAPDomainResult, topic_processed)
 
     await rdap_client.aio_close()
     await httpx_client.aclose()

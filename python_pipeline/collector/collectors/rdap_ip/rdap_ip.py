@@ -1,3 +1,6 @@
+"""rdap_ip.py: The Faust application for the RDAP-IP collector."""
+__author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
+
 import asyncio
 import ipaddress
 
@@ -9,7 +12,8 @@ from whodap.response import IPv4Response, IPv6Response
 
 import common.result_codes as rc
 from collectors.limiter import LimiterProvider
-from collectors.util import make_rdap_ssl_context, should_omit_ip, handle_top_level_component_exception
+from collectors.util import should_omit_ip, handle_top_level_exception
+from collectors.rdap_util import make_rdap_ssl_context
 from common import read_config, make_app, log
 from common.models import IPToProcess, IPProcessRequest, RDAPIPResult
 from common.util import ensure_model
@@ -140,8 +144,8 @@ async def process_entries(stream):
             await process_entry(dn_ip, ipv4_client, ipv6_client)
         except Exception as e:
             logger.k_unhandled_error(e, str(dn_ip))
-            await handle_top_level_component_exception(e, COMPONENT_NAME, dn_ip,
-                                                       RDAPIPResult, topic_processed)
+            await handle_top_level_exception(e, COMPONENT_NAME, dn_ip,
+                                             RDAPIPResult, topic_processed)
 
     await ipv4_client.aio_close()
     await ipv6_client.aio_close()

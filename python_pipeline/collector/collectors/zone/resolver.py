@@ -1,3 +1,6 @@
+"""resolver.py: The zone resolver."""
+__author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
+
 from logging import Logger
 
 import dns
@@ -5,11 +8,18 @@ import dns.asyncresolver
 import dns.rdatatype as rdt
 import tldextract
 
-from collectors.options import DNSCollectorOptions
+from collectors.dns_options import DNSCollectorOptions
 from common.models import ZoneInfo, SOARecord
 
 
-class ZoneCollector:
+class ZoneResolver:
+    """
+    A class used to find DNS zones.
+
+    This class provides a method that finds the DNS zone domain name for an input domain name.
+    It uses the provided DNSCollectorOptions to configure the DNS queries and timeouts.
+    """
+
     def __init__(self, options: DNSCollectorOptions, logger: Logger, cache: dns.resolver.Cache | None = None):
         self._options = options
         self._logger = logger

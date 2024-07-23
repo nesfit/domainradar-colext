@@ -50,7 +50,21 @@ def init_transformations(config: dict):
     """
     Initializes the transformation list and other metadata based on the `enabled_transformations` key
     in the configuration. If the key is not present, all transformations are enabled.
-    :param config: The configuration dictionary.
+
+    This method takes a configuration dictionary as input. It checks for the presence of the 'enabled_transformations'
+    key in the dictionary. If the key is present, it initializes the transformation list with the transformations
+    specified by the key. If the key is not present, it initializes the transformation list with all available
+    transformations.
+
+    The method also updates the metadata related to the transformations, including the names of the columns added by
+    the transformations and their target DataFrame types.
+
+    Args:
+        config (dict): The configuration dictionary.
+
+    Raises:
+        ValueError: If the 'enabled_transformations' key in the configuration dictionary contains an invalid
+        transformation identifier.
     """
     global _enabled_transformations, _added_columns_names, _added_columns_with_types, _all_columns_with_types
 
@@ -75,9 +89,21 @@ def init_transformations(config: dict):
 def extract_features(raw_data: Iterable[dict]) -> tuple[DataFrame | None, dict[str, Exception]]:
     """
     Extracts features from the raw data by passing it through the transformations enabled in the configuration.
-    The `init_transformations` function must be called once before this function can be used.
-    :param raw_data: An iterable of dictionaries, each representing one entry of raw data.
-    :return: A DataFrame where each row represents one input entry and the columns are the extracted features.
+
+    This function takes an iterable of dictionaries as input, each representing one entry of raw data. It passes the
+    raw data through the transformations that have been enabled in the configuration. The `init_transformations`
+    function must be called once before this function can be used.
+
+    The function returns a tuple. The first element of the tuple is a DataFrame where each row represents one input
+    entry and the columns are the extracted features. The second element of the tuple is a dictionary of exceptions
+    that occurred during the feature extraction process.
+
+    Args:
+        raw_data (Iterable[dict]): An iterable of dictionaries, each representing one entry of raw data.
+
+    Returns:
+        tuple[DataFrame | None, dict[str, Exception]]: A tuple where the first element is a DataFrame of extracted
+        features and the second element is a dictionary of exceptions.
     """
     # Transform the raw data into a format compatible with the transformations
     raw_data_compatible = []

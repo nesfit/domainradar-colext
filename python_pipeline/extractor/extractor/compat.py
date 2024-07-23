@@ -66,6 +66,20 @@ class CompatibilityTransformation:
             print(f"Failed to bootstrap the whoisit library: {e}")
 
     def transform(self, data: dict) -> dict:
+        """
+        Transforms the raw data object collected by the DomainRadar collector into a format that can be used by the
+        "legacy" transformations.
+
+        This method takes a dictionary of raw data as input and returns a dictionary of
+        transformed data. The transformation process involves several steps, including parsing DNS and RDAP data,
+        extracting and formatting specific data fields, and handling potential errors or inconsistencies in the raw data.
+
+        Args:
+            data (dict): A dictionary containing the raw data collected by the DomainRadar collector.
+
+        Returns:
+            dict: A dictionary containing the transformed data.
+        """
         if data.get("invalid_data"):
             return data
 
@@ -118,6 +132,20 @@ class CompatibilityTransformation:
 
     @staticmethod
     def _ensure_utc_datetime(dt: datetime | None) -> datetime | None:
+        """
+        Ensures that the provided datetime object is timezone-aware and in UTC.
+
+        This method takes a datetime object as input and returns a datetime object that is timezone-aware and in UTC.
+        If the input datetime object is naive (i.e., not timezone-aware), it is assumed to be in UTC.
+        If the input datetime object is already timezone-aware, it is converted to UTC.
+
+        Args:
+            dt (datetime | None): The input datetime object. If None, None is returned.
+
+        Returns:
+            datetime | None: The input datetime object converted to a timezone-aware datetime object in UTC.
+            If the input was None, None is returned.
+        """
         if dt is None:
             return None
         if dt.tzinfo is None:
@@ -126,6 +154,20 @@ class CompatibilityTransformation:
 
     @staticmethod
     def _flatten_ip_data(ip_data: list):
+        """
+        Flattens the IP data by extracting country codes, latitudes, and longitudes.
+
+        This method takes a list of IP data dictionaries as input. Each dictionary is expected to have a 'geo' key
+        containing a dictionary with 'country_code', 'latitude', and 'longitude' keys. The method iterates over the list
+        and appends the values of these keys to respective lists. If the 'geo' key is not present or its value is None,
+        the IP data dictionary is skipped.
+
+        Args:
+            ip_data (list): A list of dictionaries containing IP data.
+
+        Returns:
+            tuple: A tuple containing three lists - country codes, latitudes, and longitudes extracted from the IP data.
+        """
         country_codes = []
         latitudes = []
         longitudes = []
@@ -141,6 +183,19 @@ class CompatibilityTransformation:
 
     @staticmethod
     def _make_email_extras(data: dict) -> dict:
+        """
+        Extracts and returns the presence of SPF, DKIM, and DMARC records from the DNS TXT records.
+
+        This method takes a dictionary of raw data as input and checks the DNS TXT records for the presence of SPF,
+        DKIM, and DMARC records. It returns a dictionary with boolean values indicating the presence of these records.
+
+        Args:
+            data (dict): A dictionary containing the raw data collected by the DomainRadar collector.
+
+        Returns:
+            dict: A dictionary with keys 'spf', 'dkim', and 'dmarc'. The values are boolean indicating the presence of
+            the respective records in the DNS TXT records.
+        """
         ret = {
             "spf": False,
             "dkim": False,
@@ -163,6 +218,21 @@ class CompatibilityTransformation:
 
     @staticmethod
     def _make_soa(data: dict) -> (dict | None, dict | None):
+        """
+        Extracts and formats the SOA (Start of Authority) record from the DNS data.
+
+        This method takes a dictionary of raw data as input and extracts the SOA record. The method returns a tuple of
+        two dictionaries. The first dictionary contains the SOA record for the domain name, and the second dictionary
+        contains the SOA record for the zone. Only one of these is always present in the data (if the input domain
+        name is also the zone, only the first dictionary is present; otherwise, only the second dictionary is present).
+
+        Args:
+            data (dict): A dictionary containing the raw data collected by the DomainRadar collector.
+
+        Returns:
+            tuple: A tuple containing two dictionaries representing the SOA records for the domain name and the zone.
+            If the SOA record is not present, None is returned.
+        """
         soa = get_safe(data, "zone.soa")
         if soa is None:
             return None, None
@@ -201,6 +271,19 @@ class CompatibilityTransformation:
 
     @staticmethod
     def _make_tls(data: dict) -> dict | None:
+        """
+        Extracts and formats the TLS handshake and certificate data from the raw data.
+
+        This method takes a dictionary of raw data as input and extracts the TLS data. The TLS data includes information
+        about the cipher, protocol, count of certificates, and the certificates themselves. The certificates are
+        represented directly as cryptography's Certificate or as a string in case of parse errors.
+
+        Args:
+            data (dict): A dictionary containing the raw data collected by the DomainRadar collector.
+
+        Returns:
+            dict | None: A dictionary containing the TLS data. If the TLS data is not present, None is returned.
+        """
         def make_certificate(cert_data: dict) -> Certificate | str:
             data_b64: str = cert_data.get("derData", "")
             dn: str = cert_data.get("dn", "")
@@ -231,10 +314,28 @@ class CompatibilityTransformation:
 
     @staticmethod
     def _parse_rdap_backup(rdap_data: dict):
-        return {}  # TODO
+        # TODO: custom parsing of the key elements from RDAP responses for the responses
+        #       where the parser fails
+        return {}
 
     @staticmethod
-    def _parse_whois_to_rdap_equivalent(dn: str, whois_parsed: dict, whois_raw: str):
+    def _parse_whois(dn: str, whois_parsed: dict, whois_raw: str):
+        """
+        Parses WHOIS data to the RDAP-like representation expected by the transformations.
+
+        This method takes a domain name, parsed WHOIS data, and raw WHOIS data as input. It attempts to parse the WHOIS
+        data into the format returned by `_parse_rdap_dn`. The RDAP format includes entities, registration date,
+        expiration date, and last changed date. If the WHOIS data is not available or parsing fails,
+        it returns an empty dictionary.
+
+        Args:
+            dn (str): The domain name.
+            whois_parsed (dict): The parsed WHOIS data.
+            whois_raw (str): The raw WHOIS data.
+
+        Returns:
+            dict: A dictionary containing the parsed WHOIS data in the format expected by the transformations.
+        """
         def adjust_format(in_date, last):
             if in_date is None:
                 return None
@@ -284,6 +385,24 @@ class CompatibilityTransformation:
 
     def _parse_rdap_dn(self, dn: str, rdap_data: dict | None, rdap_entities: list | None,
                        whois_parsed: dict | None, whois_raw: str | None) -> dict:
+        """
+        Parses RDAP and WHOIS data into a unified format expected by the transformations.
+
+        This method takes a domain name, RDAP data, RDAP entities, parsed WHOIS data, and raw WHOIS data as input.
+        It attempts to parse the RDAP and WHOIS data into a unified format that includes entities, registration date,
+        expiration date, and last changed date. If the RDAP or WHOIS data is not available or parsing fails,
+        it returns an empty dictionary.
+
+        Args:
+            dn (str): The domain name.
+            rdap_data (dict | None): The RDAP data.
+            rdap_entities (list | None): The RDAP entities.
+            whois_parsed (dict | None): The parsed WHOIS data.
+            whois_raw (str | None): The raw WHOIS data.
+
+        Returns:
+            dict: A dictionary containing the parsed RDAP and WHOIS data in a unified format.
+        """
         if rdap_data is not None:
             if rdap_entities is not None:
                 for entity in rdap_entities:
@@ -328,7 +447,7 @@ class CompatibilityTransformation:
                 # Some responses are not spec-compliant, leading to weird errors
                 return self._parse_rdap_backup(rdap_data)
         elif whois_parsed is not None or whois_raw is not None:
-            return self._parse_whois_to_rdap_equivalent(dn, whois_parsed, whois_raw or "")
+            return self._parse_whois(dn, whois_parsed, whois_raw or "")
         else:
             return {}
 
@@ -341,6 +460,18 @@ class CompatibilityTransformation:
 
     @staticmethod
     def _make_ip_average_rtt(results_for_ip: dict) -> float:
+        """
+        Calculates the average round-trip time (RTT) for the IP addresses related to a domain name.
+
+        If an IP result does not have the 'average_rtt' key or if the key's value is not a number, the result is not
+        included in the calculation. If none of the IP results have the 'average_rtt' key, the method returns 0.0.
+
+        Args:
+            results_for_ip (dict): A dictionary containing the results from the IP-based collectors.
+
+        Returns:
+            float: The average round-trip time (RTT) for the IP address.
+        """
         count = 0
         total = 0
         for collector, results in results_for_ip.items():
@@ -353,6 +484,23 @@ class CompatibilityTransformation:
         return total / count if count > 0 else 0.0
 
     def _make_ip_data(self, data: dict) -> list[dict]:
+        """
+        Extracts and formats the IP data from the raw data.
+
+        This method takes a dictionary of raw data as input and extracts the IP data. The IP data includes information
+        about the IP address, the record from which it was obtained, ASN details, RDAP details, geolocation details,
+        average round-trip time (RTT), and NERD reputation.
+
+        The method returns a list of dictionaries, each representing an IP address and its associated data. If the IP
+        data is not present in the raw data, an empty list is returned.
+
+        Args:
+            data (dict): A dictionary containing the raw data collected by the DomainRadar collector.
+
+        Returns:
+            list[dict]: A list of dictionaries representing the IP data. Each dictionary contains the IP address and its
+            associated data, including ASN details, RDAP details, geolocation details, average RTT, and NERD reputation.
+        """
         def t_ip_ver(ver: str | None):
             return "6" if ver == "v6" else ("4" if ver == "v4" else ver)
 

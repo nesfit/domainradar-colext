@@ -1,3 +1,7 @@
+"""loop.py: A lightweight wrapper over aiokafka that provides a Faust-compatible interface. Highly experimental
+and currently not fast enough, as it always processes messages one by one."""
+__author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
+
 import asyncio
 import json
 import logging

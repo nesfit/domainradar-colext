@@ -1,7 +1,10 @@
+"""rtt.py: The Faust application for the RTT collector."""
+__author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
+
 from icmplib import async_ping, ICMPSocketError, DestinationUnreachable, TimeExceeded
 
 import common.result_codes as rc
-from collectors.util import should_omit_ip, handle_top_level_component_exception
+from collectors.util import should_omit_ip, handle_top_level_exception
 from common import read_config, make_app, log
 from common.models import IPToProcess, IPProcessRequest, RTTResult, RTTData
 from common.util import ensure_model
@@ -75,4 +78,4 @@ async def process_entries(stream):
             await process_entry(dn_ip)
         except Exception as e:
             logger.k_unhandled_error(e, str(dn_ip))
-            await handle_top_level_component_exception(e, COMPONENT_NAME, dn_ip, RTTResult, topic_processed)
+            await handle_top_level_exception(e, COMPONENT_NAME, dn_ip, RTTResult, topic_processed)

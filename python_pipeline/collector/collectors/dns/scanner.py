@@ -1,3 +1,6 @@
+"""scanner.py: The DNS scanner."""
+__author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
+
 import ipaddress
 import socket
 from logging import Logger
@@ -13,12 +16,19 @@ from dns.message import Message
 from dns.name import Name
 from dns.rrset import RRset
 
-from collectors.options import DNSCollectorOptions
+from collectors.dns_options import DNSCollectorOptions
 from common import result_codes as rc
 from common.models import DNSData, CNAMERecord, MXRecord, NSRecord, IPFromRecord, DNSRequest, DNSResult
 
 
-class DNSCollector:
+class DNSScanner:
+    """
+    A class used to perform DNS scans.
+
+    This class provides methods to perform DNS scans for different types of DNS records (A, AAAA, CNAME, MX, NS, TXT).
+    It uses the provided DNSCollectorOptions to configure the DNS queries and timeouts.
+    """
+
     def __init__(self, options: DNSCollectorOptions, logger: Logger, cache: dns.resolver.Cache | None = None):
         self._options = options
         self._logger = logger
@@ -34,6 +44,23 @@ class DNSCollector:
         self._timeout_error = f"Timeout ({options.timeout} s)"
 
     async def scan_dns(self, domain_name: str, request: DNSRequest) -> DNSResult:
+        """
+        Asynchronously scans DNS records for a given domain name based on the provided request.
+
+        This method takes a domain name and a DNSRequest object as input. It uses the DNSRequest object to determine
+        which types of DNS records to collect for the domain name. The method then performs DNS queries to collect the
+        requested records and returns a DNSResult object containing the results of the queries.
+
+        If the method encounters an error while performing a DNS query, it logs the error and continues with the next
+        query. If all queries fail, the method returns a DNSResult object with an error status.
+
+        Args:
+            domain_name (str): The domain name to scan.
+            request (DNSRequest): The request object specifying which types of DNS records to collect.
+
+        Returns:
+            DNSResult: The result of the DNS scan, including any collected DNS records and any errors that occurred.
+        """
         if self._options.use_one_socket and self._udp_sock is None:
             self._udp_sock = await dns.asyncbackend.get_default_backend().make_socket(socket.AF_INET, socket.SOCK_DGRAM)
 

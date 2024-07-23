@@ -1,3 +1,6 @@
+"""limiter.py: The local rate limiter for the RDAP collectors."""
+__author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
+
 import asyncio
 
 from asynciolimiter import (Limiter as AioLim,
@@ -7,7 +10,7 @@ from asynciolimiter import (Limiter as AioLim,
 TLim = AioLim | AioStrict | AioLeakyBucket
 
 
-class _Limiter:
+class Limiter:
     OK = 0
     IMMEDIATE_FAIL = 1
     TIMEOUT = 2
@@ -75,9 +78,9 @@ class LimiterProvider:
         self._default_type = self._default.get("type", "limiter")
         self._overrides = config.get("limiter_overrides", {})
 
-        self._limiters: dict[str, _Limiter] = {}
+        self._limiters: dict[str, Limiter] = {}
 
-    def get_limiter(self, endpoint: str, tld: str | None = None) -> _Limiter:
+    def get_limiter(self, endpoint: str, tld: str | None = None) -> Limiter:
         if endpoint in self._limiters:
             return self._limiters[endpoint]
 
@@ -92,7 +95,7 @@ class LimiterProvider:
         self._limiters[endpoint] = new_limiter
         return new_limiter
 
-    def _make_limiter(self, settings: dict) -> _Limiter:
+    def _make_limiter(self, settings: dict) -> Limiter:
         lim_type = settings.get("type", self._default_type)
         immediate = settings.get("immediate", self._default_immediate)
         max_wait = settings.get("max_wait", self._default_max_wait)
@@ -106,4 +109,4 @@ class LimiterProvider:
         if not limiter_cls:
             raise ValueError(f"Unknown limiter type: {lim_type}")
 
-        return _Limiter(limiter_cls(**args), immediate, max_wait)
+        return Limiter(limiter_cls(**args), immediate, max_wait)
