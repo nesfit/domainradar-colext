@@ -1,5 +1,10 @@
 package cz.vut.fit.domainradar;
 
+/**
+ * The configuration keys, descriptions and default values for the collectors.
+ *
+ * @author Ondřej Ondryáš
+ */
 @SuppressWarnings("ALL")
 public class CollectorConfig {
     /* --- GeoIP collector --- */

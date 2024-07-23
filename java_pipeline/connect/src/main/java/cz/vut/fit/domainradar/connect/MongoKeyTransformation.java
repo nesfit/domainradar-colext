@@ -15,6 +15,11 @@ import java.util.Map;
 
 import static cz.vut.fit.domainradar.Topics.TOPICS_TO_COLLECTOR_ID;
 
+/**
+ * Implementation of Connect's {@link Transformation} that ...
+ *
+ * @author Ondřej Ondryáš
+ */
 public class MongoKeyTransformation<R extends ConnectRecord<R>> implements Transformation<R> {
     public static final Schema DN_KEY_SCHEMA = SchemaBuilder.struct()
             .name("cz.vut.fit.domainradar.MongoDNKey")

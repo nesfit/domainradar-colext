@@ -16,6 +16,10 @@ import org.jetbrains.annotations.Nullable;
 import java.io.IOException;
 import java.util.Map;
 
+/**
+ * Implementation of Connect's {@link Converter} that deserializes the {@link IPToProcess} DN/IP pair into
+ * a Connect record.
+ */
 public class IPToProcessConverter implements Converter {
     private final ObjectMapper _objectMapper;
     public static final Schema SCHEMA = SchemaBuilder.struct()

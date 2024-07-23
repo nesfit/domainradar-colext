@@ -16,6 +16,16 @@ import java.util.Map;
 
 import static cz.vut.fit.domainradar.Topics.TOPICS_TO_COLLECTOR_ID;
 
+/**
+ * Implementation of Connect's {@link Converter} that deserializes the results from collectors into a Connect record.
+ * <p>
+ * The converter only outputs the common fields of all results. The resulting value is a structure that contains the
+ * status code, error message, last attempt timestamp and collector identifier. The identifier is either taken from the
+ * deserialized message (in case of IP-based collectors) or from the source topic name (in case of DN-based collectors).
+ *
+ * @author Ondřej Ondryáš
+ * @see cz.vut.fit.domainradar.Topics#TOPICS_TO_COLLECTOR_ID
+ */
 public class CommonResultConverter implements Converter {
     public record CommonResult(
             int statusCode,
@@ -46,6 +56,8 @@ public class CommonResultConverter implements Converter {
         @Nullable var collectorId = TOPICS_TO_COLLECTOR_ID.get(topic);
 
         try {
+            // Deserialize as a CommonResult object that contains the common fields only
+            // The collector field may be missing
             var result = _objectMapper.readValue(value, CommonResult.class);
             if (result.collector == null && collectorId == null)
                 throw new DataException("Cannot determine collector name");
@@ -53,6 +65,7 @@ public class CommonResultConverter implements Converter {
             var resultStruct = new Struct(SCHEMA.schema());
             resultStruct.put("status_code", (short) result.statusCode());
             resultStruct.put("error", result.error());
+            // Connect's Timestamp schema expects the "old" java.util.Date object, not an Instant
             resultStruct.put("last_attempt", java.util.Date.from(result.lastAttempt()));
             resultStruct.put("collector", (result.collector != null) ? result.collector : collectorId);
             return new SchemaAndValue(SCHEMA.schema(), resultStruct);

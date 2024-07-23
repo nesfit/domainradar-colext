@@ -3,6 +3,11 @@ package cz.vut.fit.domainradar;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * The Kafka topic names.
+ *
+ * @author Ondřej Ondryáš
+ */
 public final class Topics {
     public static final String IN_ZONE = "to_process_zone";
     public static final String IN_DNS = "to_process_DNS";
@@ -18,7 +23,9 @@ public final class Topics {
 
     public static final String OUT_MERGE_ALL = "all_collected_data";
 
-
+    /**
+     * Mapping of the output topics to the collector IDs.
+     */
     public static final Map<String, String> TOPICS_TO_COLLECTOR_ID = new HashMap<>();
 
     static {
