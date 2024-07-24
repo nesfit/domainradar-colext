@@ -49,18 +49,26 @@ async def process_entries(stream):
             logger.k_trace("Processing zone", dn)
             req = ensure_model(ZoneRequest, req)
 
-            try:
-                zone_info = await collector.get_zone_info(dn)
-            except dns.exception.Timeout:
-                logger.k_info("Timeout", dn)
-                result = ZoneResult(status_code=rc.TIMEOUT, error=f"Timeout ({TIMEOUT} s)", zone=None)
+            if dn.endswith(".arpa"):
+                result = ZoneResult(status_code=rc.INVALID_DOMAIN_NAME,
+                                    error=".arpa domain names not supported",
+                                    zone=None)
             else:
-                if zone_info is None:
-                    logger.k_debug("Zone not found", dn)
-                    result = ZoneResult(status_code=rc.NOT_FOUND, error="Zone not found", zone=None)
+                try:
+                    zone_info = await collector.get_zone_info(dn)
+                except dns.exception.Timeout:
+                    logger.k_info("Timeout", dn)
+                    result = ZoneResult(status_code=rc.TIMEOUT, error=f"Timeout ({DNS_OPTIONS.timeout} s)", zone=None)
+                except dns.resolver.NoNameservers as e:
+                    logger.k_info("No nameservers", dn)
+                    result = ZoneResult(status_code=rc.CANNOT_FETCH, error="SERVFAIL: " + str(e), zone=None)
                 else:
-                    logger.k_trace("Zone found: %s", dn, zone_info.zone)
-                    result = ZoneResult(status_code=0, zone=zone_info)
+                    if zone_info is None:
+                        logger.k_debug("Zone not found", dn)
+                        result = ZoneResult(status_code=rc.NOT_FOUND, error="Zone not found", zone=None)
+                    else:
+                        logger.k_trace("Zone found: %s", dn, zone_info.zone)
+                        result = ZoneResult(status_code=0, zone=zone_info)
 
             await topic_processed_zone.send(key=dn, value=result)
 
