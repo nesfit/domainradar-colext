@@ -16,8 +16,8 @@ from whodap.response import DomainResponse
 
 import common.result_codes as rc
 from collectors.limiter import LimiterProvider
-from collectors.util import handle_top_level_exception
 from collectors.rdap_util import fetch_entities, make_rdap_ssl_context, extract_known_tld
+from collectors.util import handle_top_level_exception
 from common import read_config, make_app, log
 from common.models import RDAPDomainRequest, RDAPDomainResult
 from common.util import ensure_model
@@ -130,6 +130,12 @@ async def fetch_whois(domain_name, client: DomainClient) -> tuple[str | None, di
 
         logger.k_debug("WHOIS other error: %s: %s", domain_name, endpoint, msg)
         return None, None, rc.CANNOT_FETCH, str(e)
+    except Exception as e:
+        logger.k_warning("Unhandled WHOIS exception", domain_name, e=e)
+        if isinstance(e, IOError):
+            return None, None, rc.INTERNAL_ERROR, str(e)
+        else:
+            return None, None, rc.CANNOT_FETCH, str(e)
 
 
 async def process_entry(dn, req, rdap_client, whois_client):
