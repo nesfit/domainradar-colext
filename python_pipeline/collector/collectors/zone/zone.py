@@ -57,10 +57,10 @@ async def process_entries(stream):
                 try:
                     zone_info = await collector.get_zone_info(dn)
                 except dns.exception.Timeout:
-                    logger.k_info("Timeout", dn)
+                    logger.k_debug("Timeout", dn)
                     result = ZoneResult(status_code=rc.TIMEOUT, error=f"Timeout ({DNS_OPTIONS.timeout} s)", zone=None)
                 except dns.resolver.NoNameservers as e:
-                    logger.k_info("No nameservers", dn)
+                    logger.k_debug("No nameservers", dn)
                     result = ZoneResult(status_code=rc.CANNOT_FETCH, error="SERVFAIL: " + str(e), zone=None)
                 else:
                     if zone_info is None:
