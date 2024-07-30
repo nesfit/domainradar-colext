@@ -6,6 +6,11 @@ import org.jetbrains.annotations.Nullable;
 
 import java.time.Instant;
 
+/**
+ * A record representing a result of the zone collector.
+ *
+ * @param zone The collected zone data.
+ */
 public record ZoneResult(int statusCode,
                          @Nullable String error,
                          @NotNull Instant lastAttempt,

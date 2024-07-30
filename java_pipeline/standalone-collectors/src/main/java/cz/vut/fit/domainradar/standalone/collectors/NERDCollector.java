@@ -33,6 +33,11 @@ import java.util.Properties;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
 
+/**
+ * A collector that processes IP data using the NERD API.
+ *
+ * @author Ondřej Ondryáš
+ */
 public class NERDCollector extends IPStandaloneCollector<NERDData> {
     public static final String NAME = "nerd";
     public static final String COMPONENT_NAME = "collector-" + NAME;
@@ -73,7 +78,9 @@ public class NERDCollector extends IPStandaloneCollector<NERDData> {
                 .executor(_executor)
                 .build();
 
+        // Add a bit of a buffer to make the absolute processing timeout
         final var processingTimeout = (long) (_httpTimeout.toMillis() * 1.2);
+        // A batch counter for debugging only
         AtomicLong batchCounter = new AtomicLong(0);
 
         _parallelProcessor.subscribe(UniLists.of(Topics.IN_IP));
@@ -89,6 +96,8 @@ public class NERDCollector extends IPStandaloneCollector<NERDData> {
 
             final var batch = batchCounter.getAndIncrement();
             Logger.trace("Processing batch {}: {}", batch, entries);
+
+            // Bounded the processing with the absolute processing timeout
             var processFuture = this.processIps(entries, batch)
                     .orTimeout(processingTimeout, TimeUnit.MILLISECONDS);
 
@@ -109,6 +118,7 @@ public class NERDCollector extends IPStandaloneCollector<NERDData> {
 
     private CompletableFuture<Void> processIps(List<IPToProcess> entries, final long batch) {
         var toProcess = new ArrayList<Inet4Address>(entries.size());
+        // Filter out invalid or IPv6 addresses
         for (var inputIpToProcess : entries) {
             try {
                 final var ip = InetAddresses.forString(inputIpToProcess.ip());
@@ -134,6 +144,7 @@ public class NERDCollector extends IPStandaloneCollector<NERDData> {
             return CompletableFuture.completedFuture(null);
         }
 
+        // Store the IPv4 addresses one after another in a byte array
         final var ipsLen = toProcess.size();
         var bytes = new byte[ipsLen * 4];
         var ptr = 0;
@@ -164,6 +175,7 @@ public class NERDCollector extends IPStandaloneCollector<NERDData> {
                         }
 
                         Logger.trace("Processing {} IPs (batch {})", ipsLen, batch);
+                        // Read the response data as doubles stored in little-endian order
                         var resultDataBuffer = ByteBuffer.wrap(resultData);
                         resultDataBuffer.order(ByteOrder.LITTLE_ENDIAN);
 

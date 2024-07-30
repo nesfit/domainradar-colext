@@ -6,6 +6,11 @@ import org.jetbrains.annotations.Nullable;
 
 import java.time.Instant;
 
+/**
+ * The base interface for records representing a result of a collecting operation.
+ *
+ * @author Ondřej Ondryáš
+ */
 public interface Result {
     /**
      * An integer representing the status of the performed collecting operation.

@@ -1,3 +1,7 @@
+# A Dockerfile for building an image that runs a standalone Kafka Connect instance
+# with the DomainRadar custom extensions included in its plugins.
+# Author: Ondřej Ondryáš <xondry02@vut.cz>
+
 ARG KAFKA_URL=https://downloads.apache.org/kafka/3.7.0/kafka_2.13-3.7.0.tgz
 
 # Use Eclipse Temurin 21 JDK image as the base

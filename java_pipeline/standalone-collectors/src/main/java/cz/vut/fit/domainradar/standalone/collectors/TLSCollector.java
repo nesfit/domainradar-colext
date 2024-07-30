@@ -35,11 +35,19 @@ import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.*;
 
+/**
+ * A collector that processes TLS data for domain names.
+ *
+ * @author Ondřej Ondryáš
+ */
 public class TLSCollector extends BaseStandaloneCollector<String, String> {
     public static final String NAME = "tls";
     public static final String COMPONENT_NAME = "collector-" + NAME;
     private static final org.slf4j.Logger Logger = Common.getComponentLogger(TLSCollector.class);
 
+    /**
+     * A naive trust manager that accepts all certificates.
+     */
     static class NaiveTrustManager implements X509TrustManager {
         @Override
         public X509Certificate[] getAcceptedIssuers() {
@@ -72,6 +80,7 @@ public class TLSCollector extends BaseStandaloneCollector<String, String> {
                 JsonSerde.of(jsonMapper, TLSResult.class).serializer());
 
         try {
+            // Determine the runtime SSL/TLS capabilities
             var sslEngine = SSLContext.getDefault().createSSLEngine();
             var enabledProtocols = Arrays.toString(sslEngine.getEnabledProtocols());
             var enabledCiphers = Arrays.toString(sslEngine.getEnabledCipherSuites());
@@ -86,6 +95,8 @@ public class TLSCollector extends BaseStandaloneCollector<String, String> {
     @Override
     public void run(CommandLine cmd) {
         buildProcessor(0);
+        // The timeout is used for connect and for the communication, so the absolute
+        // processing bound must be slightly over its double
         final long futureTimeout = (long) (_timeout * 2.1);
 
         _parallelProcessor.subscribe(UniLists.of(Topics.IN_TLS));
@@ -116,6 +127,7 @@ public class TLSCollector extends BaseStandaloneCollector<String, String> {
 
     public CompletableFuture<TLSResult> runTLSResolve(@NotNull String hostName, @NotNull String targetIp) {
         return CompletableFuture.supplyAsync(() -> {
+            // Create a new SSL context with a naive trust manager that accepts all certificates
             SSLContext context;
             try {
                 context = SSLContext.getInstance("TLS");
@@ -137,8 +149,8 @@ public class TLSCollector extends BaseStandaloneCollector<String, String> {
                     return errorResult(ResultCodes.UNSUPPORTED_ADDRESS, "Cannot use this IP version");
                 }
 
+                // Make the TLS layer
                 SSLSocketFactory factory = context.getSocketFactory();
-
                 try (var socket = (SSLSocket) factory.createSocket(rawSocket, targetIp, 443, false)) {
                     // Enable timeouts
                     socket.setSoTimeout(_timeout);
@@ -207,7 +219,7 @@ public class TLSCollector extends BaseStandaloneCollector<String, String> {
 
     @Override
     public void close() {
-        _producer.close();
+        _producer.close(_closeTimeout);
         _executor.shutdown();
     }
 

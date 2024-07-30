@@ -22,7 +22,17 @@ import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
 import java.util.Properties;
+import java.util.function.Consumer;
 
+/**
+ * An abstract base class for standalone collectors that consume and process Kafka records.
+ * This class provides common functionality for managing Kafka consumers, producers, and parallel processing
+ * using Confluent Parallel Consumer.
+ *
+ * @param <KIn> The type of the key for input Kafka records.
+ * @param <VIn> The type of the value for input Kafka records.
+ * @author Ondřej Ondryáš
+ */
 public abstract class BaseStandaloneCollector<KIn, VIn> implements Closeable {
 
     protected final Properties _properties;
@@ -48,6 +58,7 @@ public abstract class BaseStandaloneCollector<KIn, VIn> implements Closeable {
         _properties.putAll(properties);
 
         _properties.setProperty(ConsumerConfig.GROUP_ID_CONFIG, groupId);
+        // The CPC library requires disabling auto-commit as it manages the offsets itself
         _properties.setProperty(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
         _properties.setProperty(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, "60000");
 
@@ -63,10 +74,35 @@ public abstract class BaseStandaloneCollector<KIn, VIn> implements Closeable {
         _consumer = createConsumer(keyInSerde.deserializer(), valueInSerde.deserializer());
     }
 
+    /**
+     * Runs the collector with the specified command line arguments.
+     * The implementations must use it to call the parallel processor's {@link ParallelStreamProcessor#poll(Consumer)} method
+     * and return, without blocking.
+     *
+     * @param cmd The parsed command line arguments.
+     */
     public abstract void run(CommandLine cmd);
 
+    /**
+     * Returns the collector identifier.
+     * <p>
+     * This is used, for example, to populate the
+     * {@link cz.vut.fit.domainradar.models.results.CommonIPResult#collector()} field in IP results.
+     *
+     * @return The collector identifier.
+     */
     public abstract @NotNull String getName();
 
+    /**
+     * Sends multiple copies of the same result under multiple keys to a given topic.
+     *
+     * @param producer The producer to use for sending the results.
+     * @param topic    The target topic.
+     * @param entries  The list of keys to send the result under.
+     * @param result   The result to send.
+     * @param <KOut>   The type of the keys to send.
+     * @param <VOut>   The type of the result to send.
+     */
     protected static <KOut, VOut> void sendAboutAll(@NotNull KafkaProducer<KOut, VOut> producer,
                                                     @NotNull String topic, @NotNull List<KOut> entries,
                                                     @NotNull VOut result) {
@@ -75,6 +111,13 @@ public abstract class BaseStandaloneCollector<KIn, VIn> implements Closeable {
         }
     }
 
+    /**
+     * Builds the ParallelStreamProcessor with the specified batch size.
+     * Uses the properties loaded in the constructor.
+     *
+     * @param batchSize The batch size for processing records. If greater than 0,
+     *                  the processor will be configured to use the specified batch size.
+     */
     protected void buildProcessor(int batchSize) {
         var optionsBuilder = ParallelConsumerOptions.<KIn, VIn>builder()
                 .ordering(ParallelConsumerOptions.ProcessingOrder.KEY)
@@ -90,16 +133,44 @@ public abstract class BaseStandaloneCollector<KIn, VIn> implements Closeable {
         _parallelProcessor = ParallelStreamProcessor.createEosStreamProcessor(optionsBuilder.build());
     }
 
+    /**
+     * Creates a Kafka consumer using the properties loaded in the constructor.
+     *
+     * @param keyDeserializer   The key deserializer to use.
+     * @param valueDeserializer The value deserializer to use.
+     * @return The created Kafka consumer.
+     */
     protected @NotNull KafkaConsumer<KIn, VIn> createConsumer(@NotNull Deserializer<KIn> keyDeserializer,
                                                               @NotNull Deserializer<VIn> valueDeserializer) {
         return new KafkaConsumer<>(_properties, keyDeserializer, valueDeserializer);
     }
 
+    /**
+     * Creates a Kafka producer using the properties loaded in the constructor. The producer is assigned an identifier
+     * composed of the string "producer-", the collector identifier, and the string "main".
+     *
+     * @param keySerializer   The key serializer to use.
+     * @param valueSerializer The value serializer to use.
+     * @param <KOut>          The type of the keys to serialize.
+     * @param <VOut>          The type of the values to serialize.
+     * @return The created Kafka producer.
+     */
     protected @NotNull <KOut, VOut> KafkaProducer<KOut, VOut> createProducer(@NotNull Serializer<KOut> keySerializer,
                                                                              @NotNull Serializer<VOut> valueSerializer) {
-        return createProducer(keySerializer, valueSerializer, "A");
+        return createProducer(keySerializer, valueSerializer, "main");
     }
 
+    /**
+     * Creates a Kafka producer using the properties loaded in the constructor. The producer is assigned an identifier
+     * composed of the string "producer-", the collector identifier, and the given discriminator value.
+     *
+     * @param keySerializer   The key serializer to use.
+     * @param valueSerializer The value serializer to use.
+     * @param discriminator   A discriminator to append to the client ID to distinguish between multiple producers.
+     * @param <KOut>          The type of the keys to serialize.
+     * @param <VOut>          The type of the values to serialize.
+     * @return The created Kafka producer.
+     */
     protected @NotNull <KOut, VOut> KafkaProducer<KOut, VOut> createProducer(@NotNull Serializer<KOut> keySerializer,
                                                                              @NotNull Serializer<VOut> valueSerializer,
                                                                              String discriminator) {
@@ -110,9 +181,19 @@ public abstract class BaseStandaloneCollector<KIn, VIn> implements Closeable {
         return new KafkaProducer<>(properties, keySerializer, valueSerializer);
     }
 
+    /**
+     * Adds additional command-line options specific to the collector.
+     *
+     * @param options The options object to add the options to.
+     */
     public void addOptions(@NotNull Options options) {
     }
 
+    /**
+     * Closes the collector, stopping the parallel processor and the consumer.
+     *
+     * @throws IOException If an error occurs while closing the processor or the consumer.
+     */
     @Override
     public void close() throws IOException {
         if (_parallelProcessor != null) {

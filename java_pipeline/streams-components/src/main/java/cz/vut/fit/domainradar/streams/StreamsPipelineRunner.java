@@ -22,11 +22,17 @@ import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
 
+/**
+ * The main class for running the Streams Pipeline.
+ * This class initializes the logger and other necessary properties; then, it starts the Kafka Streams
+ * application.
+ */
 public class StreamsPipelineRunner {
     private static final Logger Logger = LoggerFactory.getLogger(StreamsPipelineRunner.class);
     private static Properties Properties;
 
     public static void main(String[] args) {
+        // Initialize and read the command line options
         final var options = makeOptions();
         final var parser = new DefaultParser();
         CommandLine cmd;
@@ -48,6 +54,7 @@ public class StreamsPipelineRunner {
             return;
         }
 
+        // Read the properties
         final Properties props = new Properties();
         Properties = props;
 
@@ -64,6 +71,7 @@ public class StreamsPipelineRunner {
             }
         }
 
+        // Add properties from the command line
         final var cmdLineBootstrapServers = cmd.getOptionValue("bootstrap-server");
         if (cmdLineBootstrapServers != null) {
             props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, cmdLineBootstrapServers);
@@ -83,48 +91,58 @@ public class StreamsPipelineRunner {
                     var parts = option.split("=", 2);
                     props.put(parts[0], parts[1]);
                 } else {
-                    Logger.warn("Invalid command-line option: {}", option);
+                    Logger.warn("Ignoring invalid command-line option: {}", option);
                 }
             }
         }
 
+        // Set the Kafka Streams app ID based on the command-line argument
         props.put(StreamsConfig.APPLICATION_ID_CONFIG, cmd.getOptionValue("id"));
+        // Set the default Serde to string
         props.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.StringSerde.class);
+        // Set the default deserialization exception handler to "log and continue"
         props.put(StreamsConfig.DEFAULT_DESERIALIZATION_EXCEPTION_HANDLER_CLASS_CONFIG,
                 "org.apache.kafka.streams.errors.LogAndContinueExceptionHandler");
 
-        final StreamsBuilder builder = new StreamsBuilder();
+        // Initialize the StreamsBuilder and populate it with the requested components
         final ObjectMapper jsonMapper = Common.makeMapper().build();
+        final StreamsBuilder builder = new StreamsBuilder();
         List<PipelineComponent> components;
 
         try {
             components = populateBuilder(cmd, builder, jsonMapper);
-            logComponents(components);
+            for (var component : components) {
+                Logger.info("Using component: {} ({})", component.getName(), Integer.toHexString(component.hashCode()));
+            }
         } catch (Exception e) {
             Logger.error("Failed to initialize some of the pipeline components", e);
             System.exit(1);
             return;
         }
 
+        // Run the Streams app
         runStreams(builder, components);
     }
 
     private static void runStreams(StreamsBuilder builder, List<PipelineComponent> components) {
         Logger.info("Running in Kafka Streams mode");
 
+        // A latch used to wait for the shutdown signal
         final CountDownLatch latch = new CountDownLatch(1);
 
+        // Build the topology
         final Topology topology = builder.build(Properties);
         Logger.info("Topology: {}", topology.describe());
 
         try (KafkaStreams streams = new KafkaStreams(topology, Properties)) {
-            // attach shutdown handler to catch control-c
+            // Register a shutdown hook to release the latch
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 streams.close();
                 latch.countDown();
             }, "streams-shutdown-hook"));
 
             try {
+                // Start the app and wait for the shutdown signal
                 streams.start();
                 latch.await();
                 closeComponents(components);
@@ -138,6 +156,15 @@ public class StreamsPipelineRunner {
         }
     }
 
+    /**
+     * Initializes the components requested in the command line options. Adds the components'
+     * topologies to a given {@link StreamsBuilder}.
+     *
+     * @param cmd        The parsed command line arguments.
+     * @param builder    The StreamsBuilder instance to use for building the topology.
+     * @param jsonMapper The ObjectMapper instance to use for serialization and deserialization.
+     * @return A list of initialized PipelineComponent instances.
+     */
     private static List<PipelineComponent> populateBuilder(CommandLine cmd, StreamsBuilder builder,
                                                            ObjectMapper jsonMapper) {
         // var useAllCollectors = cmd.hasOption("ac") || cmd.hasOption("a");
@@ -153,6 +180,12 @@ public class StreamsPipelineRunner {
         return components;
     }
 
+    /**
+     * Prints the help message and exits the application.
+     *
+     * @param options  The Options instance containing the command line options.
+     * @param exitCode The exit code to use.
+     */
     private static void printHelpAndExit(Options options, int exitCode) {
         final var formatter = new HelpFormatter();
         formatter.printHelp(119,
@@ -161,12 +194,11 @@ public class StreamsPipelineRunner {
         System.exit(exitCode);
     }
 
-    private static void logComponents(List<PipelineComponent> components) {
-        for (var component : components) {
-            Logger.info("Using component: {} ({})", component.getName(), Integer.toHexString(component.hashCode()));
-        }
-    }
-
+    /**
+     * Closes the components from the given list.
+     *
+     * @param components The components to close.
+     */
     private static void closeComponents(List<PipelineComponent> components) {
         for (var component : components) {
             try {
@@ -177,6 +209,9 @@ public class StreamsPipelineRunner {
         }
     }
 
+    /**
+     * Creates the main command line options.
+     */
     @NotNull
     private static Options makeOptions() {
         final var options = new Options();

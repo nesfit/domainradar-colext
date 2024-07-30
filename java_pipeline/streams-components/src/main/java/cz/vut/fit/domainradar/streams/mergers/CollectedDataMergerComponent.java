@@ -13,28 +13,50 @@ import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.kstream.*;
-import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * The data merger component that merges collected data from all the collectors.
+ * This class implements the PipelineComponent interface.
+ */
 public class CollectedDataMergerComponent implements PipelineComponent {
+    /**
+     * A record that holds an IP address and a map of arbitrary collected data for that IP.
+     * Used to materialize the intermediate results of the per-IP data aggregation.
+     *
+     * @param ip     The IP address.
+     * @param ipData A map where the key is the collector name and the value is the collected data.
+     */
     public record IPDataPair(String ip, Map<String, CommonIPResult<JsonNode>> ipData) {
     }
 
-    private static final org.slf4j.Logger Logger = LoggerFactory.getLogger(CollectedDataMergerComponent.class);
+    // private static final org.slf4j.Logger Logger = LoggerFactory.getLogger(CollectedDataMergerComponent.class);
     private final ObjectMapper _jsonMapper;
 
     public CollectedDataMergerComponent(ObjectMapper jsonMapper) {
         _jsonMapper = jsonMapper;
     }
 
+    /**
+     * Determines if the current result is "more useful" than the previous result.
+     * The "current" result is considered more useful if:
+     * <ul>
+     *  <li>The "previous" result was not OK and the "current" result is newer.</li>
+     *  <li>The "previous" result was not OK and the "current" result is OK.</li>
+     *  <li>The "current" result is newer and OK.</li>
+     * </ul>
+     *
+     * @param previous The previous result.
+     * @param current  The current result.
+     * @return true if the current result is more useful; false otherwise.
+     */
     public static boolean isMoreUseful(final Result previous, final Result current) {
         final var oldNOK = previous.statusCode() != ResultCodes.OK;
         final var newOK = current.statusCode() == ResultCodes.OK;
         final var newNewer = previous.lastAttempt().isBefore(current.lastAttempt());
-        // Store the latest successful result.
         return (oldNOK && newNewer) || (oldNOK && newOK) || (newOK && newNewer);
     }
 
@@ -223,6 +245,15 @@ public class CollectedDataMergerComponent implements PipelineComponent {
         return true;
     }
 
+    /**
+     * Checks if the TLS result is present when it should be present.
+     * <p>
+     * The TLS result should be present if there is at least one IP address in the
+     * DNS result for the domain name.
+     *
+     * @param result The collected data containing DNS and TLS results.
+     * @return true if the TLS result is present or not required; false otherwise.
+     */
     public static boolean hasTlsIfRequired(AllCollectedData result) {
         if (result.tlsResult() != null)
             // TLS present, no need to check further
@@ -248,6 +279,6 @@ public class CollectedDataMergerComponent implements PipelineComponent {
 
     @Override
     public String getName() {
-        return "COLLECTED_MERGER";
+        return "merger";
     }
 }

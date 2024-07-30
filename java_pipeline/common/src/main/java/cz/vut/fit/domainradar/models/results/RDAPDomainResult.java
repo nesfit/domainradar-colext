@@ -7,6 +7,17 @@ import org.jetbrains.annotations.Nullable;
 
 import java.time.Instant;
 
+/**
+ * A record representing a result of an RDAP domain collector.
+ *
+ * @param rdapTarget      The domain name at which the RDAP query was targeted.
+ * @param rdapData        The raw RDAP data.
+ * @param entities        The entities extracted from the RDAP data.
+ * @param whoisStatusCode The status code of the WHOIS query.
+ * @param whoisError      The error message of the WHOIS query.
+ * @param whoisRaw        The raw WHOIS data.
+ * @param whoisParsed     The parsed WHOIS data.
+ */
 public record RDAPDomainResult(int statusCode,
                                @Nullable String error,
                                @NotNull Instant lastAttempt,

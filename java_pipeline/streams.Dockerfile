@@ -1,3 +1,6 @@
+# A Dockerfile for building an image that runs the pipeline components based on Kafka Streams.
+# Author: Ondřej Ondryáš <xondry02@vut.cz>
+
 # Use Eclipse Temurin 21 JDK image as the base for the building process
 FROM eclipse-temurin:21-jdk-jammy AS build
 

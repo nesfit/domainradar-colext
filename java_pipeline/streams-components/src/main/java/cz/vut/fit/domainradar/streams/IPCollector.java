@@ -7,7 +7,6 @@ import java.time.Instant;
 public interface IPCollector<TResult extends Result>
         extends PipelineCollector<TResult> {
 
-
     @Override
     default TResult errorResult(String message, int code, Class<?> clz) {
         try {

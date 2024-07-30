@@ -1,5 +1,10 @@
 package cz.vut.fit.domainradar.models;
 
+/**
+ * A class containing constants representing the collector result codes.
+ *
+ * @author Ondřej Ondryáš
+ */
 @SuppressWarnings("ALL")
 public final class ResultCodes {
     /**

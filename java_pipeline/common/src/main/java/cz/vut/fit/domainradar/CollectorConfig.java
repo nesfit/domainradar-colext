@@ -13,17 +13,17 @@ public class CollectorConfig {
     public static final String GEOIP_DIRECTORY_DEFAULT = "";
 
     public static final String GEOIP_CITY_DB_NAME_CONFIG = "collectors.geoip.citydb";
-    public static final String GEOIP_CITY_DB_NAME_DOC = "The name of the GeoIP City database.";
+    public static final String GEOIP_CITY_DB_NAME_DOC = "The name of the GeoIP City database file.";
     public static final String GEOIP_CITY_DB_NAME_DEFAULT = "GeoLite2-City.mmdb";
 
     public static final String GEOIP_ASN_DB_NAME_CONFIG = "collectors.geoip.asndb";
-    public static final String GEOIP_ASN_DB_NAME_DOC = "The name of the GeoIP ASN database.";
+    public static final String GEOIP_ASN_DB_NAME_DOC = "The name of the GeoIP ASN database file.";
     public static final String GEOIP_ASN_DB_NAME_DEFAULT = "GeoLite2-ASN.mmdb";
 
     /* --- NERD collector --- */
     public static final String NERD_HTTP_TIMEOUT_CONFIG = "collectors.nerd.timeout";
     public static final String NERD_HTTP_TIMEOUT_DOC = "The request timeout to use in the NERD collector (seconds).";
-    public static final String NERD_HTTP_TIMEOUT_DEFAULT = "3";
+    public static final String NERD_HTTP_TIMEOUT_DEFAULT = "5";
 
     public static final String NERD_TOKEN_CONFIG = "collectors.nerd.token";
     public static final String NERD_TOKEN_DOC = "The NERD access token.";

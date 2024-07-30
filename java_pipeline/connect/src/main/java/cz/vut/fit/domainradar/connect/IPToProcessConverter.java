@@ -19,6 +19,8 @@ import java.util.Map;
 /**
  * Implementation of Connect's {@link Converter} that deserializes the {@link IPToProcess} DN/IP pair into
  * a Connect record.
+ *
+ * @author Ondřej Ondryáš
  */
 public class IPToProcessConverter implements Converter {
     private final ObjectMapper _objectMapper;

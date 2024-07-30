@@ -16,7 +16,11 @@ import java.util.Map;
 import static cz.vut.fit.domainradar.Topics.TOPICS_TO_COLLECTOR_ID;
 
 /**
- * Implementation of Connect's {@link Transformation} that ...
+ * Implementation of Connect's {@link Transformation} that modifies the key of a record before it is written to MongoDB.
+ * <p>
+ * This transformation extracts certain fields from the record's value and uses them to construct a new key.
+ * The new key is either a structured key with domain name and IP or a simple domain name key, depending on whether
+ * the record comes from a DN-based collector, or from an IP-based one.
  *
  * @author Ondřej Ondryáš
  */

@@ -18,7 +18,6 @@ import cz.vut.fit.domainradar.standalone.IPStandaloneCollector;
 import org.apache.commons.cli.CommandLine;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.jetbrains.annotations.NotNull;
-import org.slf4j.LoggerFactory;
 import pl.tlinkowski.unij.api.UniLists;
 
 import java.io.File;
@@ -26,6 +25,11 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Properties;
 
+/**
+ * A collector that processes GeoIP and ASN data for IP addresses.
+ *
+ * @author Ondřej Ondryáš
+ */
 public class GeoAsnCollector extends IPStandaloneCollector<GeoIPData> {
     public static final String NAME = "geo-asn";
     public static final String COMPONENT_NAME = "collector-geoip"; // weird exception
@@ -33,6 +37,7 @@ public class GeoAsnCollector extends IPStandaloneCollector<GeoIPData> {
 
     private final DatabaseReader _cityReader, _asnReader;
 
+    // Empty responses to avoid null checks
     private final CityResponse _emptyCity = new CityResponse(new City(), new Continent(), new Country(),
             new Location(), null, new Postal(), new Country(), new RepresentedCountry(), new ArrayList<>(0), null);
     private final AsnResponse _emptyAsn = new AsnResponse(0L, null, null, null);

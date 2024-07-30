@@ -2,6 +2,11 @@ package cz.vut.fit.domainradar.models.ip;
 
 import org.jetbrains.annotations.Nullable;
 
+/**
+ * A record that represents a set of geolocation and autonomous system data about a specific IP address.
+ *
+ * @author Ondřej Ondryáš
+ */
 public record GeoIPData(@Nullable String continentCode,
                         @Nullable String countryCode,
                         @Nullable String region,

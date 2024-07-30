@@ -9,6 +9,12 @@ import org.apache.kafka.connect.transforms.Transformation;
 
 import java.util.Map;
 
+/**
+ * Implementation of Connect's {@link Transformation} that extracts the "domain" attribute fetched from the PostgreSQL
+ * database and sets it as the key for the result record.
+ *
+ * @author Ondřej Ondryáš
+ */
 public class PostgresIngressTransformation<R extends ConnectRecord<R>> implements Transformation<R> {
     @Override
     public R apply(R r) {
@@ -18,6 +24,7 @@ public class PostgresIngressTransformation<R extends ConnectRecord<R>> implement
         String dn;
 
         if (r.value() instanceof Map) {
+            // In case the value was schemaless
             @SuppressWarnings("unchecked") final var valueMap = (Map<String, Object>) r.value();
             dn = (String) valueMap.get("domain");
         } else if (r.value() instanceof Struct struct) {

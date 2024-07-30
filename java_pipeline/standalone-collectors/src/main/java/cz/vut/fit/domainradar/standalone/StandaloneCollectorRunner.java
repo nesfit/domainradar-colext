@@ -17,19 +17,27 @@ import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
 
+/**
+ * The main class for running standalone collectors.
+ * <p>
+ * This class initializes the command line options, parses the arguments,
+ * and runs the selected collectors.
+ */
 public class StandaloneCollectorRunner {
     private static final org.slf4j.Logger Logger = LoggerFactory.getLogger(StandaloneCollectorRunner.class);
 
     public static void main(String[] args) {
+        // Initialize the command line options
         final var options = makeInitialOptions();
 
         CommandLine cmd;
-        cmd = parseCommandLine(args, options, false);
+        cmd = parseCommandLine(args, options, false); // ignore unknown options for the first run
         if (cmd == null) return;
 
         final ObjectMapper jsonMapper = Common.makeMapper().build();
         final Properties properties = initProperties(cmd);
 
+        // Initialize the collectors based on the command line options
         var toRun = initCollectors(cmd, jsonMapper, properties);
 
         if (toRun.isEmpty()) {
@@ -44,14 +52,21 @@ public class StandaloneCollectorRunner {
         if (cmdExtended == null) return;
 
         for (var component : toRun) {
-            Logger.info("Using component: {} ({})", component.getName(), Integer.toHexString(component.hashCode()));
+            Logger.info("Using collector: {} ({})", component.getName(), Integer.toHexString(component.hashCode()));
         }
 
+        // A latch used to wait for the shutdown signal
         final CountDownLatch latch = new CountDownLatch(1);
+        // Register a shutdown hook to release the latch
         Runtime.getRuntime().addShutdownHook(new Thread(latch::countDown, "system-shutdown-hook"));
+
+        // Run the collectors (this does not block)
         toRun.forEach(collector -> collector.run(cmdExtended));
+
         try {
+            // Wait for the shutdown signal
             latch.await();
+            // Close the collectors
             for (var component : toRun) {
                 try {
                     component.close();
@@ -65,9 +80,17 @@ public class StandaloneCollectorRunner {
             System.exit(1);
         }
     }
-
-    private static List<BaseStandaloneCollector<?, ?>> initCollectors(CommandLine cmd, ObjectMapper mapper,
-                                                                      Properties properties) {
+    
+    /**
+     * Initializes the list of collectors based on the command line options.
+     *
+     * @param cmd        The parsed command line arguments.
+     * @param mapper     The ObjectMapper instance to use for serialization and deserialization.
+     * @param properties The Properties instance containing configuration settings.
+     * @return A list of initialized BaseStandaloneCollector instances.
+     */
+    @NotNull
+    private static List<BaseStandaloneCollector<?, ?>> initCollectors(CommandLine cmd, ObjectMapper mapper, Properties properties) {
         var appId = cmd.getOptionValue("id");
         var useAll = cmd.hasOption("a");
         var components = new ArrayList<BaseStandaloneCollector<?, ?>>();
@@ -92,6 +115,14 @@ public class StandaloneCollectorRunner {
         return components;
     }
 
+    /**
+     * Parses the command line arguments using the specified options.
+     *
+     * @param args            The command line arguments to parse.
+     * @param options         The Options instance containing the command line options.
+     * @param stopAtNonOption If true, parsing will stop at the first non-option argument.
+     * @return The parsed CommandLine instance, or null if parsing fails or help is requested.
+     */
     @Nullable
     private static CommandLine parseCommandLine(String[] args, Options options, boolean stopAtNonOption) {
         final var parser = new DefaultParser();
@@ -117,6 +148,9 @@ public class StandaloneCollectorRunner {
         return cmd;
     }
 
+    /**
+     * Creates the main command line options.
+     */
     @NotNull
     private static Options makeInitialOptions() {
         final var options = new Options();
@@ -146,10 +180,24 @@ public class StandaloneCollectorRunner {
                 .argName("path")
                 .hasArg()
                 .build());
+        options.addOption(Option.builder("o")
+                .longOpt("option")
+                .desc("A properties key/value to add to the configuration")
+                .argName("key=value")
+                .hasArg()
+                .build()
+        );
 
         return options;
     }
 
+
+    /**
+     * Initializes the properties from the file and the --option passed in the command line.
+     *
+     * @param cmd The parsed command line arguments.
+     * @return The initialized Properties instance.
+     */
     private static Properties initProperties(CommandLine cmd) {
         final Properties props = new Properties();
 
@@ -170,6 +218,19 @@ public class StandaloneCollectorRunner {
             props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, cmdLineBootstrapServers);
         }
 
+        // Add the --option properties
+        var cmdLineProperties = cmd.getOptionValues("option");
+        if (cmdLineProperties != null) {
+            for (var option : cmdLineProperties) {
+                if (option.contains("=")) {
+                    var parts = option.split("=", 2);
+                    props.put(parts[0], parts[1]);
+                } else {
+                    Logger.warn("Ignoring invalid command-line option: {}", option);
+                }
+            }
+        }
+
         if (!props.containsKey(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG)) {
             Logger.error("Bootstrap servers not set. Use the {} property key or the -s option.",
                     ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG);
@@ -179,6 +240,12 @@ public class StandaloneCollectorRunner {
         return props;
     }
 
+    /**
+     * Prints the help message and exits the application.
+     *
+     * @param options  The Options instance containing the command line options.
+     * @param exitCode The exit code to use.
+     */
     private static void printHelpAndExit(Options options, int exitCode) {
         final var formatter = new HelpFormatter();
         formatter.printHelp(119,

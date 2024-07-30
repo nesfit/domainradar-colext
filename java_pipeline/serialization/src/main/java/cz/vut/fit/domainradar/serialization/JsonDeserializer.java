@@ -10,15 +10,33 @@ import org.apache.kafka.common.utils.ByteBufferInputStream;
 
 import java.nio.ByteBuffer;
 
+/**
+ * A custom JSON deserializer for Kafka that uses Jackson to deserialize JSON data into Java objects.
+ *
+ * @param <T> The type of the deserialized object.
+ * @author Ondřej Ondryáš
+ */
 public class JsonDeserializer<T> implements Deserializer<T> {
     private final ObjectMapper _objectMapper;
     private final JavaType _forType;
 
+    /**
+     * Creates a new JSON deserializer for the specified non-generic class.
+     *
+     * @param objectMapper The ObjectMapper instance to use for deserialization.
+     * @param forType      The class of the object to deserialize.
+     */
     public JsonDeserializer(ObjectMapper objectMapper, Class<T> forType) {
         _objectMapper = objectMapper;
         _forType = objectMapper.constructType(forType);
     }
 
+    /**
+     * Creates a new JSON deserializer for the specified type. Used primarily for generic types.
+     *
+     * @param objectMapper The ObjectMapper instance to use for deserialization.
+     * @param forType      The TypeReference encapsulating the generic type to deserialize.
+     */
     public JsonDeserializer(ObjectMapper objectMapper, TypeReference<T> forType) {
         _objectMapper = objectMapper;
         _forType = objectMapper.constructType(forType);

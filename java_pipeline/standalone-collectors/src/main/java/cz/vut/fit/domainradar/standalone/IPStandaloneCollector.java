@@ -10,11 +10,20 @@ import cz.vut.fit.domainradar.serialization.JsonSerde;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.jetbrains.annotations.NotNull;
 
+import java.io.IOException;
 import java.time.Instant;
 import java.util.Properties;
 
+/**
+ * An abstract class for standalone collectors that process IP-related data.
+ * This class extends the {@link BaseStandaloneCollector} and provides additional functionality
+ * specific to IP processing and result handling.
+ *
+ * @param <TData> The type of the data to be processed and included in the result.
+ * @author Ondřej Ondryáš
+ * @see CommonIPResult
+ */
 public abstract class IPStandaloneCollector<TData> extends BaseStandaloneCollector<IPToProcess, IPRequest> {
-
     protected final KafkaProducer<IPToProcess, CommonIPResult<TData>> _producer;
 
     public IPStandaloneCollector(@NotNull ObjectMapper jsonMapper,
@@ -29,11 +38,30 @@ public abstract class IPStandaloneCollector<TData> extends BaseStandaloneCollect
                 }).serializer());
     }
 
+    /**
+     * Creates an erroneous result.
+     *
+     * @param code    The error result code.
+     * @param message The error message.
+     * @return A {@link CommonIPResult} instance with the specified error code and message.
+     */
     protected CommonIPResult<TData> errorResult(int code, String message) {
         return new CommonIPResult<>(code, message, Instant.now(), getName(), null);
     }
 
+    /**
+     * Creates a successful result.
+     *
+     * @param data The data to include in the result.
+     * @return A {@link CommonIPResult} instance with the specified data.
+     */
     protected CommonIPResult<TData> successResult(TData data) {
         return new CommonIPResult<>(ResultCodes.OK, null, Instant.now(), getName(), data);
+    }
+
+    @Override
+    public void close() throws IOException {
+        super.close();
+        _producer.close(_closeTimeout);
     }
 }

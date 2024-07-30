@@ -5,9 +5,27 @@ import cz.vut.fit.domainradar.models.results.Result;
 
 import java.time.Instant;
 
+/**
+ * An interface representing a pipeline collector based on Kafka Streams.
+ *
+ * @param <TResult> The type of the result produced by the collector.
+ */
 public interface PipelineCollector<TResult extends Result> extends PipelineComponent {
+    /**
+     * Returns the collector identifier.
+     *
+     * @return The collector identifier.
+     */
     String getCollectorName();
 
+    /**
+     * Creates an erroneous result with the specified message and result code.
+     *
+     * @param message The error message.
+     * @param code    The error code.
+     * @param clz     The class type of the result.
+     * @return The error result of type TResult.
+     */
     default TResult errorResult(String message, int code, Class<?> clz) {
         try {
             final var constructor = clz.getDeclaredConstructors()[0];
