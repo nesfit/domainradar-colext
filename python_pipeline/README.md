@@ -9,9 +9,10 @@ This directory contains the Python codebase for the DomainRadar project. It incl
     - [RDAP-IP collector](./collector/collectors/rdap_ip/rdap_ip.py)
     - [RTT collector](./collector/collectors/rtt/rtt.py)
 - [Feature extractor](./extractor/extractor/extractor.py)
+- [Classifier unit](./classifier/classifier_unit/classifier.py)
 
-The project is structured into two separate projects: `collector` with all the collectors, and `extractor` with the
-feature extractor. The `common` module is shared by the two projects.
+The project is structured into three separate projects: `collector` with all the collectors, `extractor` with the
+feature extractor, and `classifier` with the classifier unit. The `common` module is shared by the two projects.
 
 The Python components are based on [faust-streaming](https://faust-streaming.github.io/faust/)
 and [aiokafka](https://aiokafka.readthedocs.io/en/stable/). Refer to faust's documentation for more information on
@@ -24,6 +25,8 @@ There is also a `pyproject.toml` file in the root directory that links the two p
 "meta-project". This way, you can have a single Poetry virtual environment for the development of the two projects.
 
 The configuration file `config.example.toml` contains the default configuration for all the pipeline components with descriptions of the available options. Copy it to `config.toml` and edit it to suit your needs. You can also use the `APP_CONFIG_FILE` environment variable to set an alternative path to the configuration file.
+
+The `classifier` project requires you to clone the [domainradar-clf](https://github.com/nesfit/domainradar-clf) repository manually into this directory (/python_pipeline). Without doing that, poetry will **not resolve dependencies** for the project (and neither for the root meta-project). Also, this dependency **does not work on Windows**. To work on the other components without having to pull the classifier project, comment `domrad-python-classifier-unit` out from the root `pyproject.toml`.
 
 To run the components, use the following commands:
 

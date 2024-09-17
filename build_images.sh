@@ -11,9 +11,9 @@
 
 TAG_PREFIX="domrad"
 
-py_packages=("collector" "collector" "collector" "collector" "collector" "extractor")
-py_modules=("collectors.zone" "collectors.dns" "collectors.rdap_ip" "collectors.rdap_dn" "collectors.rtt" "extractor")
-py_tags=("zone" "dns" "rdap-ip" "rdap-dn" "rtt" "extractor")
+py_packages=("collector" "collector" "collector" "collector" "collector" "extractor" "classifier")
+py_modules=("collectors.zone" "collectors.dns" "collectors.rdap_ip" "collectors.rdap_dn" "collectors.rtt" "extractor" "classifier_unit")
+py_tags=("zone" "dns" "rdap-ip" "rdap-dn" "rtt" "extractor" "classifier")
 
 STREAMS_TAG="java-streams"
 PARCON_TAG="java-standalone"
@@ -92,8 +92,14 @@ build_python_one() {
     echo "  > Building ${py_modules[i]} <  " >"$OUT_MSG"
     echo "    > Tag: '$TAG_PREFIX/${py_tags[i]}' < " >"$OUT_MSG"
 
-    docker build --target production -t "$TAG_PREFIX/${py_tags[i]}" --build-arg "TARGET_UNIT=${py_packages[i]}" \
-      --build-arg "TARGET_MODULE=${py_modules[i]}" "$@" . 2>"$OUT_BUILD"
+
+    if [ "${py_tags[i]}" == "classifier" ]; then
+      docker build -f classifier.Dockerfile --target production -t "$TAG_PREFIX/${py_tags[i]}" --build-arg "TARGET_UNIT=${py_packages[i]}" \
+        --build-arg "TARGET_MODULE=${py_modules[i]}" "$@" . 2>"$OUT_BUILD"
+    else
+      docker build --target production -t "$TAG_PREFIX/${py_tags[i]}" --build-arg "TARGET_UNIT=${py_packages[i]}" \
+        --build-arg "TARGET_MODULE=${py_modules[i]}" "$@" . 2>"$OUT_BUILD"
+    fi
 }
 
 build_python() {

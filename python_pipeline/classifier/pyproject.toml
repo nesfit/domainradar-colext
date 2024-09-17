@@ -18,7 +18,7 @@ aiokafka = { extras = ["zstd"], version = "^0.10.0" }
 faust-streaming = { extras = ["rocksdict"], version = "^0.11.0" }
 pandas = "^2.2.2"
 # classifiers = { git = "https://github.com/nesfit/domainradar-clf.git", branch = "main" }
-classifiers = { path = "/home/ondryaso/Projects/domainradar/domainradar-clf", develop = true }
+classifiers = { path = "../domainradar-clf", develop = true }
 pyarrow = "^16.1.0"
 pydantic = "^2.8.2"
 
@@ -28,6 +28,11 @@ pytest = "^8.0.0"
 [tool.pytest.ini_options]
 minversion = "6.0"
 testpaths = ["tests"]
+
+[[tool.poetry.source]]
+name = "pytorch_cpu"
+url = "https://download.pytorch.org/whl/cpu"
+priority = "explicit"
 
 [build-system]
 requires = ["poetry-core"]

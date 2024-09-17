@@ -11,9 +11,15 @@ repository = "https://github.com/nesfit/domainradar-colext"
 python = ">=3.11,<3.12"
 domrad-python-collectors = { path = "./collector/", develop = true }
 domrad-python-extractor = { path = "./extractor/", develop = true, extras = ["parquet"] }
+domrad-python-classifier-unit = { path = "./classifier/", develop = true }
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0.0"
+
+[[tool.poetry.source]]
+name = "pytorch_cpu"
+url = "https://download.pytorch.org/whl/cpu"
+priority = "explicit"
 
 [build-system]
 requires = ["poetry-core"]
