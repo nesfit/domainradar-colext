@@ -10,18 +10,34 @@ client_key_password = "password for the private key"
 check_hostname = true
 
 [consumer]
-# Options passed directly to confluent-kafka and its underlying librdkafka library
-# The dotted keys must be enclosed in ""
+# Options passed directly to confluent-kafka and its underlying librdkafka library.
+# The dotted keys must be enclosed in "".
 # See: https://github.com/confluentinc/librdkafka/blob/master/CONFIGURATION.md
 "session.timeout.ms" = 10000
 
 [producer]
-# Same as above
+# Same as above.
 "compression.codec" = "zstd"
 
 [manager]
 app_id = "colext-config-manager"
-compose_command = "docker compose -f compose.yml"
-configs_dir = "/path/to/configs"
+# When true, the manager will use a Unix domain socket to communicate with its daemon that invokes Docker Compose.
 use_socket = false
+# The path to the Unix domain socket file (if use_socket is true).
 socket_path = "/path/to/socket"
+# The base Docker Compose command that will be used for managing the services (only used if use_socket is false).
+compose_command = "docker compose -f compose.yml"
+# The directory where the managed configuration files are stored.
+configs_dir = "/path/to/configs"
+
+[manager.components]
+"collector-dns" = "dns.toml"
+"collector-zone" = "zone.toml"
+"collector-tls" = "tls.properties"
+"collector-nerd" = "nerd.properties"
+"collector-geoip" = "geoip.properties"
+"collector-rdap-dn" = "rdap_dn.toml"
+"collector-rdap-ip" = "rdap_ip.toml"
+"collector-rtt" = "rtt.toml"
+"merger" = "merger.properties"
+"extractor" = "extractor.toml"

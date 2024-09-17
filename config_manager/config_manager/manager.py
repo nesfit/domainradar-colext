@@ -8,11 +8,11 @@ import sys
 
 from . import transformers, codes
 from .models import ConfigurationChangeResult as _Res, ConfigurationValidationError as _Err
-from .pipeline_components import components as _components
 from .updown_provider import SocketUpDownProvider, DirectUpDownProvider, BaseUpDownProvider
 
 logger = logging.getLogger(__package__)
 config = {}
+_components = {}
 updown_provider: BaseUpDownProvider | None = None
 
 
@@ -105,11 +105,13 @@ def is_known_component(component_id: str) -> bool:
 
 
 def init(app_config: dict):
-    global config, updown_provider
+    global config, _components, updown_provider
     config = app_config
+    _components = app_config["manager"]["components"]
+
     if config["manager"].get("use_socket"):
         socket_path = config["manager"]["socket_path"]
-        updown_provider = SocketUpDownProvider(socket_path, logger)
+        updown_provider = SocketUpDownProvider(_components, socket_path, logger)
         try:
             updown_provider.open_socket()
         except Exception as e:
@@ -117,7 +119,7 @@ def init(app_config: dict):
             sys.exit(1)
     else:
         compose_cmd = config["manager"]["compose_command"]
-        updown_provider = DirectUpDownProvider(compose_cmd)
+        updown_provider = DirectUpDownProvider(_components, compose_cmd)
 
 
 def _down(component_id: str) -> bool:

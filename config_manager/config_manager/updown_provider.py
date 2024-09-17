@@ -2,9 +2,11 @@ import abc
 import logging
 import socket
 import subprocess
-from .pipeline_components import components
 
 class BaseUpDownProvider(abc.ABC):
+    def __init__(self, managed_components: list):
+        self.managed_components = managed_components
+
     @abc.abstractmethod
     def up(self, component: str) -> int:
         pass
@@ -14,15 +16,16 @@ class BaseUpDownProvider(abc.ABC):
         pass
 
     def up_all(self) -> int:
-        return self.up(" ".join(components.keys()))
+        return self.up(" ".join(self.managed_components))
 
     def down_all(self) -> int:
-        return self.down(" ".join(components.keys()))
+        return self.down(" ".join(self.managed_components))
 
 
 class DirectUpDownProvider(BaseUpDownProvider):
 
-    def __init__(self, compose_cmd: str):
+    def __init__(self, managed_components: list, compose_cmd: str):
+        super().__init__(managed_components)
         self.compose_cmd = compose_cmd
 
     def up(self, component: str):
@@ -33,7 +36,8 @@ class DirectUpDownProvider(BaseUpDownProvider):
 
 
 class SocketUpDownProvider(BaseUpDownProvider):
-    def __init__(self, socket_path: str, logger: logging.Logger):
+    def __init__(self, managed_components: list, socket_path: str, logger: logging.Logger):
+        super().__init__(managed_components)
         self.logger = logger
         self.socket_path = socket_path
         self.sock = None
