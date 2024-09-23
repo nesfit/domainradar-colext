@@ -57,7 +57,8 @@ ENV APP_DATADIR=/app/faust_data
 
 COPY --from=builder $PYSETUP_PATH $PYSETUP_PATH
 COPY ./${TARGET_UNIT} /app
-COPY ./domainradar-clf ../domainradar-clf
+# This is fugly, must be fixed
+COPY ./domainradar-clf/classifiers /opt/pysetup/.venv/lib/python3.11/site-packages/classifiers
 COPY ./common /app/common
 COPY ./docker_entrypoint.sh /app/docker_entrypoint.sh
 RUN mkdir /app/faust_data
