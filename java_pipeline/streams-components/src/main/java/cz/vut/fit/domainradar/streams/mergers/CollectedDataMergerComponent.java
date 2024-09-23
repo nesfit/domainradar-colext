@@ -185,12 +185,12 @@ public class CollectedDataMergerComponent implements PipelineComponent {
         // The exception is the TLS collector in case there are no IP addresses in the DNS data.
         var finalResultTable = mergedDnsIpTable
                 .leftJoin(tlsTable, (intermRes, tls) -> new AllCollectedData(intermRes.zone(), intermRes.dnsResult(),
-                                tls, null, intermRes.ipResults()),
+                                tls, intermRes.rdapDomainResult(), intermRes.ipResults()),
                         namedOp("join_TLS"),
                         Materialized.with(Serdes.String(), finalResultSerde))
                 .filter((dn, result) -> hasTlsIfRequired(result))
                 .join(zoneTable, (intermRes, zone) -> new AllCollectedData(zone.zone(), intermRes.dnsResult(),
-                                null, null, intermRes.ipResults()),
+                                intermRes.tlsResult(), intermRes.rdapDomainResult(), intermRes.ipResults()),
                         namedOp("join_ZONE"),
                         Materialized.with(Serdes.String(), finalResultSerde))
                 .join(rdapDnTable, (intermRes, rdap) -> new AllCollectedData(intermRes.zone(), intermRes.dnsResult(),
