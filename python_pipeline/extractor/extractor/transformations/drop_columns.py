@@ -20,6 +20,7 @@ _to_drop = [
     "dns_NS",
     "dns_TXT",
     "tls",
+    "html",
     "rdap_entities",
     "rdap_expiration_date",
     "rdap_last_changed_date",

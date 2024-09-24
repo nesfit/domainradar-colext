@@ -123,7 +123,6 @@ class HTMLTransformation(Transformation):
                 ]
 
     def transform(self, df: DataFrame) -> DataFrame:
-        print(df['html'].values)
         df['soup'] = df['html'].apply(lambda html: BeautifulSoup(html, 'html.parser') if notnull(html) else None)
         df['js_inline'] = df['soup'].apply(
             lambda soup: [script for script in soup.find_all('script') if not script.has_attr('src')] if soup else [])
