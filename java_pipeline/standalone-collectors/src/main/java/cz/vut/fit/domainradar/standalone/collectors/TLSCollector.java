@@ -1,28 +1,13 @@
 package cz.vut.fit.domainradar.standalone.collectors;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import cz.vut.fit.domainradar.CollectorConfig;
-import cz.vut.fit.domainradar.Common;
-import cz.vut.fit.domainradar.Topics;
-import cz.vut.fit.domainradar.models.ResultCodes;
-import cz.vut.fit.domainradar.models.results.TLSResult;
-import cz.vut.fit.domainradar.models.tls.TLSData;
-import cz.vut.fit.domainradar.serialization.JsonSerde;
-import cz.vut.fit.domainradar.standalone.BaseStandaloneCollector;
-import org.apache.commons.cli.CommandLine;
-import org.apache.kafka.clients.producer.KafkaProducer;
-import org.apache.kafka.clients.producer.ProducerRecord;
-import org.apache.kafka.common.serialization.Serdes;
-import org.apache.kafka.common.serialization.StringSerializer;
-import org.jetbrains.annotations.NotNull;
-import pl.tlinkowski.unij.api.UniLists;
-
-import javax.net.ssl.*;
-import javax.security.auth.x500.X500Principal;
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.Certificate;
@@ -33,7 +18,43 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
-import java.util.concurrent.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
+import javax.net.ssl.SNIHostName;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLParameters;
+import javax.net.ssl.SSLSession;
+import javax.net.ssl.SSLSocket;
+import javax.net.ssl.SSLSocketFactory;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
+import javax.security.auth.x500.X500Principal;
+
+import org.apache.commons.cli.CommandLine;
+import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.serialization.Serdes;
+import org.apache.kafka.common.serialization.StringSerializer;
+import org.jetbrains.annotations.NotNull;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import cz.vut.fit.domainradar.CollectorConfig;
+import cz.vut.fit.domainradar.Common;
+import cz.vut.fit.domainradar.Topics;
+import cz.vut.fit.domainradar.models.ResultCodes;
+import cz.vut.fit.domainradar.models.results.TLSResult;
+import cz.vut.fit.domainradar.models.tls.TLSData;
+import cz.vut.fit.domainradar.serialization.JsonSerde;
+import cz.vut.fit.domainradar.standalone.BaseStandaloneCollector;
+import org.jetbrains.annotations.Nullable;
+import pl.tlinkowski.unij.api.UniLists;
+
 
 /**
  * A collector that processes TLS data for domain names.
@@ -125,6 +146,101 @@ public class TLSCollector extends BaseStandaloneCollector<String, String> {
         });
     }
 
+    private String fetchHttpContent(String hostName, SSLSocket socket) throws IOException {
+        final var request = "GET / HTTP/1.1\r\nHost: " + hostName + "\r\nConnection: close\r\n\r\n";
+        socket.getOutputStream().write(request.getBytes());
+        socket.getOutputStream().flush();
+
+        final var reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+        String line;
+        String location = null;
+        var isRedirect = false;
+        var statusCode = 0;
+
+        // Read HTTP headers
+        while ((line = reader.readLine()) != null) {
+            if (line.startsWith("HTTP/")) {
+                statusCode = Integer.parseInt(line.split(" ")[1]);
+            }
+
+            if (line.startsWith("Location:")) {
+                location = line.split(" ")[1];
+                isRedirect = true;
+            }
+
+            if (line.isEmpty()) break; // End of headers
+        }
+
+        // Check if it's a redirect
+        if (isRedirect && statusCode >= 300 && statusCode < 400 && location != null) {
+            Logger.info("Redirecting to: {}", location);
+            return this.handleRedirect(location, hostName); // Handle the redirect
+        }
+
+        // Read the body of the response
+        var body = new StringBuilder();
+        var bodyStarted = false;
+
+        while ((line = reader.readLine()) != null) {
+            if (!bodyStarted) {
+                // Skip lines until the body starts
+                if (line.trim().isEmpty()) {
+                    bodyStarted = true;
+                    continue;
+                }
+                // Check for custom numeric prefixes
+                try {
+                    Integer.parseInt(line.trim());
+                    continue;
+                } catch (NumberFormatException e) {
+                    bodyStarted = true;
+                }
+            }
+
+            body.append(line).append("\n");
+        }
+
+        final var resultBody = body.toString();
+        Logger.debug("Body received:\n{}", resultBody);
+        return resultBody;
+    }
+
+    private String handleRedirect(String newLocation, String currentHost) {
+        try {
+            // Parse the redirected URL
+            final var uri = new URI(newLocation);  // This can throw URISyntaxException
+            final var url = uri.toURL();
+
+            final var newHost = url.getHost();
+            final var port = url.getPort() == -1 ? 443 : url.getPort(); // Default to 443 if no port is specified
+
+            try (var redirectedSocket = new Socket()) {
+                redirectedSocket.connect(new InetSocketAddress(newHost, port), _timeout);
+
+                // Wrap the SSLContext.getDefault() call in a try-catch block
+                SSLSocketFactory factory;
+                try {
+                    factory = SSLContext.getDefault().getSocketFactory();
+                } catch (NoSuchAlgorithmException e) {
+                    Logger.error("Failed to get SSLContext default: {}", e.getMessage());
+                    return null;
+                }
+
+                try (var sslSocket = (SSLSocket) factory.createSocket(redirectedSocket, newHost, port, false)) {
+                    sslSocket.setSoTimeout(_timeout);
+                    sslSocket.startHandshake();
+                    return this.fetchHttpContent(newHost, sslSocket);
+                }
+            }
+        } catch (URISyntaxException e) {
+            Logger.error("Invalid redirect URI: {}", newLocation, e);
+            return null;
+        } catch (IOException e) {
+            Logger.error("Error following redirect to {}: {}", newLocation, e.getMessage());
+            return null;
+        }
+    }
+
     public CompletableFuture<TLSResult> runTLSResolve(@NotNull String hostName, @NotNull String targetIp) {
         return CompletableFuture.supplyAsync(() -> {
             // Create a new SSL context with a naive trust manager that accepts all certificates
@@ -154,7 +270,6 @@ public class TLSCollector extends BaseStandaloneCollector<String, String> {
                 try (var socket = (SSLSocket) factory.createSocket(rawSocket, targetIp, 443, false)) {
                     // Enable timeouts
                     socket.setSoTimeout(_timeout);
-
                     // Enable SNI
                     SSLParameters sslParams = new SSLParameters();
                     sslParams.setServerNames(List.of(new SNIHostName(hostName)));
@@ -185,11 +300,9 @@ public class TLSCollector extends BaseStandaloneCollector<String, String> {
                         }
                     }
 
-                    final var tlsData = new TLSData(targetIp,
-                            protocol, cipher, certificates);
-
-                    Logger.trace("Success: {}", hostName);
-                    return new TLSResult(ResultCodes.OK, null, Instant.now(), tlsData);
+                    @Nullable final var finalHtmlResponse = this.fetchHttpContent(hostName, socket);
+                    final var tlsData = new TLSData(targetIp, protocol, cipher, certificates);
+                    return new TLSResult(ResultCodes.OK, null, Instant.now(), tlsData, finalHtmlResponse);
                 } catch (SocketTimeoutException e) {
                     Logger.debug("Socket read timed out: {}", hostName);
                     return errorResult(ResultCodes.TIMEOUT, "Socket read timed out (%d ms)".formatted(_timeout));
@@ -224,6 +337,6 @@ public class TLSCollector extends BaseStandaloneCollector<String, String> {
     }
 
     private static TLSResult errorResult(int code, String message) {
-        return new TLSResult(code, message, Instant.now(), null);
+        return new TLSResult(code, message, Instant.now(), null, null);
     }
 }
