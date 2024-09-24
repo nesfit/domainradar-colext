@@ -12,6 +12,7 @@ python = ">=3.11,<3.12"
 domrad-python-collectors = { path = "./collector/", develop = true }
 domrad-python-extractor = { path = "./extractor/", develop = true, extras = ["parquet"] }
 domrad-python-classifier-unit = { path = "./classifier/", develop = true }
+beautifulsoup4 = "^4.12.3"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0.0"

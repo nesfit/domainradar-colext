@@ -14,6 +14,7 @@ from .transformations.base_transformation import Transformation
 from .transformations.dns import DNSTransformation
 from .transformations.drop_columns import DropColumnsTransformation
 from .transformations.geo import GeoTransformation
+from .transformations.html import HTMLTransformation
 from .transformations.ip import IPTransformation
 from .transformations.lexical import LexicalTransformation
 from .transformations.rdap_dn import RDAPDomainTransformation
@@ -21,6 +22,7 @@ from .transformations.rdap_ip import RDAPAddressTransformation
 from .transformations.tls import TLSTransformation
 
 _all_transformations = OrderedDict([
+    ("html", HTMLTransformation),
     ("dns", DNSTransformation),
     ("ip", IPTransformation),
     ("geo", GeoTransformation),

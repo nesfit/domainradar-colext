@@ -118,7 +118,7 @@ batch_size = 100
 batch_timeout = 5
 # This property controls the applied transformations. The order is irelevant, it is set by the code.
 # You probably don't want to change this. Leave the property out to use all available transformations.
-enabled_transformations = ["dns", "ip", "geo", "tls", "lexical", "rdap_dn", "rdap_ip", "drop"]
+enabled_transformations = ["html", "dns", "ip", "geo", "tls", "lexical", "rdap_dn", "rdap_ip", "drop"]
 # When set to true, the feature extractor will produce the JSON-serialized feature vectors one-by-one to the
 # feature_vectors_json topic. This is useful for debugging and testing the feature extractor, as well as for
 # the "standalone" mode, where the extractor is not connected to the rest of the pipeline.
