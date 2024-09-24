@@ -894,6 +894,7 @@ develop = true
 
 [package.dependencies]
 aiokafka = {version = "^0.10.0", extras = ["zstd"]}
+beautifulsoup4 = "^4.12.3"
 cryptography = "^42.0.5"
 faust-streaming = {version = "^0.11.0", extras = ["rocksdict"]}
 feather-format = "^0.4.1"
@@ -3371,4 +3372,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.11,<3.12"
-content-hash = "571e675b6db1b768e891ce9de24a198f7135115f90fa70901aec4ba0b65716e9"
+content-hash = "5b89b5aadc16636d6bc4ba1ee2ea2f5c24844a993b781d307577f18e7dcf4d69"

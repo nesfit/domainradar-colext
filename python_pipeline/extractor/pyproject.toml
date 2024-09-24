@@ -25,7 +25,7 @@ feather-format = "^0.4.1"
 pydantic = "^2.8.2"
 python-whois = "^0.9.4"
 pyarrow = "^16.1.0"
-
+beautifulsoup4 = "^4.12.3"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0.0"
