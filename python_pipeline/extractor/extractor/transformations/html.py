@@ -65,9 +65,9 @@ class HTMLTransformation(Transformation):
             # TODO
             anchors, hrefs, hrefs_http, hrefs_internal = [], [], [], []
 
-        no_hrefs = len(hrefs) == 0
-        external_hrefs_ratio = len(hrefs_http) / len(hrefs) > 0.5 if hrefs else 0
-        internal_hrefs_ratio = len(hrefs_internal) / len(hrefs) <= 0.5 if hrefs else 0
+        no_hrefs_flag = len(hrefs) == 0
+        external_hrefs_flag = len(hrefs_http) / len(hrefs) > 0.5 if hrefs else 0
+        internal_hrefs_flag = len(hrefs_internal) / len(hrefs) <= 0.5 if hrefs else 0
 
         form_actions = get_elements('form', 'action')
         malicious_form = any("http" in form.get('action', '') or
@@ -107,7 +107,7 @@ class HTMLTransformation(Transformation):
                 len(get_elements('link', 'type')), len(get_elements('link', 'type="application/rss+xml"')),
                 len(get_elements('link', 'rel="shortlink"')), len(soup.find_all(href=True)),
                 len(form_actions), len([form for form in form_actions if "http" in form.get('action', '')]),
-                len(tags.get('strong', [])), int(no_hrefs), int(internal_hrefs_ratio), len(hrefs_internal), int(external_hrefs_ratio),
+                len(tags.get('strong', [])), int(no_hrefs_flag), int(internal_hrefs_flag), len(hrefs_internal), int(external_hrefs_flag),
                 len(hrefs_http), len(get_elements('link', 'rel="shortcut icon"')), int(bool(
                 [icon for icon in get_elements('link', 'rel="shortcut icon"') if "http" in icon.get('href', '')])),
                 len([form for form in form_actions if ".php" in form.get('action', '')]),
