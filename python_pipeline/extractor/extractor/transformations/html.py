@@ -201,7 +201,7 @@ class HTMLTransformation(Transformation):
 
     def get_js_f(self, js: list) -> Iterable[int | float]:
         if not js:
-            return [0] * (len(self._patterns) + 1)
+            return [0] * (len(self._patterns))
 
         regex_patterns = self._patterns
         dic: dict[str, int | float] = {key: 0 for key in regex_patterns.keys()}
