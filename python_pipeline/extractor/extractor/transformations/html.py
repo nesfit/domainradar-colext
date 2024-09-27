@@ -1,6 +1,5 @@
 import re
 from collections import Counter, OrderedDict
-from math import log2
 from typing import Iterable
 
 from bs4 import BeautifulSoup
@@ -66,9 +65,9 @@ class HTMLTransformation(Transformation):
             # TODO
             anchors, hrefs, hrefs_http, hrefs_internal = [], [], [], []
 
-        no_hrefs = len(hrefs) == 0
-        external_hrefs_ratio = len(hrefs_http) / len(hrefs) > 0.5 if hrefs else 0
-        internal_hrefs_ratio = len(hrefs_internal) / len(hrefs) <= 0.5 if hrefs else 0
+        no_hrefs_flag = len(hrefs) == 0
+        external_hrefs_flag = len(hrefs_http) / len(hrefs) > 0.5 if hrefs else 0
+        internal_hrefs_flag = len(hrefs_internal) / len(hrefs) <= 0.5 if hrefs else 0
 
         form_actions = get_elements('form', 'action')
         malicious_form = any("http" in form.get('action', '') or
@@ -108,7 +107,7 @@ class HTMLTransformation(Transformation):
                 len(get_elements('link', 'type')), len(get_elements('link', 'type="application/rss+xml"')),
                 len(get_elements('link', 'rel="shortlink"')), len(soup.find_all(href=True)),
                 len(form_actions), len([form for form in form_actions if "http" in form.get('action', '')]),
-                len(tags.get('strong', [])), no_hrefs, internal_hrefs_ratio, len(hrefs_internal), external_hrefs_ratio,
+                len(tags.get('strong', [])), int(no_hrefs_flag), int(internal_hrefs_flag), len(hrefs_internal), int(external_hrefs_flag),
                 len(hrefs_http), len(get_elements('link', 'rel="shortcut icon"')), int(bool(
                 [icon for icon in get_elements('link', 'rel="shortcut icon"') if "http" in icon.get('href', '')])),
                 len([form for form in form_actions if ".php" in form.get('action', '')]),
@@ -163,7 +162,7 @@ class HTMLTransformation(Transformation):
          df["html_document_create_element"],
          df["html_window_set_timeout"], df["html_window_set_interval"], df["html_hex_encoding"],
          df["html_unicode_encoding"],
-         df["html_long_variable_name"], df["html_entropy"]) = zip(*df["js_inline"].apply(self.get_js_f))
+         df["html_long_variable_name"]) = zip(*df["js_inline"].apply(self.get_js_f))
 
         df.drop("soup", axis=1, inplace=True)
         df.drop("js_inline", axis=1, inplace=True)
@@ -199,28 +198,20 @@ class HTMLTransformation(Transformation):
         return (html_num_of_words, html_num_of_lines, html_unique_words, html_average_word_len,
                 html_blocked_keywords_label, html_num_of_blank_spaces)
 
-    def calculate_entropy(self, text):
-        if not text:
-            return 0
-        counter = Counter(text)
-        length = len(text)
-        entropy = -sum((count / length) * log2(count / length) for count in counter.values())
-        return entropy
 
     def get_js_f(self, js: list) -> Iterable[int | float]:
         if not js:
-            return [0] * (len(self._patterns) + 1)
+            return [0] * (len(self._patterns))
 
         regex_patterns = self._patterns
         dic: dict[str, int | float] = {key: 0 for key in regex_patterns.keys()}
 
-        total_entropy = 0
         for script in js:
             for key, pattern in regex_patterns.items():
                 dic[key] += len(pattern.findall(str(script)))
-            total_entropy += self.calculate_entropy(str(script))
 
-        dic['entropy'] = total_entropy / len(dic)
+
+
         print(dic)
         return dic.values()
 
@@ -272,9 +263,9 @@ class HTMLTransformation(Transformation):
             "html_num_of_form_http": "Int64",
             "html_num_of_strong": "Int64",
             "html_no_hrefs": "Int64",
-            "html_internal_href_ratio": "float64",
+            "html_internal_href_ratio": "Int64",
             "html_num_of_internal_hrefs": "Int64",
-            "html_external_href_ratio": "float64",
+            "html_external_href_ratio": "Int64",
             "html_num_of_external_href": "Int64",
             "html_num_of_icon": "Int64",
             "html_icon_external": "Int64",
@@ -315,6 +306,5 @@ class HTMLTransformation(Transformation):
             "html_window_set_interval": "Int64",
             "html_hex_encoding": "Int64",
             "html_unicode_encoding": "Int64",
-            "html_long_variable_name": "Int64",
-            "html_entropy": "float64"
+            "html_long_variable_name": "Int64"
         }
