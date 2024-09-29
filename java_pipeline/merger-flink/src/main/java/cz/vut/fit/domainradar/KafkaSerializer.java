@@ -13,11 +13,13 @@ public class KafkaSerializer<K, V> implements KafkaRecordSerializationSchema<Tup
     private final Serializer<V> _valueSerializer;
     private final String _targetTopic;
 
-    public KafkaSerializer(ObjectMapper objectMapper, String targetTopic) {
+    public KafkaSerializer(String targetTopic) {
+        var objectMapper = Common.makeMapper().build();
         _keySerializer = new JsonSerializer<>(objectMapper);
         _valueSerializer = new JsonSerializer<>(objectMapper);
         _targetTopic = targetTopic;
     }
+
 
     @Nullable
     @Override

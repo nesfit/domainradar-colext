@@ -1,10 +1,12 @@
 package cz.vut.fit.domainradar;
 
 import org.apache.flink.api.java.tuple.Tuple6;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * A tuple representing a deserialized Kafka record.
  * It contains the key, value, topic, partition, offset, and timestamp.
+ *
  * @param <K> Key type
  * @param <V> Value type
  */
@@ -14,18 +16,22 @@ public class ConsumedKafkaRecord<K, V> extends Tuple6<K, V, String, Integer, Lon
         super();
     }
 
-    public ConsumedKafkaRecord(K key, V value, String topic, int partition, long offset, long timestamp) {
+    public ConsumedKafkaRecord(@NotNull K key, @NotNull V value, @NotNull String topic,
+                               int partition, long offset, long timestamp) {
         super(key, value, topic, partition, offset, timestamp);
     }
 
+    @NotNull
     public K getKey() {
         return f0;
     }
 
+    @NotNull
     public V getValue() {
         return f1;
     }
 
+    @NotNull
     public String getTopic() {
         return f2;
     }
