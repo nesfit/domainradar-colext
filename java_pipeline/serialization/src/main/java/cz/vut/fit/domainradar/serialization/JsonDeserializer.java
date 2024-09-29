@@ -43,7 +43,7 @@ public class JsonDeserializer<T> implements Deserializer<T> {
     }
 
     @Override
-    public T deserialize(String s, byte[] bytes) {
+    public T deserialize(String topic, byte[] bytes) {
         if (bytes == null || bytes.length == 0)
             return null;
 

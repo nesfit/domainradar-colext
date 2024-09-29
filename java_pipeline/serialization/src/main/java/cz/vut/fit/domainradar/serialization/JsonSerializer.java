@@ -12,7 +12,7 @@ import org.apache.kafka.common.serialization.Serializer;
  * @author Ondřej Ondryáš
  */
 public class JsonSerializer<T> implements Serializer<T> {
-    private final ObjectMapper _objectMapper;
+    protected final ObjectMapper _objectMapper;
 
     public JsonSerializer(ObjectMapper objectMapper) {
         _objectMapper = objectMapper;
