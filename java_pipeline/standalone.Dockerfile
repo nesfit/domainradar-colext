@@ -17,13 +17,14 @@ WORKDIR /src
 COPY pom.xml ./
 COPY streams-components/pom.xml ./streams-components/
 COPY standalone-collectors/pom.xml ./standalone-collectors/
+COPY merger-flink/pom.xml ./merger-flink/
 COPY common/pom.xml ./common/
 COPY serialization/pom.xml ./serialization/
 COPY connect/pom.xml ./connect/
 
 # Resolve dependencies
-RUN --mount=type=cache,target=/root/.m2/ mvn clean -pl '-:connect,-:streams-components' && \
-    mvn dependency:go-offline -DexcludeGroupIds=cz.vut.fit.domainradar -pl '-:connect,-:streams-components'
+RUN --mount=type=cache,target=/root/.m2/ mvn clean -pl '-:connect,-:streams-components,-:merger-flink' && \
+    mvn dependency:go-offline -DexcludeGroupIds=cz.vut.fit.domainradar -pl '-:connect,-:streams-components,-:merger-flink'
 
 # Copy the source files
 COPY ./ .
