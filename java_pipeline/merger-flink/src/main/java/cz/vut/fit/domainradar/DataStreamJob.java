@@ -1,35 +1,6 @@
-/*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package cz.vut.fit.domainradar;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import cz.vut.fit.domainradar.flink.models.BaseKafkaDomainResult;
-import cz.vut.fit.domainradar.flink.models.KafkaDNSResult;
-import cz.vut.fit.domainradar.models.results.AllCollectedData;
-import cz.vut.fit.domainradar.models.results.DNSResult;
-import cz.vut.fit.domainradar.models.results.Result;
-import cz.vut.fit.domainradar.models.results.TLSResult;
-import cz.vut.fit.domainradar.serialization.JsonDeserializer;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
-import org.apache.flink.api.common.typeinfo.TypeHint;
-import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.utils.ParameterTool;
 import org.apache.flink.configuration.Configuration;
@@ -37,15 +8,13 @@ import org.apache.flink.configuration.PipelineOptions;
 import org.apache.flink.connector.kafka.sink.KafkaSink;
 import org.apache.flink.connector.kafka.source.KafkaSource;
 import org.apache.flink.connector.kafka.source.enumerator.initializer.OffsetsInitializer;
-import org.apache.flink.connector.kafka.source.reader.deserializer.KafkaRecordDeserializationSchema;
+import org.apache.flink.streaming.api.datastream.KeyedStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.streaming.api.watermark.Watermark;
-import org.apache.flink.util.Collector;
-import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.OffsetResetStrategy;
 import org.apache.flink.connector.base.DeliveryGuarantee;
+import org.apache.kafka.streams.kstream.SessionWindows;
+import org.apache.kafka.streams.kstream.internals.SessionWindow;
 
-import java.io.IOException;
 import java.time.Duration;
 import java.util.Properties;
 
@@ -71,39 +40,48 @@ public class DataStreamJob {
             }
         });
 
-        KafkaSource<KafkaDNSResult> dnsSource
-                = KafkaSource.<KafkaDNSResult>builder()
-                .setProperties(kafkaProperties)
-                .setTopics("processed_DNS")
-                .setStartingOffsets(OffsetsInitializer.committedOffsets(OffsetResetStrategy.EARLIEST))
-                .setDeserializer(new KafkaDomainResultDeserializer<DNSResult, KafkaDNSResult>(
-                        KafkaDNSResult.class.getName(), DNSResult.class.getName()
-                ))
-                .build();
+        KafkaSink<Tuple2<String, String>> sink = makeKafkaSink("all_collected_data");
 
-        /*KafkaSource<ConsumedKafkaRecord<String, TLSResult>> tlsSource
-                = makeKafkaSource("processed_TLS", new TypeHint<>() {
-        });
+        var zoneStream = makeKafkaDomainStream(env, "processed_zone");
+        var dnsStream = makeKafkaDomainStream(env, "processed_DNS");
+        var tlsStream = makeKafkaDomainStream(env, "processed_TLS");
+        var rdapDnStream = makeKafkaDomainStream(env, "processed_RDAP_DN");
 
-        env.fromSource(dnsSource, makeWatermarkStrategy(), "Kafka: processed_DNS")
-                .map(rec -> rec.getValue().toString())
-                .print();
-        */
+        var allDomainStreams = zoneStream.union(dnsStream, tlsStream, rdapDnStream)
+                .keyBy(KafkaDomainEntry::getDomainName)
+                .process(new DomainEntriesProcessFunction())
+                .map(dnAggregate -> new KafkaMergedResult(dnAggregate.getDomainName(), dnAggregate))
+                .map(new SerdeMappingFunction())
+                .sinkTo(sink);
+
 
         // Execute the program
         env.execute("DomainRadar Data Merger");
     }
 
-    /*
-    private static <K, V> KafkaSource<ConsumedKafkaRecord<K, V>> makeKafkaSource(
-            final String topic, final TypeHint<ConsumedKafkaRecord<K, V>> typeHint) {
-        return KafkaSource.<ConsumedKafkaRecord<K, V>>builder()
+    private static KeyedStream<KafkaDomainEntry, String> makeKafkaDomainStream(final StreamExecutionEnvironment env,
+                                                                               final String topic) {
+        return env.fromSource(makeKafkaDomainSource(topic), makeWatermarkStrategy(), "Kafka: " + topic)
+                .keyBy(KafkaDomainEntry::getDomainName);
+    }
+
+    private static KafkaSource<KafkaDomainEntry> makeKafkaDomainSource(final String topic) {
+        return KafkaSource.<KafkaDomainEntry>builder()
                 .setProperties(kafkaProperties)
                 .setTopics(topic)
                 .setStartingOffsets(OffsetsInitializer.committedOffsets(OffsetResetStrategy.EARLIEST))
-                .setDeserializer(new KafkaDeserializer<>(typeHint))
+                .setDeserializer(new KafkaDomainEntryDeserializer())
                 .build();
-    }*/
+    }
+
+    private static KafkaSource<KafkaIPEntry> makeKafkaIpSource(final String topic) {
+        return KafkaSource.<KafkaIPEntry>builder()
+                .setProperties(kafkaProperties)
+                .setTopics(topic)
+                .setStartingOffsets(OffsetsInitializer.committedOffsets(OffsetResetStrategy.EARLIEST))
+                .setDeserializer(new KafkaIPEntryDeserializer())
+                .build();
+    }
 
     private static <K, V> KafkaSink<Tuple2<K, V>> makeKafkaSink(final String topic) {
         return KafkaSink.<Tuple2<K, V>>builder()
@@ -113,9 +91,8 @@ public class DataStreamJob {
                 .build();
     }
 
-    private static <T extends BaseKafkaDomainResult> WatermarkStrategy<T> makeWatermarkStrategy() {
+    private static <T> WatermarkStrategy<T> makeWatermarkStrategy() {
         return WatermarkStrategy
-                .<T>forBoundedOutOfOrderness(Duration.ofSeconds(10))
-                .withTimestampAssigner((event, ts) -> event.getRecordMetadata().getCollectorTimestamp());
+                .<T>forBoundedOutOfOrderness(Duration.ofSeconds(10));
     }
 }
