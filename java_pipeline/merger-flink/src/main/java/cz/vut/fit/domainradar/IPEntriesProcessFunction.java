@@ -98,7 +98,9 @@ public class IPEntriesProcessFunction extends KeyedCoProcessFunction<String, Kaf
             _ipAndCollectorToIpData.put(key, value);
         }
 
-        this.processIngestedData(out, ctx.timerService());
+        // Only attempt processing if the domain data was already ingested by the process function
+        if (_domainData.value() != null)
+            this.processIngestedData(out, ctx.timerService());
     }
 
     private void processIngestedData(Collector<KafkaMergedResult> out, TimerService timerService) throws Exception {
