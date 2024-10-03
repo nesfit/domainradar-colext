@@ -2,7 +2,7 @@ package cz.vut.fit.domainradar.streams;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import cz.vut.fit.domainradar.Common;
-import cz.vut.fit.domainradar.streams.mergers.ReworkedCollectedDataMergerComponent;
+import cz.vut.fit.domainradar.streams.mergers.CollectedDataMergerComponent;
 import org.apache.commons.cli.*;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.KafkaStreams;
@@ -172,7 +172,7 @@ public class StreamsPipelineRunner {
         var components = new ArrayList<PipelineComponent>();
 
         if (cmd.hasOption("merger") || useAll) {
-            var merger = new ReworkedCollectedDataMergerComponent(jsonMapper);
+            var merger = new CollectedDataMergerComponent(jsonMapper);
             merger.use(builder);
             components.add(merger);
         }
