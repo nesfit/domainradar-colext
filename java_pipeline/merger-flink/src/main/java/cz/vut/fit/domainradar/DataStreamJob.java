@@ -29,7 +29,7 @@ public class DataStreamJob {
 
         // Read configuration
         // All configuration properties with the "kafka." prefix will be passed to the Kafka source
-        ParameterTool params = ParameterTool.fromPropertiesFile(ParameterTool.fromSystemProperties().get("merger.config"));
+        ParameterTool params = ParameterTool.fromPropertiesFile(args[0]);
         env.getConfig().setGlobalJobParameters(params);
         params.toMap().forEach((k, v) -> {
             if (k.startsWith("kafka.")) {
