@@ -1,51 +1,118 @@
 package cz.vut.fit.domainradar;
 
-import org.apache.flink.api.java.tuple.Tuple7;
 import org.jetbrains.annotations.NotNull;
 
 /**
  * A tuple representing a Kafka record with a (domain name, IP) pair key.
  * It contains the key fields, value, topic, partition, offset, and timestamp.
  */
-public class KafkaIPEntry extends Tuple7<String, String, byte[], String, Integer, Long, Long> {
+public class KafkaIPEntry implements KafkaEntry {
+
+    @NotNull
+    String domainName;
+    @NotNull
+    String ip;
+    byte[] value;
+    int statusCode;
+    byte collectorTag;
+    @NotNull
+    String topic;
+    int partition;
+    long offset;
+    long timestamp;
 
     public KafkaIPEntry() {
-        super();
+        this.domainName = "";
+        this.ip = "";
+        this.topic = "";
+        this.value = new byte[0];
     }
 
-    public KafkaIPEntry(@NotNull String key, String ip, byte[] value, @NotNull String topic,
-                        int partition, long offset, long timestamp) {
-        super(key, ip, value, topic, partition, offset, timestamp);
+    public KafkaIPEntry(@NotNull String domainName, @NotNull String ip, byte[] value, int statusCode,
+                        byte collectorTag, @NotNull String topic, int partition, long offset, long timestamp) {
+        this.domainName = domainName;
+        this.ip = ip;
+        this.value = value;
+        this.statusCode = statusCode;
+        this.collectorTag = collectorTag;
+        this.topic = topic;
+        this.partition = partition;
+        this.offset = offset;
+        this.timestamp = timestamp;
     }
 
     @NotNull
     public String getDomainName() {
-        return f0;
+        return this.domainName;
     }
 
-    @NotNull
-    public String getIP() {
-        return f1;
+    public void setDomainName(@NotNull String domainName) {
+        this.domainName = domainName;
     }
 
     public byte[] getValue() {
-        return f2;
+        return this.value;
+    }
+
+    public void setValue(byte[] value) {
+        this.value = value;
+    }
+
+    public int getStatusCode() {
+        return this.statusCode;
+    }
+
+    public void setStatusCode(int statusCode) {
+        this.statusCode = statusCode;
     }
 
     @NotNull
     public String getTopic() {
-        return f3;
+        return this.topic;
+    }
+
+    public void setTopic(@NotNull String topic) {
+        this.topic = topic;
     }
 
     public int getPartition() {
-        return f4;
+        return this.partition;
+    }
+
+    public void setPartition(int partition) {
+        this.partition = partition;
     }
 
     public long getOffset() {
-        return f5;
+        return this.offset;
+    }
+
+    public void setOffset(long offset) {
+        this.offset = offset;
     }
 
     public long getTimestamp() {
-        return f6;
+        return this.timestamp;
+    }
+
+    public void setTimestamp(long timestamp) {
+        this.timestamp = timestamp;
+    }
+
+    @NotNull
+    public String getIP() {
+        return this.ip;
+    }
+
+    public void setIP(@NotNull String ip) {
+        this.ip = ip;
+    }
+
+    public byte getCollector() {
+        return this.collectorTag;
+    }
+
+    public void setCollectorTag(byte collectorTag) {
+        this.collectorTag = collectorTag;
     }
 }

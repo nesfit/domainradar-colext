@@ -11,7 +11,7 @@ public final class ResultFitnessComparator {
         return (oldNOK && newNewer) || (oldNOK && newOK) || (newOK && newNewer);
     }
 
-    public static boolean isMoreUseful(final KafkaDomainEntry previous, final KafkaDomainEntry current) {
+    public static boolean isMoreUseful(final KafkaEntry previous, final KafkaEntry current) {
         if (previous == null)
             return true;
         if (current == null)
@@ -23,7 +23,7 @@ public final class ResultFitnessComparator {
         return (oldNOK && newNewer) || (oldNOK && newOK) || (newOK && newNewer);
     }
 
-    public static KafkaDomainEntry getMoreUseful(final KafkaDomainEntry left, final KafkaDomainEntry right) {
+    public static <T extends KafkaEntry> T getMoreUseful(final T left, final T right) {
         return isMoreUseful(left, right) ? right : left;
     }
 }

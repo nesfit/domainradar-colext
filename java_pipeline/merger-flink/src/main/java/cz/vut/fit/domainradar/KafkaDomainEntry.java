@@ -1,50 +1,95 @@
 package cz.vut.fit.domainradar;
 
-import org.apache.flink.api.java.tuple.Tuple7;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * A tuple representing a Kafka record with a string key.
- * It contains the key, value, topic, partition, offset, and timestamp.
+ * A POJO representing a Kafka record with a string key.
+ * It contains the key, value, status (result) code, topic, partition, offset, and timestamp.
  */
-public class KafkaDomainEntry extends Tuple7<String, byte[], Integer, String, Integer, Long, Long> {
+public class KafkaDomainEntry implements KafkaEntry {
+
+    @NotNull
+    String domainName;
+    byte[] value;
+    int statusCode;
+    @NotNull
+    String topic;
+    int partition;
+    long offset;
+    long timestamp;
 
     public KafkaDomainEntry() {
-        super();
+        this.domainName = "";
+        this.topic = "";
+        this.value = new byte[0];
     }
 
-    public KafkaDomainEntry(@NotNull String key, byte[] value, int statusCode, @NotNull String topic,
+    public KafkaDomainEntry(@NotNull String domainName, byte[] value, int statusCode, @NotNull String topic,
                             int partition, long offset, long timestamp) {
-        super(key, value, statusCode, topic, partition, offset, timestamp);
+        this.domainName = domainName;
+        this.value = value;
+        this.statusCode = statusCode;
+        this.topic = topic;
+        this.partition = partition;
+        this.offset = offset;
+        this.timestamp = timestamp;
     }
 
     @NotNull
     public String getDomainName() {
-        return f0;
+        return this.domainName;
+    }
+
+    public void setDomainName(@NotNull String domainName) {
+        this.domainName = domainName;
     }
 
     public byte[] getValue() {
-        return f1;
+        return this.value;
+    }
+
+    public void setValue(byte[] value) {
+        this.value = value;
     }
 
     public int getStatusCode() {
-        return f2;
+        return this.statusCode;
+    }
+
+    public void setStatusCode(int statusCode) {
+        this.statusCode = statusCode;
     }
 
     @NotNull
     public String getTopic() {
-        return f3;
+        return this.topic;
+    }
+
+    public void setTopic(@NotNull String topic) {
+        this.topic = topic;
     }
 
     public int getPartition() {
-        return f4;
+        return this.partition;
+    }
+
+    public void setPartition(int partition) {
+        this.partition = partition;
     }
 
     public long getOffset() {
-        return f5;
+        return this.offset;
+    }
+
+    public void setOffset(long offset) {
+        this.offset = offset;
     }
 
     public long getTimestamp() {
-        return f6;
+        return this.timestamp;
+    }
+
+    public void setTimestamp(long timestamp) {
+        this.timestamp = timestamp;
     }
 }

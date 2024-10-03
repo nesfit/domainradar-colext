@@ -4,7 +4,7 @@ public class KafkaDomainAggregate {
     private String domainName;
     private KafkaDomainEntry zoneData;
     private KafkaDomainEntry dnsData;
-    private KafkaDomainEntry rdapDnData;
+    private KafkaDomainEntry rdapData;
     private KafkaDomainEntry tlsData;
 
     public KafkaDomainAggregate() {
@@ -14,7 +14,7 @@ public class KafkaDomainAggregate {
         this.domainName = domainName;
         this.zoneData = zoneData;
         this.dnsData = dnsData;
-        this.rdapDnData = rdapDnData;
+        this.rdapData = rdapDnData;
         this.tlsData = tlsData;
     }
 
@@ -34,31 +34,31 @@ public class KafkaDomainAggregate {
         this.zoneData = zoneData;
     }
 
-    public KafkaDomainEntry getDnsData() {
+    public KafkaDomainEntry getDNSData() {
         return dnsData;
     }
 
-    public void setDnsData(KafkaDomainEntry dnsData) {
+    public void setDNSData(KafkaDomainEntry dnsData) {
         this.dnsData = dnsData;
     }
 
-    public KafkaDomainEntry getRdapDnData() {
-        return rdapDnData;
+    public KafkaDomainEntry getRDAPData() {
+        return rdapData;
     }
 
-    public void setRdapDnData(KafkaDomainEntry rdapDnData) {
-        this.rdapDnData = rdapDnData;
+    public void setRDAPData(KafkaDomainEntry rdapData) {
+        this.rdapData = rdapData;
     }
 
-    public KafkaDomainEntry getTlsData() {
+    public KafkaDomainEntry getTLSData() {
         return tlsData;
     }
 
-    public void setTlsData(KafkaDomainEntry tlsData) {
+    public void setTLSData(KafkaDomainEntry tlsData) {
         this.tlsData = tlsData;
     }
 
     public boolean isComplete() {
-        return zoneData != null && dnsData != null && rdapDnData != null && tlsData != null;
+        return zoneData != null && dnsData != null && rdapData != null && tlsData != null;
     }
 }
