@@ -11,7 +11,6 @@ import cz.vut.fit.domainradar.serialization.JsonSerde;
 import cz.vut.fit.domainradar.standalone.BaseStandaloneCollector;
 import org.apache.commons.cli.CommandLine;
 import org.apache.kafka.clients.producer.KafkaProducer;
-import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.jetbrains.annotations.NotNull;
@@ -110,15 +109,15 @@ public class TLSCollector extends BaseStandaloneCollector<String, String> {
 
             try {
                 var result = resultFuture.join();
-                _producer.send(new ProducerRecord<>(Topics.OUT_TLS, dn, result));
+                _producer.send(resultRecord(Topics.OUT_TLS, dn, result));
             } catch (CompletionException e) {
                 if (e.getCause() instanceof TimeoutException) {
                     Logger.debug("Operation timed out: {}", dn);
-                    _producer.send(new ProducerRecord<>(Topics.OUT_TLS, dn,
+                    _producer.send(resultRecord(Topics.OUT_TLS, dn,
                             errorResult(ResultCodes.TIMEOUT, "Operation timed out (%d ms)".formatted(_timeout))));
                 } else {
                     Logger.warn("Unexpected error: {}", dn, e);
-                    _producer.send(new ProducerRecord<>(Topics.OUT_TLS, dn,
+                    _producer.send(resultRecord(Topics.OUT_TLS, dn,
                             errorResult(ResultCodes.INTERNAL_ERROR, e.getMessage())));
                 }
             }

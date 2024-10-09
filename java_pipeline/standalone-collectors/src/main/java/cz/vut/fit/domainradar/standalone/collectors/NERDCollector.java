@@ -12,7 +12,6 @@ import cz.vut.fit.domainradar.models.results.CommonIPResult;
 import cz.vut.fit.domainradar.standalone.IPStandaloneCollector;
 import org.apache.commons.cli.CommandLine;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.apache.kafka.clients.producer.ProducerRecord;
 import org.jetbrains.annotations.NotNull;
 import pl.tlinkowski.unij.api.UniLists;
 
@@ -129,7 +128,7 @@ public class NERDCollector extends IPStandaloneCollector<NERDData> {
                     continue;
                 } else if (ip instanceof Inet6Address) {
                     Logger.trace("Discarding IPv6 address: {}", inputIpToProcess.ip());
-                    _producer.send(new ProducerRecord<>(Topics.OUT_IP, inputIpToProcess,
+                    _producer.send(resultRecord(Topics.OUT_IP, inputIpToProcess,
                             errorResult(ResultCodes.UNSUPPORTED_ADDRESS, null)));
                     continue;
                 }
@@ -137,7 +136,7 @@ public class NERDCollector extends IPStandaloneCollector<NERDData> {
                 // Invalid IP address
             }
             Logger.debug("Invalid IP address: {}", inputIpToProcess);
-            _producer.send(new ProducerRecord<>(Topics.OUT_IP, inputIpToProcess,
+            _producer.send(resultRecord(Topics.OUT_IP, inputIpToProcess,
                     errorResult(ResultCodes.INVALID_ADDRESS, null)));
         }
 
@@ -185,7 +184,7 @@ public class NERDCollector extends IPStandaloneCollector<NERDData> {
                             var value = resultDataBuffer.getDouble(i);
 
                             Logger.trace("DN/IP {} -> {}", entriesToProcess.get(i), value);
-                            _producer.send(new ProducerRecord<>(Topics.OUT_IP, entriesToProcess.get(i),
+                            _producer.send(resultRecord(Topics.OUT_IP, entriesToProcess.get(i),
                                     successResult(new NERDData(value))));
                         }
                     } else {

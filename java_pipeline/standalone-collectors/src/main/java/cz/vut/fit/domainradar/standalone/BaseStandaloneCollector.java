@@ -2,6 +2,7 @@ package cz.vut.fit.domainradar.standalone;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import cz.vut.fit.domainradar.CollectorConfig;
+import cz.vut.fit.domainradar.models.results.Result;
 import io.confluent.parallelconsumer.ParallelConsumerOptions;
 import io.confluent.parallelconsumer.ParallelStreamProcessor;
 import io.confluent.parallelconsumer.internal.DrainingCloseable;
@@ -103,12 +104,28 @@ public abstract class BaseStandaloneCollector<KIn, VIn> implements Closeable {
      * @param <KOut>   The type of the keys to send.
      * @param <VOut>   The type of the result to send.
      */
-    protected static <KOut, VOut> void sendAboutAll(@NotNull KafkaProducer<KOut, VOut> producer,
-                                                    @NotNull String topic, @NotNull List<KOut> entries,
-                                                    @NotNull VOut result) {
+    protected static <KOut, VOut extends Result> void sendAboutAll(@NotNull KafkaProducer<KOut, VOut> producer,
+                                                                   @NotNull String topic, @NotNull List<KOut> entries,
+                                                                   @NotNull VOut result) {
         for (var entry : entries) {
-            producer.send(new ProducerRecord<>(topic, entry, result));
+            producer.send(new ProducerRecord<>(topic, null, result.lastAttempt().toEpochMilli(), entry, result));
         }
+    }
+
+    /**
+     * Creates a {@link ProducerRecord} for a given topic, key, and {@link Result}-like value. Uses the
+     * result's {@link Result#lastAttempt()} as the timestamp for the produced Kafka record.
+     *
+     * @param topic  The target topic.
+     * @param key    The key for the produced record.
+     * @param value  The value for the produced record.
+     * @param <KOut> The type of the key to send.
+     * @param <VOut> The type of the result to send. Extends {@link Result}.
+     * @return The Kafka record.
+     */
+    protected static <KOut, VOut extends Result> ProducerRecord<KOut, VOut> resultRecord(
+            String topic, KOut key, VOut value) {
+        return new ProducerRecord<>(topic, null, value.lastAttempt().toEpochMilli(), key, value);
     }
 
     /**
