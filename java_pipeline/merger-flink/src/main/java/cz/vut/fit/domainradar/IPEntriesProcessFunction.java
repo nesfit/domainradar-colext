@@ -11,6 +11,7 @@ import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.typeutils.TupleTypeInfo;
 import org.apache.flink.streaming.api.functions.co.KeyedCoProcessFunction;
 import org.apache.flink.util.Collector;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -164,8 +165,8 @@ public class IPEntriesProcessFunction extends KeyedCoProcessFunction<String, Kaf
         LOG.trace("(IP {}\tColID {}): Done", ip, collectorTag);
     }
 
-    private void processIngestedData(Collector<KafkaMergedResult> out,
-                                     KeyedCoProcessFunction<?, ?, ?, ?>.Context ctx) throws Exception {
+    private void processIngestedData(@NotNull Collector<KafkaMergedResult> out,
+                                     @NotNull KeyedCoProcessFunction<?, ?, ?, ?>.Context ctx) throws Exception {
         LOG.trace("Processing ingested data");
         // There must be at least TOTAL_EXPECTED_RECORDS_PER_IPS entries for each IP before it makes sense
         // to inspect the data further
@@ -248,7 +249,7 @@ public class IPEntriesProcessFunction extends KeyedCoProcessFunction<String, Kaf
      *
      * @param targetDataMap The target Map of Maps to store the data in.
      */
-    private void collectIPData(Map<String, Map<Byte, KafkaIPEntry>> targetDataMap) throws Exception {
+    private void collectIPData(@NotNull Map<String, Map<Byte, KafkaIPEntry>> targetDataMap) throws Exception {
         for (var ipTagEntry : _ipAndCollectorToIpData.entries()) {
             final var ipTagPair = ipTagEntry.getKey();
             final var entry = ipTagEntry.getValue();

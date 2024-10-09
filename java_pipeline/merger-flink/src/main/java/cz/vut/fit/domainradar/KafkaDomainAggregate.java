@@ -1,6 +1,9 @@
 package cz.vut.fit.domainradar;
 
+import org.jetbrains.annotations.NotNull;
+
 public class KafkaDomainAggregate {
+    @NotNull
     private String domainName;
     private KafkaDomainEntry zoneData;
     private KafkaDomainEntry dnsData;
@@ -8,9 +11,11 @@ public class KafkaDomainAggregate {
     private KafkaDomainEntry tlsData;
 
     public KafkaDomainAggregate() {
+        this.domainName = "";
     }
 
-    public KafkaDomainAggregate(String domainName, KafkaDomainEntry zoneData, KafkaDomainEntry dnsData, KafkaDomainEntry rdapDnData, KafkaDomainEntry tlsData) {
+    public KafkaDomainAggregate(@NotNull String domainName, KafkaDomainEntry zoneData, KafkaDomainEntry dnsData,
+                                KafkaDomainEntry rdapDnData, KafkaDomainEntry tlsData) {
         this.domainName = domainName;
         this.zoneData = zoneData;
         this.dnsData = dnsData;
@@ -18,11 +23,11 @@ public class KafkaDomainAggregate {
         this.tlsData = tlsData;
     }
 
-    public String getDomainName() {
+    public @NotNull String getDomainName() {
         return domainName;
     }
 
-    public void setDomainName(String domainName) {
+    public void setDomainName(@NotNull String domainName) {
         this.domainName = domainName;
     }
 

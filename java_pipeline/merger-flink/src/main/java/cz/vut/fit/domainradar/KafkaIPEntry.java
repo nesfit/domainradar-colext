@@ -12,7 +12,7 @@ public class KafkaIPEntry implements KafkaEntry {
     String domainName;
     @NotNull
     String ip;
-    byte[] value;
+    byte @NotNull [] value;
     int statusCode;
     byte collectorTag;
     @NotNull
@@ -28,7 +28,7 @@ public class KafkaIPEntry implements KafkaEntry {
         this.value = new byte[0];
     }
 
-    public KafkaIPEntry(@NotNull String domainName, @NotNull String ip, byte[] value, int statusCode,
+    public KafkaIPEntry(@NotNull String domainName, @NotNull String ip, byte @NotNull [] value, int statusCode,
                         byte collectorTag, @NotNull String topic, int partition, long offset, long timestamp) {
         this.domainName = domainName;
         this.ip = ip;
@@ -50,11 +50,11 @@ public class KafkaIPEntry implements KafkaEntry {
         this.domainName = domainName;
     }
 
-    public byte[] getValue() {
+    public byte @NotNull [] getValue() {
         return this.value;
     }
 
-    public void setValue(byte[] value) {
+    public void setValue(byte @NotNull [] value) {
         this.value = value;
     }
 

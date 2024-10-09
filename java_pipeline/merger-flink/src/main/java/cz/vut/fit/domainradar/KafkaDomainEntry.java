@@ -10,7 +10,7 @@ public class KafkaDomainEntry implements KafkaEntry {
 
     @NotNull
     String domainName;
-    byte[] value;
+    byte @NotNull [] value;
     int statusCode;
     @NotNull
     String topic;
@@ -24,7 +24,7 @@ public class KafkaDomainEntry implements KafkaEntry {
         this.value = new byte[0];
     }
 
-    public KafkaDomainEntry(@NotNull String domainName, byte[] value, int statusCode, @NotNull String topic,
+    public KafkaDomainEntry(@NotNull String domainName, byte @NotNull [] value, int statusCode, @NotNull String topic,
                             int partition, long offset, long timestamp) {
         this.domainName = domainName;
         this.value = value;
@@ -44,11 +44,11 @@ public class KafkaDomainEntry implements KafkaEntry {
         this.domainName = domainName;
     }
 
-    public byte[] getValue() {
+    public byte @NotNull [] getValue() {
         return this.value;
     }
 
-    public void setValue(byte[] value) {
+    public void setValue(byte @NotNull [] value) {
         this.value = value;
     }
 

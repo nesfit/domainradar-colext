@@ -1,12 +1,16 @@
 package cz.vut.fit.domainradar;
 
+import org.jetbrains.annotations.NotNull;
+
 public interface KafkaEntry {
+    @NotNull
     String getDomainName();
 
-    byte[] getValue();
+    byte @NotNull [] getValue();
 
     int getStatusCode();
 
+    @NotNull
     String getTopic();
 
     int getPartition();
