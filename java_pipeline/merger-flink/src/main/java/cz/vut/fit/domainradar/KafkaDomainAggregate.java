@@ -2,6 +2,9 @@ package cz.vut.fit.domainradar;
 
 import org.jetbrains.annotations.NotNull;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class KafkaDomainAggregate {
     @NotNull
     private String domainName;
@@ -9,9 +12,11 @@ public class KafkaDomainAggregate {
     private KafkaDomainEntry dnsData;
     private KafkaDomainEntry rdapData;
     private KafkaDomainEntry tlsData;
+    private final List<String> dnsIps;
 
     public KafkaDomainAggregate() {
         this.domainName = "";
+        this.dnsIps = new ArrayList<>();
     }
 
     public KafkaDomainAggregate(@NotNull String domainName, KafkaDomainEntry zoneData, KafkaDomainEntry dnsData,
@@ -21,6 +26,7 @@ public class KafkaDomainAggregate {
         this.dnsData = dnsData;
         this.rdapData = rdapDnData;
         this.tlsData = tlsData;
+        this.dnsIps = new ArrayList<>();
     }
 
     public @NotNull String getDomainName() {
@@ -63,7 +69,11 @@ public class KafkaDomainAggregate {
         this.tlsData = tlsData;
     }
 
-    public boolean isComplete() {
-        return zoneData != null && dnsData != null && rdapData != null && tlsData != null;
+    public boolean isMaybeComplete() {
+        return zoneData != null && dnsData != null && rdapData != null;
+    }
+
+    public List<String> getIPs() {
+        return dnsIps;
     }
 }

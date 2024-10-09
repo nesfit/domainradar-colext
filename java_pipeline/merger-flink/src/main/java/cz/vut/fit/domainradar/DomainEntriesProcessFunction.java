@@ -1,5 +1,7 @@
 package cz.vut.fit.domainradar;
 
+import cz.vut.fit.domainradar.models.results.DNSResult;
+import cz.vut.fit.domainradar.serialization.JsonDeserializer;
 import org.apache.flink.api.common.functions.AggregateFunction;
 import org.apache.flink.api.common.functions.OpenContext;
 import org.apache.flink.api.common.state.AggregatingState;
@@ -8,35 +10,43 @@ import org.apache.flink.api.common.state.ValueState;
 import org.apache.flink.api.common.state.ValueStateDescriptor;
 import org.apache.flink.streaming.api.functions.KeyedProcessFunction;
 import org.apache.flink.util.Collector;
+import org.apache.kafka.common.serialization.Deserializer;
 
 import java.time.Duration;
 
 public class DomainEntriesProcessFunction extends KeyedProcessFunction<String, KafkaDomainEntry, KafkaDomainAggregate> {
 
-    // IMP: Use a rich aggregation function to maintain the "last update" timestamp inside the aggregate?
     private transient AggregatingState<KafkaDomainEntry, KafkaDomainAggregate> _domainData;
     private transient ValueState<Long> _entryExpirationTimestamp;
+    private transient ValueState<Boolean> _completeStateProduced;
 
     private transient long _finishedEntryGracePeriodMs;
     private transient long _maxEntryLifetimeMs;
 
+    private transient Deserializer<DNSResult> _dnsResultDeserializer;
 
     @Override
     public void open(OpenContext openContext) {
         AggregatingStateDescriptor<KafkaDomainEntry, KafkaDomainAggregate, KafkaDomainAggregate> domainDataDescriptor
                 = new AggregatingStateDescriptor<>("Per-Domain Data Aggregator",
                 new DomainEntriesAggregator(), KafkaDomainAggregate.class);
-        ValueStateDescriptor<Long> entryExpirationTimestampDescriptor
+        var entryExpirationTimestampDescriptor
                 = new ValueStateDescriptor<>("Last Update", Long.class);
+        var completeStateDescriptor
+                = new ValueStateDescriptor<>("Complete result dispatched", Boolean.class);
 
         // IMP: Do we need per-entry TTL? Probably not.
         // descriptor.enableTimeToLive(ttlConfig);
         _domainData = this.getRuntimeContext().getAggregatingState(domainDataDescriptor);
         _entryExpirationTimestamp = this.getRuntimeContext().getState(entryExpirationTimestampDescriptor);
+        _completeStateProduced = this.getRuntimeContext().getState(completeStateDescriptor);
 
         // TODO: configurable
         _finishedEntryGracePeriodMs = Duration.ofSeconds(5).toMillis();
         _maxEntryLifetimeMs = Duration.ofMinutes(10).toMillis();
+
+        var mapper = Common.makeMapper().build();
+        _dnsResultDeserializer = new JsonDeserializer<>(mapper, DNSResult.class);
     }
 
     @Override
@@ -53,9 +63,18 @@ public class DomainEntriesProcessFunction extends KeyedProcessFunction<String, K
         // Delete the pending cleanup timer
         if (expirationTimestamp != null)
             context.timerService().deleteEventTimeTimer(expirationTimestamp);
-        if (currentState.isComplete()) {
-            // The entry is complete, produce it
+
+        // If zone, DNS and RDAP-DN data are present, we can check verify TLS presence and populate the IPs
+        if (currentState.isMaybeComplete()) {
+            currentState = this.getFinalStateIfComplete();
+        } else {
+            currentState = null;
+        }
+
+        // getFinalStateIfComplete returns an aggregate iff it is ready to be produced
+        if (currentState != null) {
             collector.collect(currentState);
+            _completeStateProduced.update(Boolean.TRUE);
             // Schedule cleanup
             context.timerService().registerEventTimeTimer(context.timestamp() + _finishedEntryGracePeriodMs);
         } else {
@@ -75,7 +94,7 @@ public class DomainEntriesProcessFunction extends KeyedProcessFunction<String, K
         if (currentState == null)
             return; // Should not happen
 
-        if (currentState.isComplete()) {
+        if (_completeStateProduced.value() == Boolean.TRUE) {
             // The last complete snapshot was produced already, just clean the store for the key
             _domainData.clear();
             _entryExpirationTimestamp.clear();
@@ -88,12 +107,77 @@ public class DomainEntriesProcessFunction extends KeyedProcessFunction<String, K
             if (timestamp == currentNextExpiration) {
                 // The entry is not complete, but it's time to produce it anyway
                 // Though, only entries with Zone & DNS data should be produced
-                if (currentState.getZoneData() != null && currentState.getDNSData() != null)
+                if (currentState.getZoneData() != null && currentState.getDNSData() != null) {
+                    // Deserialize the DNS data and fill in the IP addresses
+                    this.deserializeDNSAndExtractIPs(currentState);
                     out.collect(currentState);
+                }
                 _domainData.clear();
                 _entryExpirationTimestamp.clear();
             }
         }
+    }
+
+    /**
+     * Deserializes the DNS data present in the input aggregate and populates the aggregate's IP list
+     * {@link KafkaDomainAggregate#getIPs()} with the IP addresses in the DNS response.
+     *
+     * @param currentState The aggregate.
+     * @return The deserialized {@link DNSResult}.
+     */
+    private DNSResult deserializeDNSAndExtractIPs(KafkaDomainAggregate currentState) {
+        var rawDnsData = currentState.getDNSData();
+        if (rawDnsData == null)
+            return null;
+
+        // Deserialize the DNS result
+        var dnsResult = _dnsResultDeserializer.deserialize(Topics.OUT_DNS, rawDnsData.getValue());
+        if (dnsResult == null)
+            return null;
+
+        // Extract the IP addresses
+        if (dnsResult.ips() != null) {
+            currentState.getIPs().clear();
+            for (var ip : dnsResult.ips()) {
+                currentState.getIPs().add(ip.ip());
+            }
+        }
+
+        return dnsResult;
+    }
+
+    private KafkaDomainAggregate getFinalStateIfComplete() throws Exception {
+        var currentState = _domainData.get();
+        if (currentState == null)
+            return null;
+
+        // Deserialize the DNS result and populate currentState with IP addresses
+        var dnsResult = this.deserializeDNSAndExtractIPs(currentState);
+        if (dnsResult == null)
+            return null;
+
+        // Check if TLS result is expected and if so, if it is present
+        if (currentState.getTLSData() != null)
+            // TLS data present, no need to check further
+            return currentState;
+
+        var dnsData = dnsResult.dnsData();
+        if (dnsData == null)
+            // No DNS data -> no TLS expected
+            return currentState;
+
+        var a = dnsData.A();
+        var aaaa = dnsData.AAAA();
+        var cname = dnsData.CNAME();
+
+        // If no IP data is present, TLS is not required
+        if ((a == null || a.isEmpty()) && (aaaa == null || aaaa.isEmpty())
+                && (cname == null || cname.relatedIPs() == null || cname.relatedIPs().isEmpty())) {
+            return currentState;
+        }
+
+        // Otherwise we're still waiting for TLS
+        return null;
     }
 
     public static final class DomainEntriesAggregator
@@ -106,7 +190,7 @@ public class DomainEntriesProcessFunction extends KeyedProcessFunction<String, K
 
         @Override
         public KafkaDomainAggregate add(KafkaDomainEntry kafkaDomainEntry, KafkaDomainAggregate aggregate) {
-            if (aggregate.getDomainName() == null) {
+            if (aggregate.getDomainName().isEmpty()) {
                 aggregate.setDomainName(kafkaDomainEntry.getDomainName());
             }
 

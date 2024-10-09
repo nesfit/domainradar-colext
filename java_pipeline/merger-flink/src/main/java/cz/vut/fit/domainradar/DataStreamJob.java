@@ -13,6 +13,7 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.kafka.clients.consumer.OffsetResetStrategy;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Properties;
 
 
@@ -59,7 +60,13 @@ public class DataStreamJob {
                 .process(new IPEntriesProcessFunction())
                 .map(new SerdeMappingFunction());
 
-        dnData.sinkTo(sink);
+
+        var resultWmStrategy = WatermarkStrategy
+                .<Tuple2<String, byte[]>>noWatermarks()
+                .withTimestampAssigner((event, timestamp) -> Instant.now().toEpochMilli());
+
+        dnData.assignTimestampsAndWatermarks(resultWmStrategy)
+                .sinkTo(sink);
 
         // Execute the program
         env.execute("DomainRadar Data Merger");
@@ -97,6 +104,6 @@ public class DataStreamJob {
 
     private static <T> WatermarkStrategy<T> makeWatermarkStrategy() {
         return WatermarkStrategy
-                .<T>forBoundedOutOfOrderness(Duration.ofSeconds(10));
+                .<T>forMonotonousTimestamps();
     }
 }

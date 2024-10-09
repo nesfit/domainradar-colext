@@ -111,10 +111,7 @@ public class IPEntriesProcessFunction extends KeyedCoProcessFunction<String, Kaf
         _domainData.update(value);
 
         // Load the expected IP addresses
-        var deserializer = new CommonDeserializer();
-        var expectedIps = deserializer.parseIPs(value.getDNSData().getValue());
-
-        for (var ip : expectedIps) {
+        for (var ip : value.getIPs()) {
             if (!_expectedIpsToNumberOfEntries.contains(ip))
                 _expectedIpsToNumberOfEntries.put(ip, 0);
         }

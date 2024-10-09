@@ -44,7 +44,10 @@ public class SerdeMappingFunction extends RichMapFunction<KafkaMergedResult, Tup
     public Tuple2<String, byte[]> map(KafkaMergedResult kafkaMergedResult) throws Exception {
         final var domainData = kafkaMergedResult.getDomainData();
         final var dnsResult = _dnsResultDeserializer.deserialize(Topics.OUT_DNS, domainData.getDNSData().getValue());
-        final var tlsResult = _tlsResultDeserializer.deserialize(Topics.OUT_TLS, domainData.getTLSData().getValue());
+        // The TLS result can be null in some cases (no IPs in DNS)!
+        final var tlsResult = domainData.getTLSData() == null
+                ? null
+                : _tlsResultDeserializer.deserialize(Topics.OUT_TLS, domainData.getTLSData().getValue());
         final var rdapDnResult = _rdapDnResultDeserializer.deserialize(Topics.OUT_RDAP_DN, domainData.getRDAPData().getValue());
         final var zoneResult = _zoneResultDeserializer.deserialize(Topics.OUT_ZONE, domainData.getZoneData().getValue());
 
