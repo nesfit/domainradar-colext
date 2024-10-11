@@ -217,26 +217,36 @@ public class IPEntriesProcessFunction extends KeyedCoProcessFunction<String, Kaf
             return;
         }
 
-        // In case the function hasn't managed to collect all the required data,
-        // collect whatever we have and produce that
-        if (_completeStateProduced.value() != Boolean.TRUE) {
-            LOG.trace("Entry expired before collecting all required data, producing");
-
-            final var data = _domainData.value();
-            // We don't want to produce data objects without domain data, missing IPs are fine
-            if (data == null)
-                return;
-
-            final var expectedIps = new HashMap<String, Map<Byte, KafkaIPEntry>>();
-            for (var gotEntries : _expectedIpsToNumberOfEntries.entries()) {
-                expectedIps.put(gotEntries.getKey(), new HashMap<>());
-            }
-
-            this.collectIPData(expectedIps);
-            final var mergedResult = new KafkaMergedResult(data.getDomainName(), data, expectedIps);
-            out.collect(mergedResult);
+        // If we have already collected all the required data, just clean up
+        if (_completeStateProduced.value() == Boolean.TRUE) {
+            this.clearState();
+            return;
         }
 
+        // In case we haven't managed to collect all the required data,
+        // collect whatever we have and produce that (if we have any domain data)
+        LOG.trace("Entry expired before collecting all required data, producing");
+        final var data = _domainData.value();
+
+        // We don't want to produce data objects without domain data, missing IPs are fine
+        // (this might also be a very lately arriving IP data object)
+        if (data == null) {
+            this.clearState();
+            return;
+        }
+
+        final var expectedIps = new HashMap<String, Map<Byte, KafkaIPEntry>>();
+        for (var gotEntries : _expectedIpsToNumberOfEntries.entries()) {
+            expectedIps.put(gotEntries.getKey(), new HashMap<>());
+        }
+
+        this.collectIPData(expectedIps);
+        final var mergedResult = new KafkaMergedResult(data.getDomainName(), data, expectedIps);
+        out.collect(mergedResult);
+        this.clearState();
+    }
+
+    private void clearState() {
         // Clear all the state
         LOG.trace("Clearing state");
         _domainData.clear();
