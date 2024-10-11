@@ -35,15 +35,17 @@ public class DomainEntriesProcessFunction extends KeyedProcessFunction<String, K
         var completeStateDescriptor
                 = new ValueStateDescriptor<>("Complete result dispatched flag", Boolean.class);
 
-        // IMP: Do we need per-entry TTL? Probably not.
-        // descriptor.enableTimeToLive(ttlConfig);
         _domainData = this.getRuntimeContext().getAggregatingState(domainDataDescriptor);
         _entryExpirationTimestamp = this.getRuntimeContext().getState(entryExpirationTimestampDescriptor);
         _completeStateProduced = this.getRuntimeContext().getState(completeStateDescriptor);
 
-        // TODO: configurable
-        _finishedEntryGracePeriodMs = Duration.ofSeconds(5).toMillis();
-        _maxEntryLifetimeMs = Duration.ofMinutes(10).toMillis();
+        final var parameters = this.getRuntimeContext().getGlobalJobParameters();
+        _finishedEntryGracePeriodMs = Duration.ofMillis(
+                Long.parseLong(parameters.getOrDefault(MergerConfig.DN_FINISHED_ENTRY_GRACE_PERIOD_MS_CONFIG,
+                        MergerConfig.DN_FINISHED_ENTRY_GRACE_PERIOD_DEFAULT))).toMillis();
+        _maxEntryLifetimeMs = Duration.ofMillis(
+                Long.parseLong(parameters.getOrDefault(MergerConfig.DN_MAX_ENTRY_LIFETIME_MS_CONFIG,
+                        MergerConfig.DN_MAX_ENTRY_LIFETIME_DEFAULT))).toMillis();
 
         var mapper = Common.makeMapper().build();
         _dnsResultDeserializer = new JsonDeserializer<>(mapper, DNSResult.class);

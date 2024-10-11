@@ -57,10 +57,16 @@ public class IPEntriesProcessFunction extends KeyedCoProcessFunction<String, Kaf
         _entryExpirationTimestamp = this.getRuntimeContext().getState(entryExpirationTimestampDescriptor);
         _completeStateProduced = this.getRuntimeContext().getState(completeStateDescriptor);
 
-        // TODO: configurable
-        _finishedEntryGracePeriodMs = Duration.ofSeconds(60).toMillis();
-        _maxEntryLifetimeAfterDomainDataMs = Duration.ofMinutes(30).toMillis();
-        _maxEntryLifetimeAfterEachIpMs = Duration.ofMinutes(1).toMillis();
+        final var parameters = this.getRuntimeContext().getGlobalJobParameters();
+        _finishedEntryGracePeriodMs = Duration.ofMillis(
+                Long.parseLong(parameters.getOrDefault(MergerConfig.IP_FINISHED_ENTRY_GRACE_PERIOD_MS_CONFIG,
+                        MergerConfig.IP_FINISHED_ENTRY_GRACE_PERIOD_DEFAULT))).toMillis();
+        _maxEntryLifetimeAfterDomainDataMs = Duration.ofMillis(
+                Long.parseLong(parameters.getOrDefault(MergerConfig.IP_MAX_ENTRY_LIFETIME_AFTER_DOMAIN_DATA_MS_CONFIG,
+                        MergerConfig.IP_MAX_ENTRY_LIFETIME_AFTER_DOMAIN_DATA_DEFAULT))).toMillis();
+        _maxEntryLifetimeAfterEachIpMs = Duration.ofMillis(
+                Long.parseLong(parameters.getOrDefault(MergerConfig.IP_MAX_ENTRY_LIFETIME_AFTER_IP_DATA_MS_CONFIG,
+                        MergerConfig.IP_MAX_ENTRY_LIFETIME_AFTER_IP_DATA_DEFAULT))).toMillis();
     }
 
     /**
