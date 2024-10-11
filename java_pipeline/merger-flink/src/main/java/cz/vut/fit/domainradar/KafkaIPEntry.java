@@ -108,7 +108,7 @@ public class KafkaIPEntry implements KafkaEntry {
         this.ip = ip;
     }
 
-    public byte getCollector() {
+    public byte getCollectorTag() {
         return this.collectorTag;
     }
 

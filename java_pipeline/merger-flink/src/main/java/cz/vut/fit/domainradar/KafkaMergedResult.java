@@ -13,6 +13,12 @@ public class KafkaMergedResult {
     @NotNull
     private Map<String, Map<Byte, KafkaIPEntry>> ipData;
 
+    public KafkaMergedResult() {
+        this.domainName = "";
+        this.domainData = new KafkaDomainAggregate();
+        this.ipData = Map.of();
+    }
+
     public KafkaMergedResult(@NotNull String domainName,
                              @NotNull KafkaDomainAggregate domainData,
                              @NotNull Map<String, Map<Byte, KafkaIPEntry>> ipData) {

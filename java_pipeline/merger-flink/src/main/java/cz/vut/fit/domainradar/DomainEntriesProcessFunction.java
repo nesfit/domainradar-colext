@@ -122,7 +122,7 @@ public class DomainEntriesProcessFunction extends KeyedProcessFunction<String, K
 
     /**
      * Deserializes the DNS data present in the input aggregate and populates the aggregate's IP list
-     * {@link KafkaDomainAggregate#getIPs()} with the IP addresses in the DNS response.
+     * {@link KafkaDomainAggregate#getDNSIPs()} with the IP addresses in the DNS response.
      *
      * @param currentState The aggregate.
      * @return The deserialized {@link DNSResult}.
@@ -139,9 +139,9 @@ public class DomainEntriesProcessFunction extends KeyedProcessFunction<String, K
 
         // Extract the IP addresses
         if (dnsResult.ips() != null) {
-            currentState.getIPs().clear();
+            currentState.getDNSIPs().clear();
             for (var ip : dnsResult.ips()) {
-                currentState.getIPs().add(ip.ip());
+                currentState.getDNSIPs().add(ip.ip());
             }
         }
 
