@@ -20,12 +20,13 @@ WORKDIR /src
 COPY pom.xml ./
 COPY streams-components/pom.xml ./streams-components/
 COPY standalone-collectors/pom.xml ./standalone-collectors/
+COPY merger-flink/pom.xml ./merger-flink/
 COPY common/pom.xml ./common/
 COPY serialization/pom.xml ./serialization/
 COPY connect/pom.xml ./connect/
 
 # Resolve dependencies
-RUN --mount=type=cache,target=/root/.m2/ export TO_OMIT="-:streams-components,-standalone-collectors,-serialization" && \
+RUN --mount=type=cache,target=/root/.m2/ export TO_OMIT="-:streams-components,-:standalone-collectors,-:serialization,-:merger-flink" && \
     mvn clean -pl "$TO_OMIT" && \
     mvn dependency:go-offline -DexcludeGroupIds=cz.vut.fit.domainradar -pl "$TO_OMIT"
 

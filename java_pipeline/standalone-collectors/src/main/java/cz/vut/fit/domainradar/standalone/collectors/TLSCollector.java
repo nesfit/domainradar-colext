@@ -1,13 +1,28 @@
 package cz.vut.fit.domainradar.standalone.collectors;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import cz.vut.fit.domainradar.CollectorConfig;
+import cz.vut.fit.domainradar.Common;
+import cz.vut.fit.domainradar.Topics;
+import cz.vut.fit.domainradar.models.ResultCodes;
+import cz.vut.fit.domainradar.models.results.TLSResult;
+import cz.vut.fit.domainradar.models.tls.TLSData;
+import cz.vut.fit.domainradar.serialization.JsonSerde;
+import cz.vut.fit.domainradar.standalone.BaseStandaloneCollector;
+import org.apache.commons.cli.CommandLine;
+import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.common.serialization.Serdes;
+import org.apache.kafka.common.serialization.StringSerializer;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import pl.tlinkowski.unij.api.UniLists;
+
+import javax.net.ssl.*;
+import javax.security.auth.x500.X500Principal;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.net.InetSocketAddress;
-import java.net.Socket;
-import java.net.SocketTimeoutException;
-import java.net.URI;
-import java.net.URISyntaxException;
+import java.net.*;
 import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.Certificate;
@@ -18,42 +33,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-
-import javax.net.ssl.SNIHostName;
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.SSLParameters;
-import javax.net.ssl.SSLSession;
-import javax.net.ssl.SSLSocket;
-import javax.net.ssl.SSLSocketFactory;
-import javax.net.ssl.TrustManager;
-import javax.net.ssl.X509TrustManager;
-import javax.security.auth.x500.X500Principal;
-
-import org.apache.commons.cli.CommandLine;
-import org.apache.kafka.clients.producer.KafkaProducer;
-import org.apache.kafka.clients.producer.ProducerRecord;
-import org.apache.kafka.common.serialization.Serdes;
-import org.apache.kafka.common.serialization.StringSerializer;
-import org.jetbrains.annotations.NotNull;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
-
-import cz.vut.fit.domainradar.CollectorConfig;
-import cz.vut.fit.domainradar.Common;
-import cz.vut.fit.domainradar.Topics;
-import cz.vut.fit.domainradar.models.ResultCodes;
-import cz.vut.fit.domainradar.models.results.TLSResult;
-import cz.vut.fit.domainradar.models.tls.TLSData;
-import cz.vut.fit.domainradar.serialization.JsonSerde;
-import cz.vut.fit.domainradar.standalone.BaseStandaloneCollector;
-import org.jetbrains.annotations.Nullable;
-import pl.tlinkowski.unij.api.UniLists;
+import java.util.concurrent.*;
 
 
 /**
@@ -131,15 +111,15 @@ public class TLSCollector extends BaseStandaloneCollector<String, String> {
 
             try {
                 var result = resultFuture.join();
-                _producer.send(new ProducerRecord<>(Topics.OUT_TLS, dn, result));
+                _producer.send(resultRecord(Topics.OUT_TLS, dn, result));
             } catch (CompletionException e) {
                 if (e.getCause() instanceof TimeoutException) {
                     Logger.debug("Operation timed out: {}", dn);
-                    _producer.send(new ProducerRecord<>(Topics.OUT_TLS, dn,
+                    _producer.send(resultRecord(Topics.OUT_TLS, dn,
                             errorResult(ResultCodes.TIMEOUT, "Operation timed out (%d ms)".formatted(_timeout))));
                 } else {
                     Logger.warn("Unexpected error: {}", dn, e);
-                    _producer.send(new ProducerRecord<>(Topics.OUT_TLS, dn,
+                    _producer.send(resultRecord(Topics.OUT_TLS, dn,
                             errorResult(ResultCodes.INTERNAL_ERROR, e.getMessage())));
                 }
             }

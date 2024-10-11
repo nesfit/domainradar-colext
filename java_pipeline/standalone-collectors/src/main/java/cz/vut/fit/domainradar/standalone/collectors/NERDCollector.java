@@ -12,7 +12,6 @@ import cz.vut.fit.domainradar.models.results.CommonIPResult;
 import cz.vut.fit.domainradar.standalone.IPStandaloneCollector;
 import org.apache.commons.cli.CommandLine;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.apache.kafka.clients.producer.ProducerRecord;
 import org.jetbrains.annotations.NotNull;
 import pl.tlinkowski.unij.api.UniLists;
 
@@ -117,17 +116,19 @@ public class NERDCollector extends IPStandaloneCollector<NERDData> {
     }
 
     private CompletableFuture<Void> processIps(List<IPToProcess> entries, final long batch) {
-        var toProcess = new ArrayList<Inet4Address>(entries.size());
+        var addressesToProcess = new ArrayList<Inet4Address>(entries.size());
+        var entriesToProcess = new ArrayList<IPToProcess>(entries.size());
         // Filter out invalid or IPv6 addresses
         for (var inputIpToProcess : entries) {
             try {
                 final var ip = InetAddresses.forString(inputIpToProcess.ip());
                 if (ip instanceof Inet4Address ip4) {
-                    toProcess.add(ip4);
+                    addressesToProcess.add(ip4);
+                    entriesToProcess.add(inputIpToProcess);
                     continue;
                 } else if (ip instanceof Inet6Address) {
                     Logger.trace("Discarding IPv6 address: {}", inputIpToProcess.ip());
-                    _producer.send(new ProducerRecord<>(Topics.OUT_IP, inputIpToProcess,
+                    _producer.send(resultRecord(Topics.OUT_IP, inputIpToProcess,
                             errorResult(ResultCodes.UNSUPPORTED_ADDRESS, null)));
                     continue;
                 }
@@ -135,20 +136,20 @@ public class NERDCollector extends IPStandaloneCollector<NERDData> {
                 // Invalid IP address
             }
             Logger.debug("Invalid IP address: {}", inputIpToProcess);
-            _producer.send(new ProducerRecord<>(Topics.OUT_IP, inputIpToProcess,
+            _producer.send(resultRecord(Topics.OUT_IP, inputIpToProcess,
                     errorResult(ResultCodes.INVALID_ADDRESS, null)));
         }
 
-        if (toProcess.isEmpty()) {
+        if (addressesToProcess.isEmpty()) {
             Logger.trace("No IPs left in batch {}", batch);
             return CompletableFuture.completedFuture(null);
         }
 
         // Store the IPv4 addresses one after another in a byte array
-        final var ipsLen = toProcess.size();
+        final var ipsLen = addressesToProcess.size();
         var bytes = new byte[ipsLen * 4];
         var ptr = 0;
-        for (var ip : toProcess) {
+        for (var ip : addressesToProcess) {
             System.arraycopy(ip.getAddress(), 0, bytes, ptr, 4);
             ptr += 4;
         }
@@ -169,7 +170,7 @@ public class NERDCollector extends IPStandaloneCollector<NERDData> {
                         var resultData = response.body();
                         if (resultData.length % 8 != 0 || resultData.length / 8 != ipsLen) {
                             Logger.info("Invalid NERD response (batch {})", batch);
-                            sendAboutAll(entries, errorResult(ResultCodes.INVALID_RESPONSE,
+                            sendAboutAll(entriesToProcess, errorResult(ResultCodes.INVALID_RESPONSE,
                                     "Invalid NERD response (content length mismatch)"));
                             return;
                         }
@@ -182,13 +183,13 @@ public class NERDCollector extends IPStandaloneCollector<NERDData> {
                         for (var i = 0; i < ipsLen; i++) {
                             var value = resultDataBuffer.getDouble(i);
 
-                            Logger.trace("DN/IP {} -> {}", entries.get(i), value);
-                            _producer.send(new ProducerRecord<>(Topics.OUT_IP, entries.get(i),
+                            Logger.trace("DN/IP {} -> {}", entriesToProcess.get(i), value);
+                            _producer.send(resultRecord(Topics.OUT_IP, entriesToProcess.get(i),
                                     successResult(new NERDData(value))));
                         }
                     } else {
                         Logger.debug("NERD response {} (batch {})", response.statusCode(), batch);
-                        sendAboutAll(entries, errorResult(ResultCodes.CANNOT_FETCH,
+                        sendAboutAll(entriesToProcess, errorResult(ResultCodes.CANNOT_FETCH,
                                 "NERD response " + response.statusCode()));
                     }
                 })

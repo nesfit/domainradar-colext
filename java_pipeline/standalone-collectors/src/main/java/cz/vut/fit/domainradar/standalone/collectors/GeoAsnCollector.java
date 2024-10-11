@@ -16,7 +16,6 @@ import cz.vut.fit.domainradar.models.ip.GeoIPData;
 import cz.vut.fit.domainradar.models.results.CommonIPResult;
 import cz.vut.fit.domainradar.standalone.IPStandaloneCollector;
 import org.apache.commons.cli.CommandLine;
-import org.apache.kafka.clients.producer.ProducerRecord;
 import org.jetbrains.annotations.NotNull;
 import pl.tlinkowski.unij.api.UniLists;
 
@@ -71,7 +70,7 @@ public class GeoAsnCollector extends IPStandaloneCollector<GeoIPData> {
                 return;
 
             var result = this.evaluateIP(ip);
-            _producer.send(new ProducerRecord<>(Topics.OUT_IP, ip, result));
+            _producer.send(resultRecord(Topics.OUT_IP, ip, result));
         });
     }
 
