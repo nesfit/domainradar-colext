@@ -15,6 +15,7 @@ import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
@@ -213,13 +214,13 @@ public class IPEntriesProcessFunction extends KeyedCoProcessFunction<String, Kaf
         // Check that this is the latest timer (just in case - the code should always cancel past timers)
         final var currentNextExpiration = _entryExpirationTimestamp.value();
         if (currentNextExpiration == null || timestamp != currentNextExpiration) {
-            LOG.warn("Previously canceled timer at {} triggered (current: {})", timestamp, currentNextExpiration);
+            LOG.warn("Previously canceled timer at {} triggered (current next expiration timestamp: {})", timestamp, currentNextExpiration);
             return;
         }
 
         // If we have already collected all the required data, just clean up
         if (_completeStateProduced.value() == Boolean.TRUE) {
-            this.clearState();
+            this.clearState(ctx);
             return;
         }
 
@@ -231,7 +232,7 @@ public class IPEntriesProcessFunction extends KeyedCoProcessFunction<String, Kaf
         // We don't want to produce data objects without domain data, missing IPs are fine
         // (this might also be a very lately arriving IP data object)
         if (data == null) {
-            this.clearState();
+            this.clearState(ctx);
             return;
         }
 
@@ -243,12 +244,18 @@ public class IPEntriesProcessFunction extends KeyedCoProcessFunction<String, Kaf
         this.collectIPData(expectedIps);
         final var mergedResult = new KafkaMergedResult(data.getDomainName(), data, expectedIps);
         out.collect(mergedResult);
-        this.clearState();
+        this.clearState(ctx);
     }
 
-    private void clearState() {
+    private void clearState(KeyedCoProcessFunction<?, ?, ?, ?>.OnTimerContext ctx) throws IOException {
         // Clear all the state
         LOG.trace("Clearing state");
+
+        var lastExpirationTimestamp = _entryExpirationTimestamp.value();
+        if (lastExpirationTimestamp != null) {
+            ctx.timerService().deleteEventTimeTimer(lastExpirationTimestamp);
+        }
+
         _domainData.clear();
         _ipAndCollectorToIpData.clear();
         _expectedIpsToNumberOfEntries.clear();
