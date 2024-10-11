@@ -28,12 +28,12 @@ public class DomainEntriesProcessFunction extends KeyedProcessFunction<String, K
     @Override
     public void open(OpenContext openContext) {
         AggregatingStateDescriptor<KafkaDomainEntry, KafkaDomainAggregate, KafkaDomainAggregate> domainDataDescriptor
-                = new AggregatingStateDescriptor<>("Per-Domain Data Aggregator",
+                = new AggregatingStateDescriptor<>("Per-domain data aggregator",
                 new DomainEntriesAggregator(), KafkaDomainAggregate.class);
         var entryExpirationTimestampDescriptor
-                = new ValueStateDescriptor<>("Last Update", Long.class);
+                = new ValueStateDescriptor<>("Current entry expiration timestamp", Long.class);
         var completeStateDescriptor
-                = new ValueStateDescriptor<>("Complete result dispatched", Boolean.class);
+                = new ValueStateDescriptor<>("Complete result dispatched flag", Boolean.class);
 
         // IMP: Do we need per-entry TTL? Probably not.
         // descriptor.enableTimeToLive(ttlConfig);

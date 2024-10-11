@@ -47,9 +47,9 @@ public class IPEntriesProcessFunction extends KeyedCoProcessFunction<String, Kaf
                 = new MapStateDescriptor<>("Number of entries accepted for each expected IP",
                 TypeInformation.of(String.class),
                 TypeInformation.of(Integer.class));
-        var domainDataDescriptor = new ValueStateDescriptor<>("Domain Data", KafkaDomainAggregate.class);
-        var entryExpirationTimestampDescriptor = new ValueStateDescriptor<>("Entry expiration timestamp", Long.class);
-        var completeStateDescriptor = new ValueStateDescriptor<>("Complete result dispatched", Boolean.class);
+        var domainDataDescriptor = new ValueStateDescriptor<>("Domain data", KafkaDomainAggregate.class);
+        var entryExpirationTimestampDescriptor = new ValueStateDescriptor<>("Current entry expiration timestamp", Long.class);
+        var completeStateDescriptor = new ValueStateDescriptor<>("Complete result dispatched flag", Boolean.class);
 
         _ipAndCollectorToIpData = this.getRuntimeContext().getMapState(ipAndCollectorToIpDataDescriptor);
         _expectedIpsToNumberOfEntries = this.getRuntimeContext().getMapState(expectedIpsToNumberOfEntriesDescriptor);
