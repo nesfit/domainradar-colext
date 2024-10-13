@@ -10,6 +10,7 @@ from json import dumps
 import pandas as pd
 import pyarrow as pa
 from classifiers.options import PipelineOptions
+from scipy.constants import milli
 
 from common import read_config, make_app, log
 from common.util import timestamp_now_millis
@@ -146,15 +147,6 @@ def make_error_result(dn: str, error_message: str):
         "domain_name": dn,
         "aggregate_probability": -1,
         "aggregate_description": "",
-        "classification_results": [
-            {
-                "classification_date": timestamp_now_millis(),
-                "classifier": "Error",
-                "probability": -1,
-                "description": "An error occurred while performing the classification.",
-                "details": {
-                    "error": error_message
-                }
-            }
-        ]
+        "timestamp": timestamp_now_millis(),
+        "error": error_message
     }
