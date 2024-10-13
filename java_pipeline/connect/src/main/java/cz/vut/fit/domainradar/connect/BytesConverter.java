@@ -9,10 +9,10 @@ import java.util.Map;
 
 /**
  * Implementation of {@link Converter} that keeps its input entry as a byte array.
- * Used in conjunction with {@link PostgresSinkTransformation}.
+ * Used in conjunction with {@link PostgresCollectorResultSinkTransformation}.
  *
  * @author Ondřej Ondryáš
- * @see PostgresSinkTransformation
+ * @see PostgresCollectorResultSinkTransformation
  */
 public class BytesConverter implements Converter {
     @Override

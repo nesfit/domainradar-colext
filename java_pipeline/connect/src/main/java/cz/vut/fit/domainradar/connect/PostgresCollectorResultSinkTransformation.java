@@ -9,7 +9,6 @@ import org.apache.kafka.connect.connector.ConnectRecord;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.data.Struct;
-import org.apache.kafka.connect.data.Timestamp;
 import org.apache.kafka.connect.errors.DataException;
 import org.apache.kafka.connect.transforms.Transformation;
 import org.jetbrains.annotations.NotNull;
@@ -34,7 +33,7 @@ import java.util.Map;
  * i.e. the entire JSON string with the result.
  * @author Ondřej Ondryáš
  */
-public class PostgresSinkTransformation<R extends ConnectRecord<R>> implements Transformation<R> {
+public class PostgresCollectorResultSinkTransformation<R extends ConnectRecord<R>> implements Transformation<R> {
     public record CommonResult(
             int statusCode,
             @Nullable String error,
@@ -48,7 +47,7 @@ public class PostgresSinkTransformation<R extends ConnectRecord<R>> implements T
             .field("domain_name", Schema.STRING_SCHEMA)
             .field("ip", Schema.OPTIONAL_STRING_SCHEMA)
             .field("collector", Schema.STRING_SCHEMA)
-            .field("timestamp", Timestamp.SCHEMA);
+            .field("timestamp", Schema.INT64_SCHEMA);
 
     public static final Schema VALUE_SCHEMA = SchemaBuilder.struct()
             .name("cz.vut.fit.domainradar.PostgresCollectedDataValue")
@@ -57,7 +56,7 @@ public class PostgresSinkTransformation<R extends ConnectRecord<R>> implements T
             .field("raw_data", Schema.OPTIONAL_STRING_SCHEMA);
     private final ObjectMapper _mapper;
 
-    public PostgresSinkTransformation() {
+    public PostgresCollectorResultSinkTransformation() {
         _mapper = Common.makeMapper().build();
     }
 
@@ -93,7 +92,7 @@ public class PostgresSinkTransformation<R extends ConnectRecord<R>> implements T
             keyStruct.put("domain_name", domainName);
             keyStruct.put("ip", ip);
             keyStruct.put("collector", collector);
-            keyStruct.put("timestamp", java.util.Date.from(result.lastAttempt()));
+            keyStruct.put("timestamp", result.lastAttempt().toEpochMilli());
 
             valueStruct.put("status_code", (short) result.statusCode);
             valueStruct.put("error", result.error);
