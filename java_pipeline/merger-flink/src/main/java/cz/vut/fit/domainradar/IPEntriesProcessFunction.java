@@ -15,6 +15,7 @@ import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
@@ -57,10 +58,16 @@ public class IPEntriesProcessFunction extends KeyedCoProcessFunction<String, Kaf
         _entryExpirationTimestamp = this.getRuntimeContext().getState(entryExpirationTimestampDescriptor);
         _completeStateProduced = this.getRuntimeContext().getState(completeStateDescriptor);
 
-        // TODO: configurable
-        _finishedEntryGracePeriodMs = Duration.ofSeconds(60).toMillis();
-        _maxEntryLifetimeAfterDomainDataMs = Duration.ofMinutes(30).toMillis();
-        _maxEntryLifetimeAfterEachIpMs = Duration.ofMinutes(1).toMillis();
+        final var parameters = this.getRuntimeContext().getGlobalJobParameters();
+        _finishedEntryGracePeriodMs = Duration.ofMillis(
+                Long.parseLong(parameters.getOrDefault(MergerConfig.IP_FINISHED_ENTRY_GRACE_PERIOD_MS_CONFIG,
+                        MergerConfig.IP_FINISHED_ENTRY_GRACE_PERIOD_DEFAULT))).toMillis();
+        _maxEntryLifetimeAfterDomainDataMs = Duration.ofMillis(
+                Long.parseLong(parameters.getOrDefault(MergerConfig.IP_MAX_ENTRY_LIFETIME_AFTER_DOMAIN_DATA_MS_CONFIG,
+                        MergerConfig.IP_MAX_ENTRY_LIFETIME_AFTER_DOMAIN_DATA_DEFAULT))).toMillis();
+        _maxEntryLifetimeAfterEachIpMs = Duration.ofMillis(
+                Long.parseLong(parameters.getOrDefault(MergerConfig.IP_MAX_ENTRY_LIFETIME_AFTER_IP_DATA_MS_CONFIG,
+                        MergerConfig.IP_MAX_ENTRY_LIFETIME_AFTER_IP_DATA_DEFAULT))).toMillis();
     }
 
     /**
@@ -111,7 +118,7 @@ public class IPEntriesProcessFunction extends KeyedCoProcessFunction<String, Kaf
         _domainData.update(value);
 
         // Load the expected IP addresses
-        for (var ip : value.getIPs()) {
+        for (var ip : value.getDNSIPs()) {
             if (!_expectedIpsToNumberOfEntries.contains(ip))
                 _expectedIpsToNumberOfEntries.put(ip, 0);
         }
@@ -207,32 +214,48 @@ public class IPEntriesProcessFunction extends KeyedCoProcessFunction<String, Kaf
         // Check that this is the latest timer (just in case - the code should always cancel past timers)
         final var currentNextExpiration = _entryExpirationTimestamp.value();
         if (currentNextExpiration == null || timestamp != currentNextExpiration) {
-            LOG.warn("Previously canceled timer at {} triggered (current: {})", timestamp, currentNextExpiration);
+            LOG.warn("Previously canceled timer at {} triggered (current next expiration timestamp: {})", timestamp, currentNextExpiration);
             return;
         }
 
-        // In case the function hasn't managed to collect all the required data,
-        // collect whatever we have and produce that
-        if (_completeStateProduced.value() != Boolean.TRUE) {
-            LOG.trace("Entry expired before collecting all required data, producing");
-
-            final var data = _domainData.value();
-            // We don't want to produce data objects without domain data, missing IPs are fine
-            if (data == null)
-                return;
-
-            final var expectedIps = new HashMap<String, Map<Byte, KafkaIPEntry>>();
-            for (var gotEntries : _expectedIpsToNumberOfEntries.entries()) {
-                expectedIps.put(gotEntries.getKey(), new HashMap<>());
-            }
-
-            this.collectIPData(expectedIps);
-            final var mergedResult = new KafkaMergedResult(data.getDomainName(), data, expectedIps);
-            out.collect(mergedResult);
+        // If we have already collected all the required data, just clean up
+        if (_completeStateProduced.value() == Boolean.TRUE) {
+            this.clearState(ctx);
+            return;
         }
 
+        // In case we haven't managed to collect all the required data,
+        // collect whatever we have and produce that (if we have any domain data)
+        LOG.trace("Entry expired before collecting all required data, producing");
+        final var data = _domainData.value();
+
+        // We don't want to produce data objects without domain data, missing IPs are fine
+        // (this might also be a very lately arriving IP data object)
+        if (data == null) {
+            this.clearState(ctx);
+            return;
+        }
+
+        final var expectedIps = new HashMap<String, Map<Byte, KafkaIPEntry>>();
+        for (var gotEntries : _expectedIpsToNumberOfEntries.entries()) {
+            expectedIps.put(gotEntries.getKey(), new HashMap<>());
+        }
+
+        this.collectIPData(expectedIps);
+        final var mergedResult = new KafkaMergedResult(data.getDomainName(), data, expectedIps);
+        out.collect(mergedResult);
+        this.clearState(ctx);
+    }
+
+    private void clearState(KeyedCoProcessFunction<?, ?, ?, ?>.OnTimerContext ctx) throws IOException {
         // Clear all the state
         LOG.trace("Clearing state");
+
+        var lastExpirationTimestamp = _entryExpirationTimestamp.value();
+        if (lastExpirationTimestamp != null) {
+            ctx.timerService().deleteEventTimeTimer(lastExpirationTimestamp);
+        }
+
         _domainData.clear();
         _ipAndCollectorToIpData.clear();
         _expectedIpsToNumberOfEntries.clear();

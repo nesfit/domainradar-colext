@@ -1,8 +1,12 @@
 # A Dockerfile for building an image that runs the CPC-based standalone collectors.
 # Author: Ondřej Ondryáš <xondry02@vut.cz>
 
+ARG TARGET_PKG=standalone-collectors
+
 # Use Eclipse Temurin 21 JDK image as the base for the building process
 FROM eclipse-temurin:21-jdk-jammy AS build
+ARG TARGET_PKG
+ENV TARGET_PKG=${TARGET_PKG}
 
 # Install Maven
 RUN apt-get update && \
@@ -23,14 +27,14 @@ COPY serialization/pom.xml ./serialization/
 COPY connect/pom.xml ./connect/
 
 # Resolve dependencies
-RUN --mount=type=cache,target=/root/.m2/ mvn clean -pl '-:connect,-:streams-components,-:merger-flink' && \
-    mvn dependency:go-offline -DexcludeGroupIds=cz.vut.fit.domainradar -pl '-:connect,-:streams-components,-:merger-flink'
+RUN --mount=type=cache,target=/root/.m2/ mvn clean -pl ${TARGET_PKG} -am && \
+    mvn dependency:go-offline -DexcludeGroupIds=cz.vut.fit.domainradar -pl ${TARGET_PKG} -am
 
 # Copy the source files
 COPY ./ .
 
 FROM build AS build_component
-ARG TARGET_PKG=standalone-collectors
+ARG TARGET_PKG
 ENV TARGET_PKG=${TARGET_PKG}
 
 # Build the JAR with dependencies

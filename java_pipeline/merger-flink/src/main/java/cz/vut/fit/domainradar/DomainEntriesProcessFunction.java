@@ -35,15 +35,17 @@ public class DomainEntriesProcessFunction extends KeyedProcessFunction<String, K
         var completeStateDescriptor
                 = new ValueStateDescriptor<>("Complete result dispatched flag", Boolean.class);
 
-        // IMP: Do we need per-entry TTL? Probably not.
-        // descriptor.enableTimeToLive(ttlConfig);
         _domainData = this.getRuntimeContext().getAggregatingState(domainDataDescriptor);
         _entryExpirationTimestamp = this.getRuntimeContext().getState(entryExpirationTimestampDescriptor);
         _completeStateProduced = this.getRuntimeContext().getState(completeStateDescriptor);
 
-        // TODO: configurable
-        _finishedEntryGracePeriodMs = Duration.ofSeconds(5).toMillis();
-        _maxEntryLifetimeMs = Duration.ofMinutes(10).toMillis();
+        final var parameters = this.getRuntimeContext().getGlobalJobParameters();
+        _finishedEntryGracePeriodMs = Duration.ofMillis(
+                Long.parseLong(parameters.getOrDefault(MergerConfig.DN_FINISHED_ENTRY_GRACE_PERIOD_MS_CONFIG,
+                        MergerConfig.DN_FINISHED_ENTRY_GRACE_PERIOD_DEFAULT))).toMillis();
+        _maxEntryLifetimeMs = Duration.ofMillis(
+                Long.parseLong(parameters.getOrDefault(MergerConfig.DN_MAX_ENTRY_LIFETIME_MS_CONFIG,
+                        MergerConfig.DN_MAX_ENTRY_LIFETIME_DEFAULT))).toMillis();
 
         var mapper = Common.makeMapper().build();
         _dnsResultDeserializer = new JsonDeserializer<>(mapper, DNSResult.class);
@@ -120,7 +122,7 @@ public class DomainEntriesProcessFunction extends KeyedProcessFunction<String, K
 
     /**
      * Deserializes the DNS data present in the input aggregate and populates the aggregate's IP list
-     * {@link KafkaDomainAggregate#getIPs()} with the IP addresses in the DNS response.
+     * {@link KafkaDomainAggregate#getDNSIPs()} with the IP addresses in the DNS response.
      *
      * @param currentState The aggregate.
      * @return The deserialized {@link DNSResult}.
@@ -137,9 +139,9 @@ public class DomainEntriesProcessFunction extends KeyedProcessFunction<String, K
 
         // Extract the IP addresses
         if (dnsResult.ips() != null) {
-            currentState.getIPs().clear();
+            currentState.getDNSIPs().clear();
             for (var ip : dnsResult.ips()) {
-                currentState.getIPs().add(ip.ip());
+                currentState.getDNSIPs().add(ip.ip());
             }
         }
 

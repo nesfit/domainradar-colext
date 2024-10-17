@@ -12,7 +12,8 @@ public class KafkaDomainAggregate {
     private KafkaDomainEntry dnsData;
     private KafkaDomainEntry rdapData;
     private KafkaDomainEntry tlsData;
-    private final List<String> dnsIps;
+    @NotNull
+    private List<String> dnsIps;
 
     public KafkaDomainAggregate() {
         this.domainName = "";
@@ -73,7 +74,11 @@ public class KafkaDomainAggregate {
         return zoneData != null && dnsData != null && rdapData != null;
     }
 
-    public List<String> getIPs() {
+    public @NotNull List<String> getDNSIPs() {
         return dnsIps;
+    }
+
+    public void setDNSIPs(@NotNull List<String> dnsIps) {
+        this.dnsIps = dnsIps;
     }
 }

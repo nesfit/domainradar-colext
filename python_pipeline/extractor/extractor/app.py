@@ -172,12 +172,12 @@ async def process_entries(stream):
                     await topic_processed.send(key=None, value=result_bytes)
 
                 if PRODUCE_JSONS:
+                    # Get rid of the only Timedelta object in the vector (temporary, will be addressed globally)
+                    df["rdap_registration_period"] = df["rdap_registration_period"].dt.total_seconds() / 60
+
                     # Serialize the dataframe into a JSON array and produce the vectors as individual messages
-                    df_dict = df.to_dict(orient='records')
-                    for row in df_dict:
-                        # Get rid of the only Timedelta object in the vector (temporary, will be addressed globally)
-                        row["rdap_registration_period"] = row["rdap_registration_period"].total_seconds() / 60
-                        row_json = json.dumps(row, indent=None, separators=(',', ':'))
+                    for _, row in df.iterrows():
+                        row_json = row.to_json(orient='index')
                         await topic_processed_jsons.send(key=row["domain_name"].encode("utf-8"),
                                                          value=row_json.encode("utf-8"))
 
