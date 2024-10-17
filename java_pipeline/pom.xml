@@ -27,7 +27,6 @@
     <modules>
         <module>common</module>
         <module>standalone-collectors</module>
-        <module>streams-components</module>
         <module>connect</module>
         <module>serialization</module>
         <!--<module>log4j-plugins</module>-->
