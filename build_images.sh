@@ -15,7 +15,7 @@ py_packages=("collector" "collector" "collector" "collector" "collector" "extrac
 py_modules=("collectors.zone" "collectors.dns" "collectors.rdap_ip" "collectors.rdap_dn" "collectors.rtt" "extractor" "classifier_unit")
 py_tags=("zone" "dns" "rdap-ip" "rdap-dn" "rtt" "extractor" "classifier")
 
-STREAMS_TAG="java-streams"
+FLINK_TAG="merger-flink"
 PARCON_TAG="java-standalone"
 CONNECT_TAG="kafka-connect"
 
@@ -35,7 +35,7 @@ build_java() {
   local build_connect=1
 
   if [ -n "$1" ]; then
-    if [ "$1" == "$STREAMS_TAG" ]; then
+    if [ "$1" == "$FLINK_TAG" ]; then
       build_parcon=0
       build_connect=0
       shift 1
@@ -51,10 +51,10 @@ build_java() {
   fi
 
   if [ "$build_streams" == 1 ]; then
-    echo "  > Building Kafka Streams components <  "
-    echo "    > Tag: '$TAG_PREFIX/$STREAMS_TAG' < "
+    echo "  > Building the Flink Standalone image for the merger pipeline <  "
+    echo "    > Tag: '$TAG_PREFIX/$FLINK_TAG' < "
 
-    docker build -f streams.Dockerfile -t "$TAG_PREFIX/$STREAMS_TAG" "$@" . 2>"$OUT_BUILD"
+    docker build -f flink.Dockerfile -t "$TAG_PREFIX/$FLINK_TAG" "$@" . 2>"$OUT_BUILD"
   fi
 
   if [ "$build_parcon" == 1 ]; then
@@ -159,7 +159,7 @@ if [ "$1" = "help" ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
   echo "- $STANDALONE_INPUT_TAG"
   echo "- $CONFIG_MANAGER_TAG"
   echo "Available Java component tags:"
-  echo "- $STREAMS_TAG"
+  echo "- $FLINK_TAG"
   echo "- $PARCON_TAG"
   echo "- $CONNECT_TAG"
   exit 0

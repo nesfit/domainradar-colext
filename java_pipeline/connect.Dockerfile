@@ -26,9 +26,8 @@ COPY serialization/pom.xml ./serialization/
 COPY connect/pom.xml ./connect/
 
 # Resolve dependencies
-RUN --mount=type=cache,target=/root/.m2/ export TO_OMIT="-:streams-components,-:standalone-collectors,-:serialization,-:merger-flink" && \
-    mvn clean -pl "$TO_OMIT" && \
-    mvn dependency:go-offline -DexcludeGroupIds=cz.vut.fit.domainradar -pl "$TO_OMIT"
+RUN --mount=type=cache,target=/root/.m2/ mvn clean -pl connect -am && \
+    mvn dependency:go-offline -DexcludeGroupIds=cz.vut.fit.domainradar -pl connect -am
 
 # Copy the source files
 COPY ./ .
