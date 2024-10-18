@@ -16,7 +16,6 @@ WORKDIR /src
 # Copy just the POMs to resolve dependencies (using cache)
 # TODO: in future, it should be possible to use COPY --parents pom.xml **/pom.xml .
 COPY pom.xml ./
-COPY streams-components/pom.xml ./streams-components/
 COPY standalone-collectors/pom.xml ./standalone-collectors/
 COPY merger-flink/pom.xml ./merger-flink/
 COPY common/pom.xml ./common/

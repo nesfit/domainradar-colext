@@ -1,2 +1,3 @@
 cz.vut.fit.domainradar.connect.PostgresIngressTransformation
 cz.vut.fit.domainradar.connect.PostgresCollectorResultSinkTransformation
+cz.vut.fit.domainradar.connect.MongoKeyTransformation
