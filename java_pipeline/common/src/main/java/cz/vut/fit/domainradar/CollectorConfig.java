@@ -38,6 +38,10 @@ public class CollectorConfig {
     public static final String TLS_TIMEOUT_MS_DOC = "The TLS socket timeout (milliseconds).";
     public static final String TLS_TIMEOUT_MS_DEFAULT = "3000";
 
+    public static final String TLS_MAX_REDIRECTS_CONFIG = "collectors.tls.max.redirects";
+    public static final String TLS_MAX_REDIRECTS_DOC = "The maximum number of HTTP redirects to follow.";
+    public static final String TLS_MAX_REDIRECTS_DEFAULT = "2";
+
     /* --- General settings for the PC-based standalone collectors --- */
     public static final String CLOSE_TIMEOUT_SEC_CONFIG = "collectors.kafka.close.timeout";
     public static final String CLOSE_TIMEOUT_SEC_DOC =
