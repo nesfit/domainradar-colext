@@ -34,6 +34,12 @@
             <artifactId>polyglot</artifactId>
             <version>24.1.1</version>
         </dependency>
+        <!--<dependency>
+            <groupId>org.graalvm.polyglot</groupId>
+            <artifactId>llvm-community</artifactId>
+            <version>24.1.1</version>
+            <type>pom</type>
+        </dependency>-->
 
         <dependency>
             <groupId>org.apache.kafka</groupId>
@@ -77,18 +83,18 @@
                     <execution>
                         <configuration>
                             <packages>
-                                <package>qrcode==7.4.2</package>
+                                <package>dnspython==2.6.1</package>
+                                <package>tldextract==5.1.2</package>
+                                <package>pydantic==2.4.2</package>
                             </packages>
                             <pythonHome>
                                 <includes>
+                                    <include>.*</include>
                                 </includes>
                                 <excludes>
-                                    <exclude>.*</exclude>
                                 </excludes>
                             </pythonHome>
-                            <pythonResourcesDirectory>
-                                ${project.basedir}/python-resources
-                            </pythonResourcesDirectory>
+                            <pythonResourcesDirectory>${basedir}/python-env</pythonResourcesDirectory>
                         </configuration>
                         <goals>
                             <goal>process-graalpy-resources</goal>
