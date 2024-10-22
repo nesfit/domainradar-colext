@@ -38,7 +38,7 @@ ENV TARGET_PKG=${TARGET_PKG}
 
 # Build the JAR with dependencies
 # Only TARGET_PKG will be built
-RUN --mount=type=cache,target=/root/.m2/ --mount=type=cache,target=/src/target mvn package -pl ${TARGET_PKG} -am && \
+RUN --mount=type=cache,target=/root/.m2/ --mount=type=cache,target=/src/target mvn package -DskipTests=true -pl ${TARGET_PKG} -am && \
     cd "$TARGET_PKG" && \
     OUTPUT_JAR="$TARGET_PKG/target/$(echo '${project.artifactId}-${project.version}-jar-with-dependencies.jar' | mvn -N -q -DforceStdout help:evaluate)" && \
     cd .. && \
