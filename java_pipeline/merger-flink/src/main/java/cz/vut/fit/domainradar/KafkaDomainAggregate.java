@@ -15,6 +15,18 @@ public class KafkaDomainAggregate {
     @NotNull
     private List<String> dnsIps;
 
+    @Override
+    public String toString() {
+        return "KafkaDomainAggregate[" + (isMaybeComplete() ? "MC" : "IN") + "]{" +
+                "domainName='" + domainName + '\'' +
+                ", zoneData: " + (zoneData == null ? "null" : (zoneData.statusCode + "/" + zoneData.timestamp)) +
+                ", dnsData: " + (dnsData == null ? "null" : (dnsData.statusCode + "/" + dnsData.timestamp)) +
+                ", rdapData: " + (rdapData == null ? "null" : (rdapData.statusCode + "/" + rdapData.timestamp)) +
+                ", tlsData: " + (tlsData == null ? "null" : (tlsData.statusCode + "/" + tlsData.timestamp)) +
+                ", dnsIps len: " + dnsIps.size() +
+                '}';
+    }
+
     public KafkaDomainAggregate() {
         this.domainName = "";
         this.dnsIps = new ArrayList<>();

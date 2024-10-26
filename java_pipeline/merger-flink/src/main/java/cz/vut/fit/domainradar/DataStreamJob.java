@@ -92,12 +92,7 @@ public class DataStreamJob {
                 .map(new SerdeMappingFunction())
                 .uid("serde-mapper");
 
-        var resultWmStrategy = WatermarkStrategy
-                .<Tuple2<String, byte[]>>noWatermarks()
-                .withTimestampAssigner((event, timestamp) -> Instant.now().toEpochMilli());
-
-        mergedData.assignTimestampsAndWatermarks(resultWmStrategy)
-                .uid("results-with-processing-time-timestamps")
+        mergedData
                 .sinkTo(sink)
                 .uid("kafka-sink");
 

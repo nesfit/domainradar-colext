@@ -10,6 +10,8 @@ import org.apache.kafka.common.serialization.StringSerializer;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.time.Instant;
+
 public class KafkaSerializer<K> implements KafkaRecordSerializationSchema<Tuple2<K, byte[]>> {
     @NotNull
     private final String _targetTopic;
@@ -39,6 +41,7 @@ public class KafkaSerializer<K> implements KafkaRecordSerializationSchema<Tuple2
     @Override
     public ProducerRecord<byte[], byte[]> serialize(Tuple2<K, byte[]> element, KafkaSinkContext context, Long timestamp) {
         byte[] key = _keySerializer.serialize(_targetTopic, element.f0);
-        return new ProducerRecord<>(_targetTopic, null, timestamp, key, element.f1, null);
+        return new ProducerRecord<>(_targetTopic, null,
+                Instant.now().toEpochMilli(), key, element.f1, null);
     }
 }
