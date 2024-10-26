@@ -11,7 +11,10 @@ import org.apache.flink.api.common.state.ValueStateDescriptor;
 import org.apache.flink.streaming.api.functions.KeyedProcessFunction;
 import org.apache.flink.util.Collector;
 import org.apache.kafka.common.serialization.Deserializer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.time.Duration;
 
 public class DomainEntriesProcessFunction extends KeyedProcessFunction<String, KafkaDomainEntry, KafkaDomainAggregate> {
@@ -24,6 +27,8 @@ public class DomainEntriesProcessFunction extends KeyedProcessFunction<String, K
     private transient long _maxEntryLifetimeMs;
 
     private transient Deserializer<DNSResult> _dnsResultDeserializer;
+
+    private static final Logger LOG = LoggerFactory.getLogger(DomainEntriesProcessFunction.class);
 
     @Override
     public void open(OpenContext openContext) {
@@ -53,8 +58,11 @@ public class DomainEntriesProcessFunction extends KeyedProcessFunction<String, K
 
     @Override
     public void processElement(KafkaDomainEntry kafkaDomainEntry,
-                               KeyedProcessFunction<String, KafkaDomainEntry, KafkaDomainAggregate>.Context context,
+                               KeyedProcessFunction<String, KafkaDomainEntry, KafkaDomainAggregate>.Context ctx,
                                Collector<KafkaDomainAggregate> collector) throws Exception {
+        final var key = ctx.getCurrentKey();
+        LOG.trace("[{}] Accepted domain collection result", key);
+
         _domainData.add(kafkaDomainEntry);
 
         var currentState = _domainData.get();
@@ -63,8 +71,10 @@ public class DomainEntriesProcessFunction extends KeyedProcessFunction<String, K
             return; // Should not happen
 
         // Delete the pending cleanup timer
-        if (expirationTimestamp != null)
-            context.timerService().deleteEventTimeTimer(expirationTimestamp);
+        if (expirationTimestamp != null) {
+            LOG.trace("[{}] Clearing expiration timer at {}", key, expirationTimestamp);
+            ctx.timerService().deleteEventTimeTimer(expirationTimestamp);
+        }
 
         // If zone, DNS and RDAP-DN data are present, we can check verify TLS presence and populate the IPs
         if (currentState.isMaybeComplete()) {
@@ -75,16 +85,19 @@ public class DomainEntriesProcessFunction extends KeyedProcessFunction<String, K
 
         // getFinalStateIfComplete returns an aggregate iff it is ready to be produced
         if (currentState != null) {
+            LOG.trace("[{}] Producing final result and scheduling cleanup", key);
             collector.collect(currentState);
             _completeStateProduced.update(Boolean.TRUE);
             // Schedule cleanup
-            context.timerService().registerEventTimeTimer(context.timestamp() + _finishedEntryGracePeriodMs);
+            ctx.timerService().registerEventTimeTimer(ctx.timestamp() + _finishedEntryGracePeriodMs);
         } else {
             // Round the expiration time to seconds
-            var nextExpiration = ((context.timestamp() + _maxEntryLifetimeMs) / 1000) * 1000;
+            var nextExpiration = ((ctx.timestamp() + _maxEntryLifetimeMs) / 1000) * 1000;
             // Schedule unsuccessful entry produce
+            LOG.trace("[{}] Still hasn't collected all required results, scheduling expiration at {}",
+                    key, nextExpiration);
             _entryExpirationTimestamp.update(nextExpiration);
-            context.timerService().registerEventTimeTimer(nextExpiration);
+            ctx.timerService().registerEventTimeTimer(nextExpiration);
         }
     }
 
@@ -92,32 +105,51 @@ public class DomainEntriesProcessFunction extends KeyedProcessFunction<String, K
     public void onTimer(long timestamp,
                         KeyedProcessFunction<String, KafkaDomainEntry, KafkaDomainAggregate>.OnTimerContext ctx,
                         Collector<KafkaDomainAggregate> out) throws Exception {
+        final var key = ctx.getCurrentKey();
+
+        LOG.trace("[{}] Timer triggered at {} (WM: {})", key, timestamp, ctx.timerService().currentWatermark());
+
         var currentState = _domainData.get();
-        if (currentState == null)
+        if (currentState == null) {
+            LOG.warn("[{}] Timer triggered with empty state", key);
             return; // Should not happen
+        }
 
         if (_completeStateProduced.value() == Boolean.TRUE) {
             // The last complete snapshot was produced already, just clean the store for the key
-            _domainData.clear();
-            _entryExpirationTimestamp.clear();
+            LOG.trace("[{}] Timer triggered after a complete state has been produced", key);
         } else {
-            var currentNextExpiration = _entryExpirationTimestamp.value();
-            if (currentNextExpiration == null)
-                return; // Should not happen
-
             // Check if this is the latest timer
-            if (timestamp == currentNextExpiration) {
-                // The entry is not complete, but it's time to produce it anyway
-                // Though, only entries with Zone & DNS data should be produced
-                if (currentState.getZoneData() != null && currentState.getDNSData() != null) {
-                    // Deserialize the DNS data and fill in the IP addresses
-                    this.deserializeDNSAndExtractIPs(currentState);
-                    out.collect(currentState);
-                }
-                _domainData.clear();
-                _entryExpirationTimestamp.clear();
+            var currentNextExpiration = _entryExpirationTimestamp.value();
+            if (currentNextExpiration == null || timestamp != currentNextExpiration) {
+                LOG.trace("[{}] Previously canceled timer at {} triggered (current next expiration timestamp: {})",
+                        key, timestamp, currentNextExpiration);
+                return;
             }
+
+            // The entry is not complete, but it's time to produce it anyway
+            // Though, only entries with Zone & DNS data should be produced
+            if (currentState.getZoneData() != null && currentState.getDNSData() != null) {
+                // Deserialize the DNS data and fill in the IP addresses
+                this.deserializeDNSAndExtractIPs(currentState);
+                LOG.trace("[{}] Producing incomplete result", key);
+                out.collect(currentState);
+            }
+
         }
+
+        LOG.trace("[{}] Clearing up the state", key);
+        _domainData.clear();
+        _completeStateProduced.clear();
+        this.clearTimer(ctx);
+    }
+
+    private void clearTimer(KeyedProcessFunction<?, ?, ?>.OnTimerContext ctx) throws IOException {
+        var timerValue = _entryExpirationTimestamp.value();
+        if (timerValue != null) {
+            ctx.timerService().deleteEventTimeTimer(timerValue);
+        }
+        _entryExpirationTimestamp.clear();
     }
 
     /**
