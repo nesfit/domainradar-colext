@@ -17,7 +17,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
-import java.time.Instant;
 import java.util.Properties;
 
 
@@ -85,8 +84,9 @@ public class DataStreamJob {
                 .keyBy(KafkaDomainEntry::getDomainName)
                 .process(new DomainEntriesProcessFunction())
                 .uid("dn-merging-processor")
-                .keyBy(KafkaDomainAggregate::getDomainName)
-                .connect(ipDataStream)
+                .keyBy(KafkaDomainAggregate::getDomainName);
+
+        var mergedData = ipDataStream.connect(dnData)
                 .process(new IPEntriesProcessFunction())
                 .uid("dn-ip-final-merging-processor")
                 .map(new SerdeMappingFunction())
@@ -96,7 +96,7 @@ public class DataStreamJob {
                 .<Tuple2<String, byte[]>>noWatermarks()
                 .withTimestampAssigner((event, timestamp) -> Instant.now().toEpochMilli());
 
-        dnData.assignTimestampsAndWatermarks(resultWmStrategy)
+        mergedData.assignTimestampsAndWatermarks(resultWmStrategy)
                 .uid("results-with-processing-time-timestamps")
                 .sinkTo(sink)
                 .uid("kafka-sink");

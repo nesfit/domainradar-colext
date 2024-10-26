@@ -20,7 +20,7 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 
-public class IPEntriesProcessFunction extends KeyedCoProcessFunction<String, KafkaDomainAggregate, KafkaIPEntry, KafkaMergedResult> {
+public class IPEntriesProcessFunction extends KeyedCoProcessFunction<String, KafkaIPEntry, KafkaDomainAggregate, KafkaMergedResult> {
 
     // Key: Tuple of (IP, collector tag) -> Value: IP data
     private transient MapState<Tuple2<String, Byte>, KafkaIPEntry> _ipAndCollectorToIpData;
@@ -32,6 +32,7 @@ public class IPEntriesProcessFunction extends KeyedCoProcessFunction<String, Kaf
     private transient long _finishedEntryGracePeriodMs;
     private transient long _maxEntryLifetimeAfterDomainDataMs;
     private transient long _maxEntryLifetimeAfterEachIpMs;
+    private transient long _maxWaitForDomainDataMs;
 
     // TODO: Make the mappings configurable
     private static final int TOTAL_EXPECTED_RECORDS_PER_IPS = TagRegistry.TAGS.size();
@@ -68,6 +69,9 @@ public class IPEntriesProcessFunction extends KeyedCoProcessFunction<String, Kaf
         _maxEntryLifetimeAfterEachIpMs = Duration.ofMillis(
                 Long.parseLong(parameters.getOrDefault(MergerConfig.IP_MAX_ENTRY_LIFETIME_AFTER_IP_DATA_MS_CONFIG,
                         MergerConfig.IP_MAX_ENTRY_LIFETIME_AFTER_IP_DATA_DEFAULT))).toMillis();
+        _maxWaitForDomainDataMs = Duration.ofMillis(
+                Long.parseLong(parameters.getOrDefault(MergerConfig.IP_WAIT_FOR_DOMAIN_DATA_MS_CONFIG,
+                        MergerConfig.IP_WAIT_FOR_DOMAIN_DATA_MS_DEFAULT))).toMillis();
     }
 
     /**
@@ -80,10 +84,11 @@ public class IPEntriesProcessFunction extends KeyedCoProcessFunction<String, Kaf
      * @param ctx        The processing context.
      * @param timerAfter The number of milliseconds to wait (from now) until the entry cleanup timer fires.
      */
-    private void updateExpirationTimestamp(KeyedCoProcessFunction<?, ?, ?, ?>.Context ctx,
+    private void updateExpirationTimestamp(KeyedCoProcessFunction<String, ?, ?, ?>.Context ctx,
                                            long timerAfter) throws Exception {
+        final var key = ctx.getCurrentKey();
         if (_completeStateProduced.value() == Boolean.TRUE) {
-            LOG.trace("Not updating expiration timestamp for a completed entry");
+            LOG.trace("[{}] Not updating expiration timestamp for a completed entry", key);
             return;
         }
 
@@ -92,59 +97,36 @@ public class IPEntriesProcessFunction extends KeyedCoProcessFunction<String, Kaf
         var nextExpiration = ((ctx.timestamp() + timerAfter) / 1000) * 1000;
         // Set the timer only if it hasn't been set already or the new timestamp is higher than the current one
         if (expirationTimestamp == null || expirationTimestamp < nextExpiration) {
-            LOG.trace("Updating expiration timestamp from {} to {}", expirationTimestamp, nextExpiration);
-            if (expirationTimestamp != null)
-                ctx.timerService().deleteEventTimeTimer(expirationTimestamp);
+            LOG.trace("[{}] Prolonging expiration by {} from {} to {}", key, timerAfter,
+                    expirationTimestamp, nextExpiration);
 
+            if (expirationTimestamp != null) {
+                ctx.timerService().deleteEventTimeTimer(expirationTimestamp);
+            }
             _entryExpirationTimestamp.update(nextExpiration);
             ctx.timerService().registerEventTimeTimer(nextExpiration);
+        } else {
+            LOG.trace("[{}] Expiration timestamp not prolonged", key);
         }
     }
 
     @Override
-    public void processElement1(KafkaDomainAggregate value,
-                                KeyedCoProcessFunction<String, KafkaDomainAggregate, KafkaIPEntry, KafkaMergedResult>.Context ctx,
+    public void processElement1(KafkaIPEntry value,
+                                KeyedCoProcessFunction<String, KafkaIPEntry, KafkaDomainAggregate, KafkaMergedResult>.Context ctx,
                                 Collector<KafkaMergedResult> out) throws Exception {
-        LOG.trace("Accepting incoming domain data");
-        // Presume that the domain data only comes "once" (per key lifetime)
-        // In case it comes multiple times, overwrite the previous value just in case it contains DNS data
-        // and the previous did not
-        final var currentValue = _domainData.value();
-        if (currentValue != null && (currentValue.getDNSData() != null || value.getDNSData() == null))
-            return;
-
-        // Update the data object
-        LOG.trace("Updating domain data state");
-        _domainData.update(value);
-
-        // Load the expected IP addresses
-        for (var ip : value.getDNSIPs()) {
-            if (!_expectedIpsToNumberOfEntries.contains(ip))
-                _expectedIpsToNumberOfEntries.put(ip, 0);
-        }
-
-        // Prolong the expiration timer to (now + _maxEntryLifetimeAfterDomainDataMs)
-        this.updateExpirationTimestamp(ctx, _maxEntryLifetimeAfterDomainDataMs);
-
-        // Check if all required data have been collected
-        this.processIngestedData(out, ctx);
-    }
-
-    @Override
-    public void processElement2(KafkaIPEntry value,
-                                KeyedCoProcessFunction<String, KafkaDomainAggregate, KafkaIPEntry, KafkaMergedResult>.Context ctx,
-                                Collector<KafkaMergedResult> out) throws Exception {
+        final var dn = ctx.getCurrentKey();
         final var ip = value.ip;
         final var collectorTag = value.collectorTag;
         final var key = Tuple2.of(ip, collectorTag);
 
-        LOG.trace("(IP {}\tColID {}): Processing incoming entry", ip, collectorTag);
+        LOG.trace("[{}][{} -> {}] Accepted IP collection result", dn, ip, collectorTag);
         if (_ipAndCollectorToIpData.contains(key)) {
             // If we have already seen this IP-Collector pair, only insert the new value if it's more useful
             var ipEntry = _ipAndCollectorToIpData.get(key);
             if (ResultFitnessComparator.isMoreUseful(ipEntry, value)) {
-                LOG.trace("(IP {}\tColID {}): Updating previously seen entry", ip, collectorTag);
+                LOG.trace("[{}][{} -> {}] Updating entry", dn, ip, collectorTag);
                 _ipAndCollectorToIpData.put(key, value);
+
                 // Prolong the expiration timer to (now + _maxEntryLifetimeAfterEachIpMs)
                 this.updateExpirationTimestamp(ctx, _maxEntryLifetimeAfterEachIpMs);
             }
@@ -155,29 +137,76 @@ public class IPEntriesProcessFunction extends KeyedCoProcessFunction<String, Kaf
                 seenEntriesForIp = 0;
             var newEntriesForIp = seenEntriesForIp + 1;
 
-            LOG.trace("(IP {}\tColID {}): Increasing seen to {}", ip, collectorTag, newEntriesForIp);
+            LOG.trace("[{}][{} -> {}] Increasing seen to {}", dn, ip, collectorTag, newEntriesForIp);
             _expectedIpsToNumberOfEntries.put(ip, newEntriesForIp);
             _ipAndCollectorToIpData.put(key, value);
+
             // Prolong the expiration timer to (now + _maxEntryLifetimeAfterEachIpMs)
             this.updateExpirationTimestamp(ctx, _maxEntryLifetimeAfterEachIpMs);
         }
 
-        // Only attempt processing if the domain data has already been ingested by the process function
-        if (_domainData.value() != null)
+        if (_domainData.value() != null) {
+            // Attempt processing if the domain data has already been ingested by the process function
             this.processIngestedData(out, ctx);
+        } else {
+            // Otherwise, extend the timer to (now + _maxWaitForDomainDataMs) instead
+            this.updateExpirationTimestamp(ctx, _maxWaitForDomainDataMs);
+        }
 
-        LOG.trace("(IP {}\tColID {}): Done", ip, collectorTag);
+        LOG.trace("[{}][{} -> {}] Processing IP result done", dn, ip, collectorTag);
+    }
+
+    @Override
+    public void processElement2(KafkaDomainAggregate value,
+                                KeyedCoProcessFunction<String, KafkaIPEntry, KafkaDomainAggregate, KafkaMergedResult>.Context ctx,
+                                Collector<KafkaMergedResult> out) throws Exception {
+        final var key = ctx.getCurrentKey();
+        LOG.trace("[{}] Accepted domain data", key);
+
+        // Presume that the domain data only comes "once" (per key lifetime)
+        // In case it comes multiple times, overwrite the previous value just in case it contains DNS data
+        // and the previous did not
+        final var currentValue = _domainData.value();
+        if (currentValue != null && (currentValue.getDNSData() != null || value.getDNSData() == null))
+            return;
+
+        // Update the data object
+        LOG.trace("[{}] Updating domain data state", key);
+        _domainData.update(value);
+
+        // Load the expected IP addresses
+        for (var ip : value.getDNSIPs()) {
+            if (!_expectedIpsToNumberOfEntries.contains(ip))
+                _expectedIpsToNumberOfEntries.put(ip, 0);
+        }
+
+        // If we've already seen an IP address, assume the "wait for domain data" timer is running and cancel it first
+        if (currentValue == null && !_ipAndCollectorToIpData.isEmpty()) {
+            _entryExpirationTimestamp.clear();
+        }
+
+        // (Then) prolong the expiration timer to (now + _maxEntryLifetimeAfterDomainDataMs)
+        this.updateExpirationTimestamp(ctx, _maxEntryLifetimeAfterDomainDataMs);
+
+        // Check if all required data have been collected
+        this.processIngestedData(out, ctx);
+
+        LOG.trace("[{}] Processing domain data done", key);
     }
 
     private void processIngestedData(@NotNull Collector<KafkaMergedResult> out,
-                                     @NotNull KeyedCoProcessFunction<?, ?, ?, ?>.Context ctx) throws Exception {
-        LOG.trace("Processing ingested data");
+                                     @NotNull KeyedCoProcessFunction<String, ?, ?, ?>.Context ctx) throws Exception {
+        final var key = ctx.getCurrentKey();
+        LOG.trace("[{}] Processing current state", key);
+
         // There must be at least TOTAL_EXPECTED_RECORDS_PER_IPS entries for each IP before it makes sense
         // to inspect the data further
         var expectedIps = new HashMap<String, Map<Byte, KafkaIPEntry>>();
         for (var gotEntries : _expectedIpsToNumberOfEntries.entries()) {
-            if (gotEntries.getValue() < TOTAL_EXPECTED_RECORDS_PER_IPS)
+            if (gotEntries.getValue() < TOTAL_EXPECTED_RECORDS_PER_IPS) {
+                LOG.trace("[{}] Not enough collected data object for an IP", key);
                 return;
+            }
 
             expectedIps.put(gotEntries.getKey(), null);
         }
@@ -189,6 +218,7 @@ public class IPEntriesProcessFunction extends KeyedCoProcessFunction<String, Kaf
         for (var ip : expectedIps.entrySet()) {
             for (var tag : TagRegistry.TAGS.values()) {
                 if (!ip.getValue().containsKey(tag.byteValue())) {
+                    LOG.trace("[{}] Missing data for {}", key, tag);
                     return;
                 }
             }
@@ -198,6 +228,7 @@ public class IPEntriesProcessFunction extends KeyedCoProcessFunction<String, Kaf
         var data = _domainData.value();
         var mergedResult = new KafkaMergedResult(data.getDomainName(), data, expectedIps);
 
+        LOG.trace("[{}] Producing final result", key);
         out.collect(mergedResult);
         // Only set the grace period timer after the first successfully produced result
         if (_completeStateProduced.value() != Boolean.TRUE) {
@@ -208,30 +239,35 @@ public class IPEntriesProcessFunction extends KeyedCoProcessFunction<String, Kaf
     }
 
     @Override
-    public void onTimer(long timestamp, KeyedCoProcessFunction<String, KafkaDomainAggregate, KafkaIPEntry,
+    public void onTimer(long timestamp, KeyedCoProcessFunction<String, KafkaIPEntry, KafkaDomainAggregate,
             KafkaMergedResult>.OnTimerContext ctx, Collector<KafkaMergedResult> out) throws Exception {
-        LOG.trace("Timer triggered at {}", timestamp);
-        // Check that this is the latest timer (just in case - the code should always cancel past timers)
+        final var key = ctx.getCurrentKey();
+
+        LOG.trace("[{}] Timer triggered at {} (WM: {})", key, timestamp, ctx.timerService().currentWatermark());
+
+        // Check that this is the latest timer
         final var currentNextExpiration = _entryExpirationTimestamp.value();
         if (currentNextExpiration == null || timestamp != currentNextExpiration) {
-            LOG.warn("Previously canceled timer at {} triggered (current next expiration timestamp: {})", timestamp, currentNextExpiration);
+            LOG.trace("[{}] Previously canceled timer at {} triggered (current next expiration timestamp: {})",
+                    key, timestamp, currentNextExpiration);
             return;
         }
 
         // If we have already collected all the required data, just clean up
         if (_completeStateProduced.value() == Boolean.TRUE) {
+            LOG.trace("[{}] Timer triggered after a complete state has been produced", key);
             this.clearState(ctx);
             return;
         }
 
         // In case we haven't managed to collect all the required data,
         // collect whatever we have and produce that (if we have any domain data)
-        LOG.trace("Entry expired before collecting all required data, producing");
         final var data = _domainData.value();
 
         // We don't want to produce data objects without domain data, missing IPs are fine
         // (this might also be a very lately arriving IP data object)
         if (data == null) {
+            LOG.trace("[{}] No domain data encountered", key);
             this.clearState(ctx);
             return;
         }
@@ -242,14 +278,16 @@ public class IPEntriesProcessFunction extends KeyedCoProcessFunction<String, Kaf
         }
 
         this.collectIPData(expectedIps);
+
         final var mergedResult = new KafkaMergedResult(data.getDomainName(), data, expectedIps);
+        LOG.trace("[{}] Producing incomplete result", key);
         out.collect(mergedResult);
         this.clearState(ctx);
     }
 
-    private void clearState(KeyedCoProcessFunction<?, ?, ?, ?>.OnTimerContext ctx) throws IOException {
+    private void clearState(KeyedCoProcessFunction<String, ?, ?, ?>.OnTimerContext ctx) throws IOException {
         // Clear all the state
-        LOG.trace("Clearing state");
+        LOG.trace("[{}] Clearing up the state", ctx.getCurrentKey());
 
         var lastExpirationTimestamp = _entryExpirationTimestamp.value();
         if (lastExpirationTimestamp != null) {

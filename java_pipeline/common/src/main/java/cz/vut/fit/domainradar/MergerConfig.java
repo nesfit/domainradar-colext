@@ -84,4 +84,12 @@ public class MergerConfig {
     public static final String IP_MAX_ENTRY_LIFETIME_AFTER_IP_DATA_MS_CONFIG
             = "ip.max.entry.lifetime.after.ip.data.ms";
     public static final String IP_MAX_ENTRY_LIFETIME_AFTER_IP_DATA_DEFAULT = "60000"; // 1 minute
+
+    /**
+     * The maximum time (in ms) to wait for the domain-based data blob to arrive to the final merger if an IP-based
+     * collector esult arrives first.
+     */
+    public static final String IP_WAIT_FOR_DOMAIN_DATA_MS_CONFIG
+            = "ip.wait.for.domain.data.ms";
+    public static final String IP_WAIT_FOR_DOMAIN_DATA_MS_DEFAULT = "60000"; // 1 minute
 }
