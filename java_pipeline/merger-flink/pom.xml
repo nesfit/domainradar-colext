@@ -61,11 +61,11 @@
             <artifactId>flink-connector-kafka</artifactId>
             <version>${flink.kafka.version}</version>
         </dependency>
-        <dependency>
+        <!--<dependency>
             <groupId>org.apache.flink</groupId>
             <artifactId>flink-avro</artifactId>
             <version>${flink.version}</version>
-        </dependency>
+        </dependency>-->
         <dependency>
             <groupId>${project.groupId}</groupId>
             <artifactId>common</artifactId>
