@@ -13,6 +13,8 @@ import org.apache.flink.streaming.api.datastream.KeyedStream;
 import org.apache.flink.streaming.api.environment.CheckpointConfig;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.kafka.clients.consumer.OffsetResetStrategy;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -22,14 +24,20 @@ import java.util.Properties;
 public class DataStreamJob {
 
     private static final Properties kafkaProperties = new Properties();
+    private static final Properties appProperties = new Properties();
+    private static final Logger LOG = LoggerFactory.getLogger(DataStreamJob.class);
 
     public static void main(String[] args) throws Exception {
         // ==== Configuration ====
         // All configuration properties with the "kafka." prefix will be passed to the Kafka source
         ParameterTool params = ParameterTool.fromPropertiesFile(args[0]);
+        LOG.info("Setting application properties:");
         params.toMap().forEach((k, v) -> {
             if (k.startsWith("kafka.")) {
                 kafkaProperties.setProperty(k.substring(6), v);
+            } else {
+                LOG.info("\t{}: {}", k, v);
+                appProperties.setProperty(k, v);
             }
         });
 
@@ -99,14 +107,28 @@ public class DataStreamJob {
 
     private static KeyedStream<KafkaDomainEntry, String> makeKafkaDomainStream(final StreamExecutionEnvironment env,
                                                                                final String topic) {
-        return env.fromSource(makeKafkaDomainSource(topic), makeWatermarkStrategy(), "Kafka: " + topic)
+        final var outOfOrdernessMs =
+                Long.parseLong(appProperties.getProperty(MergerConfig.DN_MAX_OUT_OF_ORDERNESS_MS_CONFIG,
+                        MergerConfig.DN_MAX_OUT_OF_ORDERNESS_MS_DEFAULT));
+        final var idlenessSec =
+                Long.parseLong(appProperties.getProperty(MergerConfig.DN_IDLENESS_SEC_CONFIG,
+                        MergerConfig.DN_IDLENESS_SEC_DEFAULT));
+
+        return env.fromSource(makeKafkaDomainSource(topic), makeWatermarkStrategy(outOfOrdernessMs, idlenessSec), "Kafka: " + topic)
                 .uid("source-kafka-dn-" + topic)
                 .keyBy(KafkaDomainEntry::getDomainName);
     }
 
     private static KeyedStream<KafkaIPEntry, String>
     makeKafkaIpStream(final StreamExecutionEnvironment env, final String topic) {
-        return env.fromSource(makeKafkaIpSource(topic), makeWatermarkStrategy(), "Kafka: " + topic)
+        final var outOfOrdernessMs =
+                Long.parseLong(appProperties.getProperty(MergerConfig.IP_MAX_OUT_OF_ORDERNESS_MS_CONFIG,
+                        MergerConfig.IP_MAX_OUT_OF_ORDERNESS_MS_DEFAULT));
+        final var idlenessSec =
+                Long.parseLong(appProperties.getProperty(MergerConfig.IP_IDLENESS_SEC_CONFIG,
+                        MergerConfig.IP_IDLENESS_SEC_DEFAULT));
+
+        return env.fromSource(makeKafkaIpSource(topic), makeWatermarkStrategy(outOfOrdernessMs, idlenessSec), "Kafka: " + topic)
                 .uid("source-kafka-ip-" + topic)
                 .keyBy(KafkaIPEntry::getDomainName);
     }
@@ -129,8 +151,14 @@ public class DataStreamJob {
                 .build();
     }
 
-    private static <T> WatermarkStrategy<T> makeWatermarkStrategy() {
-        return WatermarkStrategy
-                .<T>forMonotonousTimestamps();
+    private static <T> WatermarkStrategy<T> makeWatermarkStrategy(long outOfOrdernessMs, long idlenessSec) {
+        var strategy = WatermarkStrategy
+                .<T>forBoundedOutOfOrderness(Duration.ofMillis(outOfOrdernessMs));
+
+        if (idlenessSec > 0) {
+            return strategy.withIdleness(Duration.ofSeconds(idlenessSec));
+        } else {
+            return strategy;
+        }
     }
 }
