@@ -7,6 +7,40 @@ package cz.vut.fit.domainradar;
  */
 @SuppressWarnings("ALL")
 public class MergerConfig {
+    /* --- Domain-based sources --- */
+    /**
+     * The maximum out-of-orderness time for the domain-based Kafka sources.
+     * Set to zero if the timestamps are always monotonously rising.
+     */
+    public static final String DN_MAX_OUT_OF_ORDERNESS_MS_CONFIG = "dn.max.out.of.orderness.ms";
+    public static final String DN_MAX_OUT_OF_ORDERNESS_MS_DEFAULT = "0";
+
+    /**
+     * The idleness time (in seconds) for the domain-based Kafka sources.
+     * If no records flow in a partition of a stream for this amount of time, then that partition is considered "idle"
+     * and will not hold back the progress.
+     * In high-flow scenarios, this can be set to zero.
+     */
+    public static final String DN_IDLENESS_SEC_CONFIG = "dn.idleness.sec";
+    public static final String DN_IDLENESS_SEC_DEFAULT = "0";
+
+    /* --- IP-based sources --- */
+    /**
+     * The maximum out-of-orderness time for the IP-based Kafka sources.
+     * Set to zero if the timestamps are always monotonously rising.
+     */
+    public static final String IP_MAX_OUT_OF_ORDERNESS_MS_CONFIG = "ip.max.out.of.orderness.ms";
+    public static final String IP_MAX_OUT_OF_ORDERNESS_MS_DEFAULT = "0";
+
+    /**
+     * The idleness time (in seconds) for the IP-based Kafka sources.
+     * If no records flow in a partition of a stream for this amount of time, then that partition is considered "idle"
+     * and will not hold back the progress.
+     * In high-flow scenarios, this can be set to zero.
+     */
+    public static final String IP_IDLENESS_SEC_CONFIG = "ip.idleness.sec";
+    public static final String IP_IDLENESS_SEC_DEFAULT = "0";
+
     /* --- Domain-based collector results merger --- */
     /**
      * The time (in ms) to wait for potential updates to a domain-data aggregate entry that has already been
