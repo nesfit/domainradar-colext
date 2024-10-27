@@ -47,24 +47,48 @@ public class DataStreamJob {
         env.getConfig().setGlobalJobParameters(params);
 
         // ==== Checkpointing ====
-        env.enableCheckpointing(5000, CheckpointingMode.EXACTLY_ONCE);
+        env.enableCheckpointing(10000, CheckpointingMode.EXACTLY_ONCE);
         final var checkpointConfig = env.getCheckpointConfig();
         // Retain the last checkpoint both when the job fails and when it is manually cancelled
         checkpointConfig.setExternalizedCheckpointCleanup(
                 CheckpointConfig.ExternalizedCheckpointCleanup.RETAIN_ON_CANCELLATION);
         // Checkpoints may sometimes take longer than on average, don't congest the system
         // with additional checkpoint runs
-        checkpointConfig.setMinPauseBetweenCheckpoints(1000);
+        checkpointConfig.setMinPauseBetweenCheckpoints(5000);
         // Checkpoints have to complete within 30 seconds, or are discarded
         checkpointConfig.setCheckpointTimeout(30000);
         // Two consecutive checkpoint failures are tolerated
-        checkpointConfig.setTolerableCheckpointFailureNumber(2);
+        checkpointConfig.setTolerableCheckpointFailureNumber(5);
         // Allow only one checkpoint to be in progress at the same time
         checkpointConfig.setMaxConcurrentCheckpoints(1);
         // TODO: Determine if unaligned checkpoints help the pipeline
         //       (especially under heavy load)
         // checkpointConfig.enableUnalignedCheckpoints();
 
+        // Create the pipeline
+        makePipeline(env);
+        //makeTestPipeline(env);
+
+        // ==== Execution ====
+        env.execute("DomainRadar Data Merger");
+    }
+
+    private static void makeTestPipeline(StreamExecutionEnvironment env) {
+        var zoneStream = makeKafkaDomainStream(env, Topics.OUT_ZONE);
+        var dnsStream = makeKafkaDomainStream(env, Topics.OUT_DNS);
+        var tlsStream = makeKafkaDomainStream(env, Topics.OUT_TLS);
+        var rdapDnStream = makeKafkaDomainStream(env, Topics.OUT_RDAP_DN);
+        //var ipDataStream = makeKafkaIpStream(env, Topics.OUT_IP)
+        //        .keyBy(KafkaIPEntry::getDomainName);
+
+        zoneStream.union(dnsStream, tlsStream, rdapDnStream)
+                .keyBy(KafkaDomainEntry::getDomainName)
+                .process(new DomainEntriesProcessFunction())
+                .uid("dn-merging-processor")
+                .print();
+    }
+
+    private static void makePipeline(StreamExecutionEnvironment env) {
         // ==== Sources & Sinks ====
         KafkaSink<Tuple2<String, byte[]>> sink = KafkaSink.<Tuple2<String, byte[]>>builder()
                 .setKafkaProducerConfig(kafkaProperties)
@@ -95,9 +119,6 @@ public class DataStreamJob {
         mergedData
                 .sinkTo(sink)
                 .uid("kafka-sink");
-
-        // ==== Execution ====
-        env.execute("DomainRadar Data Merger");
     }
 
     private static KeyedStream<KafkaDomainEntry, String> makeKafkaDomainStream(final StreamExecutionEnvironment env,
