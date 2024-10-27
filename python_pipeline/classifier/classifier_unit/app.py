@@ -77,7 +77,7 @@ _executor: Executor | None = None
 async def ensure_pool() -> Executor:
     global _executor
     await _pool_semaphore.acquire()
-    if CLASSIFIER_WORKERS > 1:
+    if CLASSIFIER_WORKERS > 0:
         if _executor is not None:
             _pool_semaphore.release()
             return _executor
@@ -91,6 +91,7 @@ async def ensure_pool() -> Executor:
         await asyncio.wait(wait_futures)
         logger.info("Classifiers initialized")
     else:
+        init_classifier(pipeline_options)
         _executor = None
     _pool_semaphore.release()
     return _executor
@@ -99,11 +100,14 @@ async def ensure_pool() -> Executor:
 # The main loop
 @classifier_unit_app.agent(topic_to_process, concurrency=CLASSIFIER_WORKERS)
 async def process_entries(stream):
-    async def do_error(value: bytes):
+    async def do_error(value: bytes, exc_info):
         try:
             df = pd.read_feather(pa.BufferReader(value))
             keys = df["domain_name"].tolist()
-            logger.k_unhandled_error(e, None, all_keys=keys)
+            if exc_info is None:
+                logger.k_warning("Input processing error", None, all_keys=keys)
+            else:
+                logger.k_unhandled_error(exc_info, None, all_keys=keys)
 
             for dn in keys:
                 result = make_error_result(dn, str(e))
@@ -122,7 +126,7 @@ async def process_entries(stream):
 
             if isinstance(results, str):
                 logger.error("An error occurred while processing the input: %s", results)
-                await do_error(value)
+                await do_error(value, None)
                 continue
 
             for result in results:
@@ -132,7 +136,7 @@ async def process_entries(stream):
 
                 await topic_processed.send(key=result["domain_name"], value=serialize(result))
         except Exception as e:
-            await do_error(value)
+            await do_error(value, e)
 
     if executor:
         executor.shutdown(True, cancel_futures=True)
