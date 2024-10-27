@@ -130,6 +130,9 @@ async def fetch_whois(domain_name, client: DomainClient) -> tuple[str | None, di
 
         logger.k_debug("WHOIS other error: %s: %s", domain_name, endpoint, msg)
         return None, None, rc.CANNOT_FETCH, str(e)
+    except ConnectionResetError as e:
+        logger.k_debug("WHOIS connection reset error", domain_name)
+        return None, None, rc.CANNOT_FETCH, str(e)
     except Exception as e:
         logger.k_warning("Unhandled WHOIS exception", domain_name, e=e)
         if isinstance(e, IOError):
