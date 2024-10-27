@@ -51,7 +51,6 @@ class HTMLTransformation(Transformation):
         if not soup:
             return [0] * 53
         tags = {tag.name: soup.find_all(tag.name) for tag in soup.find_all()}
-        print(tags)
 
         def get_elements(tag=None, attr=None):
             return soup.find_all(tag, {attr: True}) if attr else soup.find_all(tag)
@@ -210,9 +209,6 @@ class HTMLTransformation(Transformation):
             for key, pattern in regex_patterns.items():
                 dic[key] += len(pattern.findall(str(script)))
 
-
-
-        print(dic)
         return dic.values()
 
     @property
