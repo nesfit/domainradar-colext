@@ -43,26 +43,47 @@ public class SerdeMappingFunction extends RichMapFunction<KafkaMergedResult, Tup
     @Override
     public Tuple2<String, byte[]> map(KafkaMergedResult kafkaMergedResult) throws Exception {
         final var domainData = kafkaMergedResult.getDomainData();
-        final var dnsResult = _dnsResultDeserializer.deserialize(Topics.OUT_DNS, domainData.getDNSData().getValue());
+
+        final var zoneData = domainData.getZoneData();
+        final var dnsData = domainData.getDNSData();
+        final var rdapDnData = domainData.getRDAPData();
+        final var tlsData = domainData.getTLSData();
+
+        // This should not happen
+        if (zoneData == null || dnsData == null) {
+            return Tuple2.of(null, null);
+        }
+
+        final var zoneResult = _zoneResultDeserializer.deserialize(Topics.OUT_ZONE, zoneData.getValue());
+        final var dnsResult = _dnsResultDeserializer.deserialize(Topics.OUT_DNS, dnsData.getValue());
+
         // The TLS result can be null in some cases (no IPs in DNS)!
-        final var tlsResult = domainData.getTLSData() == null
+        final var tlsResult = tlsData == null
                 ? null
-                : _tlsResultDeserializer.deserialize(Topics.OUT_TLS, domainData.getTLSData().getValue());
-        final var rdapDnResult = _rdapDnResultDeserializer.deserialize(Topics.OUT_RDAP_DN, domainData.getRDAPData().getValue());
-        final var zoneResult = _zoneResultDeserializer.deserialize(Topics.OUT_ZONE, domainData.getZoneData().getValue());
+                : _tlsResultDeserializer.deserialize(Topics.OUT_TLS, tlsData.getValue());
+        // The RDAP-DN result can be null in case of very late entries
+        final var rdapDnResult = rdapDnData == null
+                ? null
+                : _rdapDnResultDeserializer.deserialize(Topics.OUT_RDAP_DN, rdapDnData.getValue());
 
-        final var ipData = new HashMap<String, Map<String, CommonIPResult<JsonNode>>>();
-        for (var rawIpDataEntry : kafkaMergedResult.getIPData().entrySet()) {
-            var collectorToData = new HashMap<String, CommonIPResult<JsonNode>>();
+        // We don't need to go through the IPs if the original DNS result did not require any
+        final var ipData = (dnsResult.ips() == null || dnsResult.ips().isEmpty())
+                ? null
+                : new HashMap<String, Map<String, CommonIPResult<JsonNode>>>();
 
-            for (var rawCollectorDataEntry : rawIpDataEntry.getValue().entrySet()) {
-                var collectorName = TagRegistry.COLLECTOR_NAMES.get(rawCollectorDataEntry.getKey().intValue());
-                var deserializedEntryData = _ipResultDeserializer.deserialize(Topics.OUT_IP,
-                        rawCollectorDataEntry.getValue().getValue());
-                collectorToData.put(collectorName, deserializedEntryData);
+        if (ipData != null && kafkaMergedResult.getIPData() != null) {
+            for (var rawIpDataEntry : kafkaMergedResult.getIPData().entrySet()) {
+                var collectorToData = new HashMap<String, CommonIPResult<JsonNode>>();
+
+                for (var rawCollectorDataEntry : rawIpDataEntry.getValue().entrySet()) {
+                    var collectorName = TagRegistry.COLLECTOR_NAMES.get(rawCollectorDataEntry.getKey().intValue());
+                    var deserializedEntryData = _ipResultDeserializer.deserialize(Topics.OUT_IP,
+                            rawCollectorDataEntry.getValue().getValue());
+                    collectorToData.put(collectorName, deserializedEntryData);
+                }
+
+                ipData.put(rawIpDataEntry.getKey(), collectorToData);
             }
-
-            ipData.put(rawIpDataEntry.getKey(), collectorToData);
         }
 
         final var allCollectedData = new AllCollectedData(

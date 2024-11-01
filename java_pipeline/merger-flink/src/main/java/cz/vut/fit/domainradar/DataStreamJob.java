@@ -110,15 +110,37 @@ public class DataStreamJob {
                 .uid("dn-merging-processor")
                 .keyBy(KafkaDomainAggregate::getDomainName);
 
-        var mergedData = ipDataStream.connect(dnData)
+        // Only use the IP merger for entries that actually carried IPs to process
+        var dnDataWithIps = dnData
+                .filter(dnAggregate -> !dnAggregate.getDNSIPs().isEmpty())
+                .uid("dn-data-with-ips-filter")
+                .keyBy(KafkaDomainAggregate::getDomainName);
+        var mergedData = ipDataStream.connect(dnDataWithIps)
                 .process(new IPEntriesProcessFunction())
                 .uid("dn-ip-final-merging-processor")
                 .map(new SerdeMappingFunction())
-                .uid("serde-mapper");
-
+                .uid("serde-mapper-with-ips")
+                .filter(tuple -> tuple.f0 != null)
+                .uid("result-with-ips-not-null-filter");
         mergedData
                 .sinkTo(sink)
-                .uid("kafka-sink");
+                .uid("entries-with-ips-sink");
+
+        // Handle the IP-less merged results from DN-based collectors
+        var dnDataWithoutIps = dnData
+                .filter(dnAggregate -> dnAggregate.getDNSIPs().isEmpty())
+                .uid("dn-data-without-ips-filter")
+                .keyBy(KafkaDomainAggregate::getDomainName);
+        var resultsWithoutIps = dnDataWithoutIps
+                .map(dnAggregate -> new KafkaMergedResult(dnAggregate.getDomainName(), dnAggregate, null))
+                .uid("map-to-merged-results")
+                .map(new SerdeMappingFunction())
+                .uid("serde-mapper-without-ips")
+                .filter(tuple -> tuple.f0 != null)
+                .uid("result-without-ips-not-null-filter");
+        resultsWithoutIps
+                .sinkTo(sink)
+                .uid("entries-without-ips-sink");
     }
 
     private static KeyedStream<KafkaDomainEntry, String> makeKafkaDomainStream(final StreamExecutionEnvironment env,

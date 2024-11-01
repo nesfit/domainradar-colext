@@ -1,6 +1,7 @@
 package cz.vut.fit.domainradar;
 
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.Map;
 
@@ -10,18 +11,18 @@ public class KafkaMergedResult {
     private String domainName;
     @NotNull
     private KafkaDomainAggregate domainData;
-    @NotNull
+    @Nullable
     private Map<String, Map<Byte, KafkaIPEntry>> ipData;
 
     public KafkaMergedResult() {
         this.domainName = "";
         this.domainData = new KafkaDomainAggregate();
-        this.ipData = Map.of();
+        this.ipData = null;
     }
 
     public KafkaMergedResult(@NotNull String domainName,
                              @NotNull KafkaDomainAggregate domainData,
-                             @NotNull Map<String, Map<Byte, KafkaIPEntry>> ipData) {
+                             @Nullable Map<String, Map<Byte, KafkaIPEntry>> ipData) {
         this.domainName = domainName;
         this.domainData = domainData;
         this.ipData = ipData;
@@ -43,11 +44,11 @@ public class KafkaMergedResult {
         this.domainData = domainData;
     }
 
-    public @NotNull Map<String, Map<Byte, KafkaIPEntry>> getIPData() {
+    public @Nullable Map<String, Map<Byte, KafkaIPEntry>> getIPData() {
         return ipData;
     }
 
-    public void setIPData(@NotNull Map<String, Map<Byte, KafkaIPEntry>> ipData) {
+    public void setIPData(@Nullable Map<String, Map<Byte, KafkaIPEntry>> ipData) {
         this.ipData = ipData;
     }
 }
