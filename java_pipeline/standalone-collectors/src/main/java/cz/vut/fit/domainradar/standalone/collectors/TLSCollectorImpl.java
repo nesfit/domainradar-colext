@@ -171,7 +171,7 @@ public class TLSCollectorImpl {
         }
 
         // Check if it's a redirect
-        if (isRedirect && statusCode >= 300 && statusCode < 400 && location != null) {
+        if (isRedirect && statusCode >= 300 && statusCode < 400) {
             // If the maximum number of redirects has been reached, return null
             if (counter == _maxRedirects)
                 // The socket is not closed here as it will be closed by the caller.
