@@ -163,7 +163,7 @@ public class TLSCollectorImpl {
             }
 
             if (line.startsWith("Location:")) {
-                location = line.split(" ")[1];
+                location = line.split(":")[1].trim();
                 isRedirect = true;
             }
 
