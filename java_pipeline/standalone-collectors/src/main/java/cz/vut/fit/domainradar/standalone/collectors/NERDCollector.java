@@ -198,6 +198,9 @@ public class NERDCollector extends IPStandaloneCollector<NERDData> {
                         Logger.debug("Connection timeout (batch {})", batch, e);
                         sendAboutAll(entries, errorResult(ResultCodes.TIMEOUT,
                                 "Connection timed out (%d ms)".formatted(_httpTimeout.toMillis())));
+                    } else if (e.getCause() instanceof IOException) {
+                        Logger.debug("I/O exception (batch {})", batch, e);
+                        sendAboutAll(entries, errorResult(ResultCodes.CANNOT_FETCH, e.getMessage()));
                     } else {
                         Logger.warn("Unexpected error (batch {})", batch, e);
                         sendAboutAll(entries, errorResult(ResultCodes.INTERNAL_ERROR, e.getMessage()));

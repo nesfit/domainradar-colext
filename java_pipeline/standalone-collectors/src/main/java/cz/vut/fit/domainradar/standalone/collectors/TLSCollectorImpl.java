@@ -50,6 +50,7 @@ public class TLSCollectorImpl {
     /**
      * Connects to a TLS host on a given IP, using a given hostname for a SNI header.
      * Extracts TLS handshake information. Sends an HTTP GET request for / and stores the response body.
+     *
      * @param hostName The target hostname.
      * @param targetIp The target IP address.
      * @return A {@link TLSResult} object with the handshake information, the server's certificate and the
@@ -121,6 +122,12 @@ public class TLSCollectorImpl {
             } catch (SocketTimeoutException e) {
                 Logger.debug("Socket read timed out: {}", hostName);
                 return errorResult(ResultCodes.TIMEOUT, "Socket read timed out (%d ms)".formatted(_timeout));
+            } catch (SSLHandshakeException e) {
+                Logger.debug("TLS handshake error: {}: {}", hostName, e.getMessage());
+                return errorResult(ResultCodes.CANNOT_FETCH, "Socket handshake error: " + e.getMessage());
+            } catch (IOException e) {
+                Logger.debug("TLS error: {}: {}", hostName, e.getMessage());
+                return errorResult(ResultCodes.CANNOT_FETCH, e.getMessage());
             }
         } catch (IOException e) {
             Logger.debug("Cannot connect to {}: {}", hostName, e.getMessage());
