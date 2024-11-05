@@ -68,7 +68,9 @@ public class NERDCollector extends IPStandaloneCollector<NERDData> {
 
     @Override
     public void run(CommandLine cmd) {
-        buildProcessor(_batchSize);
+        // Add a bit of a buffer to make the absolute processing timeout
+        final var processingTimeout = (long) (_httpTimeout.toMillis() * 1.2);
+        buildProcessor(_batchSize, processingTimeout);
 
         _client = HttpClient.newBuilder()
                 .followRedirects(HttpClient.Redirect.NEVER)
@@ -77,8 +79,7 @@ public class NERDCollector extends IPStandaloneCollector<NERDData> {
                 .executor(_executor)
                 .build();
 
-        // Add a bit of a buffer to make the absolute processing timeout
-        final var processingTimeout = (long) (_httpTimeout.toMillis() * 1.2);
+
         // A batch counter for debugging only
         AtomicLong batchCounter = new AtomicLong(0);
 

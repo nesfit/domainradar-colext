@@ -88,10 +88,10 @@ public class TLSCollector extends BaseStandaloneCollector<String, String> {
 
     @Override
     public void run(CommandLine cmd) {
-        buildProcessor(0);
         // The timeout is used for connect and for the communication, so the absolute
         // processing bound must be slightly over its double
         final long futureTimeout = (long) (_timeout * 2.1);
+        buildProcessor(0, futureTimeout);
 
         _parallelProcessor.subscribe(UniLists.of(Topics.IN_TLS));
         _parallelProcessor.poll(ctx -> {

@@ -134,13 +134,16 @@ public abstract class BaseStandaloneCollector<KIn, VIn> implements Closeable {
      *
      * @param batchSize The batch size for processing records. If greater than 0,
      *                  the processor will be configured to use the specified batch size.
+     * @param timeoutMs The base timeout guaranteed by the collection process, in milliseconds.
+     *                  This value will be multiplied by a small coefficient to set the threshold for
+     *                  time spent in the queue of the parallel consumer before issuing a warning.
      */
-    protected void buildProcessor(int batchSize) {
+    protected void buildProcessor(int batchSize, long timeoutMs) {
         var optionsBuilder = ParallelConsumerOptions.<KIn, VIn>builder()
                 .ordering(ParallelConsumerOptions.ProcessingOrder.KEY)
                 .consumer(_consumer)
                 .maxConcurrency(_maxConcurrency)
-                .thresholdForTimeSpendInQueueWarning(Duration.ofSeconds(5)) // TODO: make configurable?
+                .thresholdForTimeSpendInQueueWarning(Duration.ofMillis((long)(timeoutMs * 1.1)))
                 .commitMode(_commitMode)
                 .commitInterval(_commitInterval);
 

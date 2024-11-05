@@ -59,7 +59,7 @@ public class GeoAsnCollector extends IPStandaloneCollector<GeoIPData> {
 
     @Override
     public void run(CommandLine cmd) {
-        buildProcessor(0);
+        buildProcessor(0, 500);
         _parallelProcessor.subscribe(UniLists.of(Topics.IN_IP));
         _parallelProcessor.poll(ctx -> {
             var entry = ctx.getSingleConsumerRecord();
