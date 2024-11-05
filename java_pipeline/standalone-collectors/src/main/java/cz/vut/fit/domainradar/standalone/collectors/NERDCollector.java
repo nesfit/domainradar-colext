@@ -109,7 +109,7 @@ public class NERDCollector extends IPStandaloneCollector<NERDData> {
                     sendAboutAll(entries, errorResult(ResultCodes.TIMEOUT,
                             "Operation timed out (%d ms)".formatted(processingTimeout)));
                 } else {
-                    Logger.warn("Unexpected error (batch {})", batch, e);
+                    Logger.warn("Unexpected error (batch {})", batch, e.getCause());
                     sendAboutAll(entries, errorResult(ResultCodes.INTERNAL_ERROR, e.getMessage()));
                 }
             }

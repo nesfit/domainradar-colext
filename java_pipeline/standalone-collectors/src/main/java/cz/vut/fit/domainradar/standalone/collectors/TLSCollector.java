@@ -111,7 +111,7 @@ public class TLSCollector extends BaseStandaloneCollector<String, String> {
                     _producer.send(resultRecord(Topics.OUT_TLS, dn,
                             TLSCollectorImpl.errorResult(ResultCodes.TIMEOUT, "Operation timed out (%d ms)".formatted(_timeout))));
                 } else {
-                    Logger.warn("Unexpected error: {}", dn, e);
+                    Logger.warn("Unexpected error: {}", dn, e.getCause());
                     _producer.send(resultRecord(Topics.OUT_TLS, dn,
                             TLSCollectorImpl.errorResult(ResultCodes.INTERNAL_ERROR, e.getMessage())));
                 }
