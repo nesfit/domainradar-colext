@@ -42,6 +42,11 @@ public class CollectorConfig {
     public static final String TLS_MAX_REDIRECTS_DOC = "The maximum number of HTTP redirects to follow.";
     public static final String TLS_MAX_REDIRECTS_DEFAULT = "2";
 
+    /* --- QRadar collector --- */
+    public static final String QRADAR_TOKEN_CONFIG = "collectors.qradar.token";
+    public static final String QRADAR_TOKEN_DOC = "The IBM QRadar RESTful API access token.";
+    public static final String QRADAR_TOKEN_DEFAULT = "";
+
     /* --- General settings for the PC-based standalone collectors --- */
     public static final String CLOSE_TIMEOUT_SEC_CONFIG = "collectors.kafka.close.timeout";
     public static final String CLOSE_TIMEOUT_SEC_DOC =
