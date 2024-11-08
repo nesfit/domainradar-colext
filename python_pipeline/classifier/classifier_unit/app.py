@@ -5,6 +5,7 @@ import asyncio
 import multiprocessing
 import os.path
 from concurrent.futures import ProcessPoolExecutor, Executor
+from concurrent.futures.process import BrokenProcessPool
 from json import dumps
 
 import pandas as pd
@@ -135,6 +136,8 @@ async def process_entries(stream):
                     continue
 
                 await topic_processed.send(key=result["domain_name"], value=serialize(result))
+        except BrokenProcessPool:
+            break
         except Exception as e:
             await do_error(value, e)
 
