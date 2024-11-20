@@ -8,6 +8,7 @@ import cz.vut.fit.domainradar.models.ResultCodes;
 import cz.vut.fit.domainradar.models.results.TLSResult;
 import cz.vut.fit.domainradar.serialization.JsonSerde;
 import cz.vut.fit.domainradar.standalone.BaseStandaloneCollector;
+import io.confluent.parallelconsumer.ParallelStreamProcessor;
 import org.apache.commons.cli.CommandLine;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.common.serialization.Serdes;
@@ -29,7 +30,8 @@ import java.util.concurrent.*;
  * @author Ondřej Ondryáš
  * @see TLSCollectorImpl
  */
-public class TLSCollector extends BaseStandaloneCollector<String, String> {
+public class TLSCollector
+        extends BaseStandaloneCollector<String, String, ParallelStreamProcessor<String, String>> {
     public static final String NAME = "tls";
     public static final String COMPONENT_NAME = "collector-" + NAME;
     private static final org.slf4j.Logger Logger = Common.getComponentLogger(TLSCollector.class);
@@ -122,6 +124,12 @@ public class TLSCollector extends BaseStandaloneCollector<String, String> {
     @Override
     public @NotNull String getName() {
         return NAME;
+    }
+
+    protected void buildProcessor(int batchSize, long timeoutMs) {
+        _parallelProcessor = ParallelStreamProcessor.createEosStreamProcessor(
+                this.buildProcessorOptions(batchSize, timeoutMs)
+        );
     }
 
     @Override

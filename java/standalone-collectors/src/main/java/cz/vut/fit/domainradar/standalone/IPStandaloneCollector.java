@@ -7,6 +7,8 @@ import cz.vut.fit.domainradar.models.ResultCodes;
 import cz.vut.fit.domainradar.models.requests.IPRequest;
 import cz.vut.fit.domainradar.models.results.CommonIPResult;
 import cz.vut.fit.domainradar.serialization.JsonSerde;
+import io.confluent.parallelconsumer.ParallelConsumer;
+import io.confluent.parallelconsumer.ParallelStreamProcessor;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.jetbrains.annotations.NotNull;
 
@@ -23,7 +25,9 @@ import java.util.Properties;
  * @author Ondřej Ondryáš
  * @see CommonIPResult
  */
-public abstract class IPStandaloneCollector<TData> extends BaseStandaloneCollector<IPToProcess, IPRequest> {
+public abstract class IPStandaloneCollector<TData, TProcessor extends ParallelConsumer<IPToProcess, IPRequest>>
+        extends BaseStandaloneCollector<IPToProcess, IPRequest, TProcessor> {
+
     protected final KafkaProducer<IPToProcess, CommonIPResult<TData>> _producer;
 
     public IPStandaloneCollector(@NotNull ObjectMapper jsonMapper,

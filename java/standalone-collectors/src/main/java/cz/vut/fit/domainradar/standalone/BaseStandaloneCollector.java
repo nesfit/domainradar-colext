@@ -3,6 +3,7 @@ package cz.vut.fit.domainradar.standalone;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import cz.vut.fit.domainradar.CollectorConfig;
 import cz.vut.fit.domainradar.models.results.Result;
+import io.confluent.parallelconsumer.ParallelConsumer;
 import io.confluent.parallelconsumer.ParallelConsumerOptions;
 import io.confluent.parallelconsumer.ParallelStreamProcessor;
 import io.confluent.parallelconsumer.internal.DrainingCloseable;
@@ -34,7 +35,8 @@ import java.util.function.Consumer;
  * @param <VIn> The type of the value for input Kafka records.
  * @author Ondřej Ondryáš
  */
-public abstract class BaseStandaloneCollector<KIn, VIn> implements Closeable {
+public abstract class BaseStandaloneCollector<KIn, VIn, TProcessor extends ParallelConsumer<KIn, VIn>>
+        implements Closeable {
 
     protected final Properties _properties;
     protected final Duration _closeTimeout;
@@ -44,7 +46,7 @@ public abstract class BaseStandaloneCollector<KIn, VIn> implements Closeable {
 
     protected final ObjectMapper _jsonMapper;
     protected final KafkaConsumer<KIn, VIn> _consumer;
-    protected ParallelStreamProcessor<KIn, VIn> _parallelProcessor;
+    protected TProcessor _parallelProcessor;
 
     public BaseStandaloneCollector(@NotNull ObjectMapper jsonMapper,
                                    @NotNull String appName,
@@ -138,19 +140,19 @@ public abstract class BaseStandaloneCollector<KIn, VIn> implements Closeable {
      *                  This value will be multiplied by a small coefficient to set the threshold for
      *                  time spent in the queue of the parallel consumer before issuing a warning.
      */
-    protected void buildProcessor(int batchSize, long timeoutMs) {
+    protected ParallelConsumerOptions<KIn, VIn> buildProcessorOptions(int batchSize, long timeoutMs) {
         var optionsBuilder = ParallelConsumerOptions.<KIn, VIn>builder()
                 .ordering(ParallelConsumerOptions.ProcessingOrder.KEY)
                 .consumer(_consumer)
                 .maxConcurrency(_maxConcurrency)
-                .thresholdForTimeSpendInQueueWarning(Duration.ofMillis((long)(timeoutMs * 1.1)))
+                .thresholdForTimeSpendInQueueWarning(Duration.ofMillis((long) (timeoutMs * 1.1)))
                 .commitMode(_commitMode)
                 .commitInterval(_commitInterval);
 
         if (batchSize > 0)
             optionsBuilder = optionsBuilder.batchSize(batchSize);
 
-        _parallelProcessor = ParallelStreamProcessor.createEosStreamProcessor(optionsBuilder.build());
+        return optionsBuilder.build();
     }
 
     /**
