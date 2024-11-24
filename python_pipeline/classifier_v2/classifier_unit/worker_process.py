@@ -68,7 +68,7 @@ class WorkerProcess:
                 # Retry
                 self._producer.produce(self._topic, key=key, value=value)
 
-    def _process_message(self, partition, offset, value):
+    def _process_message(self, partition: int, offset: int, value: bytes):
         try:
             df = pd.read_feather(pa.BufferReader(value))
         except Exception as e:
@@ -128,7 +128,7 @@ def sigterm_handler(signal_num, stack_frame):
         process = None
 
 
-def init_process(config: dict, to_process, processed, topic_out: str, worker_id: int):
+def init_process(config: dict, to_process: mp.Queue, processed: mp.Queue, topic_out: str, worker_id: int):
     global process
     from . import util
 
