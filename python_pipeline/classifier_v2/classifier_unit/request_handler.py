@@ -82,11 +82,11 @@ class RequestHandler:
             while len(offsets) > 0:
                 # Extract the top of the ROB
                 offset, expire_time = offsets.popitem(index=0)
-                is_late = expire_time < current_time
-                # 'None' means item done 
-                if expire_time is None or is_late:
+                # 'None' means item done
+                item_done = expire_time is None
+                if item_done or expire_time < current_time:
                     ret.append(ck.TopicPartition(self._topic_in, partition, offset + 1))
-                    if is_late:
+                    if not item_done:
                         # TODO: a "dead letter topic"
                         self._logger.warning("Message not processed in time at partition = %s, offset = %s.",
                                              partition, offset)
