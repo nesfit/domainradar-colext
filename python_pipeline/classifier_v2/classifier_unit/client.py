@@ -47,6 +47,10 @@ class ClassifierPipelineClient:
                     if to_confirm is not None:
                         self._consumer.store_offsets(offsets=to_confirm)
 
+                    if not self._request_handler.can_continue():
+                        sleep(0.2)
+                        continue
+
                     # Wait for a new message to come
                     msg = self._consumer.poll(timeout=timeout)
                     if msg is None:

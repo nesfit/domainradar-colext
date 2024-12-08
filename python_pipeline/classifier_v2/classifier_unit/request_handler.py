@@ -12,7 +12,7 @@ import confluent_kafka as ck
 # The maximum amount of entries to poll from the 'processed' queue before passing them
 # forward for confirming the offsets. Used to prevent livelocks (i.e. the request handler stuck
 # in accepting processed messages in get_messages_to_confirm).
-MAX_CONFIRMED_MESSAGES_BATCH = 10
+MAX_CONFIRMED_MESSAGES_BATCH = 100
 
 
 class RequestHandler:
@@ -20,17 +20,21 @@ class RequestHandler:
     def __init__(self, config: dict, topic_in: str, topic_out: str):
         self._config = config
         self._client_config = config.get("client", {})
-        self._logger = logging.getLogger(__name__)
+        self._logger = logging.getLogger("req-handler")
         self._topic_in = topic_in
         self._topic_out = topic_out
         mp.set_start_method(self._client_config.get("mp_start_method", "spawn"))
 
         self._robs_for_partitions: ROBContainer = {}
+        self._in_flight = 0
+        self._locked = False
         self._to_process = mp.Queue()  # queue of ToProcessEntry
         self._processed = mp.Queue()  # queue of ToProcessEntry
         self._liveliness_check_interval: float = self._client_config.get("liveliness_check_interval", 10.0)
         self._next_liveliness_check: float = time.time() + self._liveliness_check_interval
         self._max_entry_time_in_queue: float = self._client_config.get("max_entry_time_in_queue", 60.0)
+        self._max_queued_items: int = self._client_config.get("max_queued_items", 1000)
+        self._resume_after_freed_items: int = self._client_config.get("resume_after_freed_items", 100)
 
         worker_count: int = self._client_config.get("workers", 1)
         self._logger.info("Starting worker processes (n = %s)", worker_count)
@@ -52,7 +56,23 @@ class RequestHandler:
             self._robs_for_partitions[partition] = partition_rob
 
         partition_rob[offset] = time.time() + self._max_entry_time_in_queue
+        self._in_flight += 1
         self._to_process.put((partition, offset, value))
+
+    def can_continue(self) -> bool:
+        if self._locked:
+            if self._in_flight < (self._max_queued_items - self._resume_after_freed_items):
+                self._locked = False
+                self._logger.debug("Resumed from in-flight limit wait")
+                return True
+            return False
+        else:
+            if self._in_flight < self._max_queued_items:
+                return True
+            else:
+                self._locked = True
+                self._logger.debug("Reached in-flight limit")
+                return False
 
     def get_messages_to_confirm(self) -> list[ck.TopicPartition] | None:
         try:
@@ -90,6 +110,7 @@ class RequestHandler:
                         # TODO: a "dead letter topic"
                         self._logger.warning("Message not processed in time at partition = %s, offset = %s.",
                                              partition, offset)
+                    self._in_flight -= 1
                 else:
                     # Put the offset back to the ROB
                     offsets[offset] = expire_time
