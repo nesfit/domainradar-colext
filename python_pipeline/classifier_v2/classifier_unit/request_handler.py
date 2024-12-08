@@ -108,7 +108,7 @@ class RequestHandler:
                     ret.append(ck.TopicPartition(self._topic_in, partition, offset + 1))
                     if not item_done:
                         # TODO: a "dead letter topic"
-                        self._logger.warning("Message not processed in time at partition = %s, offset = %s.",
+                        self._logger.warning("Message not processed in time at partition = %s, offset = %s",
                                              partition, offset)
                     self._in_flight -= 1
                 else:
@@ -120,10 +120,13 @@ class RequestHandler:
     def close(self) -> list[ck.TopicPartition] | None:
         process: mp.Process
         for process in self._workers:
+            self._logger.debug("Terminating %s", process.pid)
             process.terminate()
 
         for process in self._workers:
+            # self._logger.debug("Waiting for %s", process.pid)
             process.join(self._client_config.get("worker_kill_timeout", 1.0))
+            self._logger.debug("%s ended", process.pid)
 
         return self.get_messages_to_confirm()
 
@@ -134,7 +137,7 @@ class RequestHandler:
         self._workers.append(worker_process)
         worker_process.daemon = True
         worker_process.start()
-        self._logger.info("Started worker process %s (PID %s).", worker_process.name, worker_process.pid)
+        self._logger.info("Started worker process %s (PID %s)", worker_process.name, worker_process.pid)
         return worker_process
 
     def _ensure_worker_liveliness(self):
@@ -146,7 +149,7 @@ class RequestHandler:
         for process in self._workers:
             if not process.is_alive():
                 dead += 1
-                self._logger.warning("Worker process %s (PID %s) is dead.", process.name, process.pid)
+                self._logger.warning("Worker process %s (PID %s) is dead", process.name, process.pid)
                 to_rm.append(process)
 
         living = len(self._workers) - dead

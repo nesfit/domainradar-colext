@@ -48,20 +48,25 @@ def read_config() -> dict:
         return _config
 
 
-def setup_logging(config: dict, section: str) -> None:
+def setup_logging(config: dict, section: str, worker: bool = False) -> None:
     config = config.get("logging", {}).get(section, {})
 
     logger = logging.getLogger()
     logger.setLevel(config.get("min_level", "INFO"))
 
+    pid = os.getpid() if worker else "client"
+    formatter = logging.Formatter(f'[%(name)s][{pid}][%(levelname)s]\t%(asctime)s: %(message)s')
+
     if "stdout_level" in config and config["stdout_level"] != "disabled":
         out_h = logging.StreamHandler(stream=sys.stdout)
         out_h.setLevel(config.get("stdout_level", "INFO"))
+        out_h.setFormatter(formatter)
         logger.addHandler(out_h)
 
     if "stderr_level" in config and config["stderr_level"] != "disabled":
         err_h = logging.StreamHandler(stream=sys.stderr)
         err_h.setLevel(config.get("stderr_level", "WARN"))
+        err_h.setFormatter(formatter)
         logger.addHandler(err_h)
 
 

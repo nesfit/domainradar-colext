@@ -18,7 +18,7 @@ class ClassifierPipelineClient:
 
         self._config = config
         self._client_config = config.get("client", {})
-        self._logger = logging.getLogger(__name__)
+        self._logger = logging.getLogger("main")
         self._request_handler = RequestHandler(config, TOPIC_INPUT, TOPIC_OUTPUT)
 
     def run(self):
@@ -45,6 +45,7 @@ class ClassifierPipelineClient:
                     # and store its offset (the consumer will later commit them)
                     to_confirm = self._request_handler.get_messages_to_confirm()
                     if to_confirm is not None:
+                        self._logger.debug("Storing offsets")
                         self._consumer.store_offsets(offsets=to_confirm)
 
                     if not self._request_handler.can_continue():
@@ -72,7 +73,9 @@ class ClassifierPipelineClient:
         finally:
             to_confirm = self._request_handler.close()
             if to_confirm is not None:
+                self._logger.debug("Storing last offsets")
                 self._consumer.store_offsets(offsets=to_confirm)
 
             # Close down the consumer to commit final offsets
+            self._logger.info("Closing the consumer")
             self._consumer.close()

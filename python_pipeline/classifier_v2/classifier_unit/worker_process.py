@@ -20,7 +20,7 @@ class WorkerProcess:
     def __init__(self, config: dict, to_process: mp.Queue,
                  processed: mp.Queue, topic_out: str, worker_id: int):
         self._config = config
-        self._logger = logging.getLogger(f"classifier-worker-{worker_id}")
+        self._logger = logging.getLogger(f"worker-{worker_id}")
         self._to_process = to_process
         self._processed = processed
         self._topic = topic_out
@@ -41,19 +41,20 @@ class WorkerProcess:
         while self._running:
             try:
                 partition, offset, value = self._to_process.get(True, 5.0)
+                self._logger.debug("Processing at partition = %s, offset = %s", partition, offset)
                 self._process_message(partition, offset, value)
                 self._producer.poll(0)  # Trigger delivery
                 self._processed.put((partition, offset), True, None)
             except queue.Empty:
                 pass
             except KeyboardInterrupt:
-                self._logger.info("Interrupted. Shutting down.")
+                self._logger.info("Interrupted. Shutting down")
                 self._running = False
             except Exception as e:
-                self._logger.error("Unexpected error. Shutting down.", exc_info=e)
+                self._logger.error("Unexpected error. Shutting down", exc_info=e)
                 self._running = False
 
-        self._logger.info("Finished (PID %s).", os.getpid())
+        self._logger.info("Finished (PID %s)", os.getpid())
         self._producer.flush(5)  # TODO: Configurable?
 
     def close(self):
@@ -61,7 +62,7 @@ class WorkerProcess:
 
     def _delivery_callback(self, err, msg):
         if err:
-            self._logger.warning("Result failed delivery: %s.", err)
+            self._logger.warning("Result failed delivery: %s", err)
             key = msg.key()
             value = msg.value()
             if key is not None and value is not None:
@@ -72,7 +73,7 @@ class WorkerProcess:
         try:
             df = pd.read_feather(pa.BufferReader(value))
         except Exception as e:
-            self._logger.error("Cannot read value at partition = %s, offset = %s.",
+            self._logger.error("Cannot read value at partition = %s, offset = %s",
                                partition, offset, exc_info=e)
             return
 
@@ -85,7 +86,7 @@ class WorkerProcess:
         result: dict
         for result in results:
             if "domain_name" not in result:
-                self._logger.warning("Missing domain_name in a classification result at partition = %s, offset = %s.",
+                self._logger.warning("Missing domain_name in a classification result at partition = %s, offset = %s",
                                      partition, offset)
                 continue
 
@@ -112,7 +113,7 @@ class WorkerProcess:
                                        key=dn.encode("utf-8"),
                                        value=WorkerProcess._serialize(result))
         except Exception as internal_e:
-            self._logger.error("Unexpected error when handling an exception at partition = %s, offset = %s.",
+            self._logger.error("Unexpected error when handling an exception at partition = %s, offset = %s",
                                partition, offset, exc_info=internal_e)
 
     @staticmethod
@@ -132,7 +133,7 @@ def init_process(config: dict, to_process: mp.Queue, processed: mp.Queue, topic_
     global process
     from . import util
 
-    util.setup_logging(config, "worker")
+    util.setup_logging(config, "worker", True)
     process = WorkerProcess(config, to_process, processed, topic_out, worker_id)
     signal.signal(signal.SIGTERM, sigterm_handler)
     process.run()
