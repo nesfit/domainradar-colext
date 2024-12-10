@@ -3,16 +3,10 @@ import multiprocessing as mp
 import queue
 import time
 
-from sortedcontainers import SortedDict
 from .worker_process import init_process
 from .types import *
 
 import confluent_kafka as ck
-
-# The maximum amount of entries to poll from the 'processed' queue before passing them
-# forward for confirming the offsets. Used to prevent livelocks (i.e. the request handler stuck
-# in accepting processed messages in get_messages_to_confirm).
-MAX_CONFIRMED_MESSAGES_BATCH = 100
 
 
 class RequestHandler:
@@ -35,6 +29,7 @@ class RequestHandler:
         self._max_entry_time_in_queue: float = self._client_config.get("max_entry_time_in_queue", 60.0)
         self._max_queued_items: int = self._client_config.get("max_queued_items", 1000)
         self._resume_after_freed_items: int = self._client_config.get("resume_after_freed_items", 100)
+        self._max_confirmed_messages_batch: int = self._client_config.get("max_confirmed_messages_batch", 50)
 
         worker_count: int = self._client_config.get("workers", 1)
         self._logger.info("Starting worker processes (n = %s)", worker_count)
@@ -81,7 +76,7 @@ class RequestHandler:
             return None
 
         livelock_prevention_counter = 0
-        while processed is not None and livelock_prevention_counter < MAX_CONFIRMED_MESSAGES_BATCH:
+        while processed is not None and livelock_prevention_counter < self._max_confirmed_messages_batch:
             livelock_prevention_counter += 1
             partition_rob = self._robs_for_partitions.get(processed[0])
             if partition_rob is None:
