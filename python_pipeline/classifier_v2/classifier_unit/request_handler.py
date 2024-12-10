@@ -144,17 +144,18 @@ class RequestHandler:
         if time.time() < self._next_liveliness_check:
             return
 
-        dead = 0
+        new_names = []
         to_rm = []
         for process in self._workers:
             if not process.is_alive():
-                dead += 1
                 self._logger.warning("Worker process %s (PID %s) is dead", process.name, process.pid)
                 to_rm.append(process)
+                new_names.append(process.name)
 
-        living = len(self._workers) - dead
+        dead = len(to_rm)
         for i in range(dead):
             self._workers.remove(to_rm[i])
-            self._workers.append(self._make_worker(living + i))
+            adopted_worker_id = int(new_names[i].split('-')[-1])
+            self._workers.append(self._make_worker(adopted_worker_id))
 
         self._next_liveliness_check = time.time() + self._liveliness_check_interval
