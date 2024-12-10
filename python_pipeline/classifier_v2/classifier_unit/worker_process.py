@@ -62,11 +62,12 @@ class WorkerProcess:
 
     def _delivery_callback(self, err, msg):
         if err:
-            self._logger.warning("Result failed delivery: %s", err)
             key = msg.key()
             value = msg.value()
+            self._logger.warning("Result '%s' failed delivery: %s", key, err)
             if key is not None and value is not None:
                 # Retry
+                self._logger.debug("Retrying %s", key)
                 self._producer.produce(self._topic, key=key, value=value)
 
     def _process_message(self, partition: int, offset: int, value: bytes):
