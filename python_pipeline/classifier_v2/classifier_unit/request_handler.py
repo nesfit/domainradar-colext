@@ -1,7 +1,11 @@
 import logging
 import multiprocessing as mp
+import os
 import queue
+import sys
 import time
+
+from confluent_kafka import KafkaException, KafkaError
 
 from .worker_process import init_process
 from .types import *
@@ -11,19 +15,21 @@ import confluent_kafka as ck
 
 class RequestHandler:
 
-    def __init__(self, config: dict, topic_in: str, topic_out: str):
+    def __init__(self, config: dict, topic_in: str, topic_out: str, consumer: ck.Consumer, producer: ck.Producer):
         self._config = config
         self._client_config = config.get("client", {})
         self._logger = logging.getLogger("req-handler")
         self._topic_in = topic_in
         self._topic_out = topic_out
+        self._consumer = consumer
+        self._producer = producer
         mp.set_start_method(self._client_config.get("mp_start_method", "spawn"))
 
         self._robs_for_partitions: ROBContainer = {}
         self._in_flight = 0
         self._locked = False
         self._to_process = mp.Queue()  # queue of ToProcessEntry
-        self._processed = mp.Queue()  # queue of ToProcessEntry
+        self._processed = mp.Queue()  # queue of ProcessedEntry
         self._liveliness_check_interval: float = self._client_config.get("liveliness_check_interval", 10.0)
         self._next_liveliness_check: float = time.time() + self._liveliness_check_interval
         self._max_entry_time_in_queue: float = self._client_config.get("max_entry_time_in_queue", 60.0)
@@ -54,6 +60,10 @@ class RequestHandler:
         self._in_flight += 1
         self._to_process.put((partition, offset, value))
 
+    def handle_results(self):
+        self._update_rob()
+        self._produce_results()
+
     def can_continue(self) -> bool:
         if self._locked:
             if self._in_flight < (self._max_queued_items - self._resume_after_freed_items):
@@ -69,9 +79,9 @@ class RequestHandler:
                 self._logger.debug("Reached in-flight limit")
                 return False
 
-    def get_messages_to_confirm(self) -> list[ck.TopicPartition] | None:
+    def _update_rob(self):
         try:
-            processed = self._processed.get_nowait()
+            processed: ProcessedEntry = self._processed.get_nowait()
         except queue.Empty:
             return None
 
@@ -83,34 +93,52 @@ class RequestHandler:
                 partition_rob = SortedDict()
                 self._robs_for_partitions[processed[0]] = partition_rob
 
-            partition_rob[processed[1]] = None
+            partition_rob[processed[1]] = processed[2]
             try:
                 processed = self._processed.get_nowait()
             except queue.Empty:
                 break
 
+    def _produce_results(self):
         partition: int
-        offsets: SortedDict[int, bool]
-        ret = []
+        offsets: ROB
+
         for partition, offsets in self._robs_for_partitions.items():
             current_time = time.time()
             while len(offsets) > 0:
                 # Extract the top of the ROB
-                offset, expire_time = offsets.popitem(index=0)
+                offset: Offset
+                expire_time_or_result: float | list[SimpleMessage]
+                offset, expire_time_or_result = offsets.peekitem(index=0)
                 # 'None' means item done
-                item_done = expire_time is None
-                if item_done or expire_time < current_time:
-                    ret.append(ck.TopicPartition(self._topic_in, partition, offset + 1))
-                    if not item_done:
-                        # TODO: a "dead letter topic"
-                        self._logger.warning("Message not processed in time at partition = %s, offset = %s",
-                                             partition, offset)
-                    self._in_flight -= 1
+                item_done = not isinstance(expire_time_or_result, float)
+                if item_done:
+                    self._producer.begin_transaction()
+                    for result_msg in expire_time_or_result:
+                        self._producer.produce(self._topic_out, key=result_msg[0], value=result_msg[1])
+
+                    positions = [ck.TopicPartition(self._topic_in, partition, offset=(offset + 1))]
+                    self._producer.send_offsets_to_transaction(positions, self._consumer.consumer_group_metadata())
+
+                    try:
+                        self._producer.commit_transaction()
+                        offsets.popitem(index=0)
+                        self._in_flight -= 1
+                    except KafkaException as e:
+                        self._logger.error("Error commiting transaction for partition = %s, offset = %s",
+                                           partition, offset, exc_info=e)
+
+                        kafka_error_code: int = e.args[0].code()
+                        if kafka_error_code == KafkaError.PRODUCER_FENCED \
+                                or kafka_error_code == KafkaError.OUT_OF_ORDER_SEQUENCE_NUMBER:
+                            raise e
+                        else:
+                            self._producer.abort_transaction()
+                            # Next iteration will try again
                 else:
-                    # Put the offset back to the ROB
-                    offsets[offset] = expire_time
+                    if not item_done and expire_time_or_result < current_time:
+                        self._logger.info("Item taking too long at partition = %s, offset = %s", partition, offset)
                     break
-        return ret if len(ret) > 0 else None
 
     def close(self) -> list[ck.TopicPartition] | None:
         process: mp.Process
@@ -123,7 +151,7 @@ class RequestHandler:
             process.join(self._client_config.get("worker_kill_timeout", 1.0))
             self._logger.debug("%s ended", process.pid)
 
-        return self.get_messages_to_confirm()
+        return self._update_rob()
 
     def _make_worker(self, worker_id: int):
         worker_process = mp.Process(target=init_process,

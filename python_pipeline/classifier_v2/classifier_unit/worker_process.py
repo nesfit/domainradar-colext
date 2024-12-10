@@ -6,12 +6,11 @@ import queue
 import signal
 from datetime import datetime
 
-import confluent_kafka as ck
 import pandas as pd
 import pyarrow as pa
 
-from . import util
 from .classifier_impl import make_classifier_impl
+from .types import SimpleMessage, Partition, Offset
 
 process = None
 
@@ -26,13 +25,6 @@ class WorkerProcess:
         self._topic = topic_out
         self._running = True
 
-        producer_settings = util.make_producer_settings(self._config)
-        producer_settings["on_delivery"] = self._delivery_callback
-
-        self._logger.info("Initializing producer")
-        # noinspection PyArgumentList
-        self._producer = ck.Producer(producer_settings, logger=self._logger)
-
         self._logger.info("Initializing pipeline")
         self._pipeline = make_classifier_impl(config)
         self._pipeline.init()
@@ -42,9 +34,8 @@ class WorkerProcess:
             try:
                 partition, offset, value = self._to_process.get(True, 5.0)
                 self._logger.debug("Processing at partition = %s, offset = %s", partition, offset)
-                self._process_message(partition, offset, value)
-                self._producer.poll(0)  # Trigger delivery
-                self._processed.put((partition, offset), True, None)
+                ret = self._process_message(partition, offset, value)
+                self._processed.put((partition, offset, ret), True, None)
             except queue.Empty:
                 pass
             except KeyboardInterrupt:
@@ -55,34 +46,24 @@ class WorkerProcess:
                 self._running = False
 
         self._logger.info("Finished (PID %s)", os.getpid())
-        self._producer.flush(5)  # TODO: Configurable?
 
     def close(self):
         self._running = False
 
-    def _delivery_callback(self, err, msg):
-        if err:
-            key = msg.key()
-            value = msg.value()
-            self._logger.warning("Result '%s' failed delivery: %s", key, err)
-            if key is not None and value is not None:
-                # Retry
-                self._logger.debug("Retrying %s", key)
-                self._producer.produce(self._topic, key=key, value=value)
+    def _process_message(self, partition: int, offset: int, value: bytes) -> list[SimpleMessage]:
+        ret = []
 
-    def _process_message(self, partition: int, offset: int, value: bytes):
         try:
             df = pd.read_feather(pa.BufferReader(value))
         except Exception as e:
             self._logger.error("Cannot read value at partition = %s, offset = %s",
                                partition, offset, exc_info=e)
-            return
+            return ret
 
         try:
             results = self._pipeline.classify(df)
         except Exception as e:
-            self._process_erroneous_df(partition, offset, df, e)
-            return
+            return self._process_erroneous_df(partition, offset, df, e)
 
         result: dict
         for result in results:
@@ -90,12 +71,14 @@ class WorkerProcess:
                 self._logger.warning("Missing domain_name in a classification result at partition = %s, offset = %s",
                                      partition, offset)
                 continue
+            ret.append((result["domain_name"].encode("utf-8"), WorkerProcess._serialize(result)))
 
-            self._producer.produce(self._topic,
-                                   key=result["domain_name"].encode("utf-8"),
-                                   value=WorkerProcess._serialize(result))
+        return ret
 
-    def _process_erroneous_df(self, partition: int, offset: int, df: pd.DataFrame, exc_info: Exception):
+    def _process_erroneous_df(self, partition: int, offset: int, df: pd.DataFrame,
+                              exc_info: Exception) -> list[SimpleMessage]:
+        ret = []
+
         try:
             keys = df["domain_name"].tolist()
             self._logger.error("Unexpected classifiers exception at partition = %s, offset = %s. Keys: %s",
@@ -110,12 +93,12 @@ class WorkerProcess:
                     "error": str(exc_info)
                 }
 
-                self._producer.produce(self._topic,
-                                       key=dn.encode("utf-8"),
-                                       value=WorkerProcess._serialize(result))
+                ret.append((dn.encode("utf-8"), WorkerProcess._serialize(result)))
         except Exception as internal_e:
             self._logger.error("Unexpected error when handling an exception at partition = %s, offset = %s",
                                partition, offset, exc_info=internal_e)
+
+        return ret
 
     @staticmethod
     def _serialize(value: dict) -> bytes:

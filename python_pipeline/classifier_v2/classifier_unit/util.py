@@ -2,6 +2,7 @@ import logging
 import os
 import sys
 import tomllib
+import platform
 
 _config_file = None
 _config = None
@@ -92,8 +93,8 @@ def make_consumer_settings(config: dict) -> dict:
     ret["group.id"] = config["client"]["app_id"]
     ret = ret | config.get("consumer", {})
 
-    # At least once guarantees with explicit offset storing
-    ret["enable.auto.commit"] = True
+    # Exactly-once semantics
+    ret["enable.auto.commit"] = False
     ret["enable.auto.offset.store"] = False
 
     return ret
@@ -101,6 +102,7 @@ def make_consumer_settings(config: dict) -> dict:
 
 def make_producer_settings(config: dict) -> dict:
     ret = make_client_settings(config)
+    ret["transactional.id"] = f'{config["client"]["app_id"]}-at-{platform.node()}'
     ret = ret | config.get("producer", {})
 
     return ret
