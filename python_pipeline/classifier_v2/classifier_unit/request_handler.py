@@ -138,15 +138,14 @@ class RequestHandler:
                             self._producer.abort_transaction()
                             # Next iteration will try again
                 else:
-                    if not item_done and expire_time_or_result < current_time:
-                        self._logger.info("Entry taking too long at partition = %s, offset = %s", partition, offset)
+                    if not item_done and expire_time_or_result < current_time and not self._closing:
+                        self._logger.info("Entry taking too long at p=%s, o=%s", partition, offset)
 
-                        if (current_time - expire_time_or_result) > self._max_entry_time_in_queue and not self._closing:
+                        if (current_time - expire_time_or_result) > self._max_entry_time_in_queue:
                             self._logger.error("Commiting suicide as an entry took over %s s in queue",
                                                self._max_entry_time_in_queue)
                             os.kill(os.getpid(), signal.SIGINT)
                             return
-
                     break
 
     def close(self) -> None:
