@@ -152,7 +152,7 @@ class RequestHandler:
         process: mp.Process
         for process in self._workers:
             self._logger.debug("Terminating %s", process.pid)
-            process.terminate()
+            os.kill(process.pid, signal.SIGINT)
 
         for process in self._workers:
             # self._logger.debug("Waiting for %s", process.pid)
