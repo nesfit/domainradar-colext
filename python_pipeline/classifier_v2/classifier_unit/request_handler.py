@@ -2,7 +2,7 @@ import logging
 import multiprocessing as mp
 import os
 import queue
-import sys
+import signal
 import time
 
 from confluent_kafka import KafkaException, KafkaError
@@ -23,7 +23,7 @@ class RequestHandler:
         self._topic_out = topic_out
         self._consumer = consumer
         self._producer = producer
-        mp.set_start_method(self._client_config.get("mp_start_method", "spawn"))
+        mp.set_start_method(self._client_config.get("mp_start_method", "forkserver"))
 
         self._robs_for_partitions: ROBContainer = {}
         self._in_flight = 0
@@ -32,10 +32,12 @@ class RequestHandler:
         self._processed = mp.Queue()  # queue of ProcessedEntry
         self._liveliness_check_interval: float = self._client_config.get("liveliness_check_interval", 10.0)
         self._next_liveliness_check: float = time.time() + self._liveliness_check_interval
-        self._max_entry_time_in_queue: float = self._client_config.get("max_entry_time_in_queue", 60.0)
-        self._max_queued_items: int = self._client_config.get("max_queued_items", 1000)
-        self._resume_after_freed_items: int = self._client_config.get("resume_after_freed_items", 100)
-        self._max_confirmed_messages_batch: int = self._client_config.get("max_confirmed_messages_batch", 50)
+        self._entry_late_warning_threshold: float = self._client_config.get("entry_late_warning_threshold", 30.0)
+        self._max_entry_time_in_queue: float = self._client_config.get("max_entry_time_in_queue", 120.0)
+        self._max_queued_items: int = self._client_config.get("max_queued_items", 100)
+        self._resume_after_freed_items: int = self._client_config.get("resume_after_freed_items", 10)
+        self._max_entries_to_confirm: int = self._client_config.get("max_entries_to_confirm", 50)
+        self._closing = False
 
         worker_count: int = self._client_config.get("workers", 1)
         self._logger.info("Starting worker processes (n = %s)", worker_count)
@@ -56,7 +58,7 @@ class RequestHandler:
             partition_rob = SortedDict()
             self._robs_for_partitions[partition] = partition_rob
 
-        partition_rob[offset] = time.time() + self._max_entry_time_in_queue
+        partition_rob[offset] = time.time() + self._entry_late_warning_threshold
         self._in_flight += 1
         self._to_process.put((partition, offset, value))
 
@@ -79,14 +81,14 @@ class RequestHandler:
                 self._logger.debug("Reached in-flight limit")
                 return False
 
-    def _update_rob(self):
+    def _update_rob(self) -> None:
         try:
             processed: ProcessedEntry = self._processed.get_nowait()
         except queue.Empty:
             return None
 
         livelock_prevention_counter = 0
-        while processed is not None and livelock_prevention_counter < self._max_confirmed_messages_batch:
+        while processed is not None and livelock_prevention_counter < self._max_entries_to_confirm:
             livelock_prevention_counter += 1
             partition_rob = self._robs_for_partitions.get(processed[0])
             if partition_rob is None:
@@ -99,7 +101,7 @@ class RequestHandler:
             except queue.Empty:
                 break
 
-    def _produce_results(self):
+    def _produce_results(self) -> None:
         partition: int
         offsets: ROB
 
@@ -137,10 +139,17 @@ class RequestHandler:
                             # Next iteration will try again
                 else:
                     if not item_done and expire_time_or_result < current_time:
-                        self._logger.info("Item taking too long at partition = %s, offset = %s", partition, offset)
+                        self._logger.info("Entry taking too long at partition = %s, offset = %s", partition, offset)
+
+                        if (current_time - expire_time_or_result) > self._max_entry_time_in_queue and not self._closing:
+                            self._logger.error("Commiting suicide as an entry took over %s s in queue",
+                                               self._max_entry_time_in_queue)
+                            os.kill(os.getpid(), signal.SIGINT)
+                            return
+
                     break
 
-    def close(self) -> list[ck.TopicPartition] | None:
+    def close(self) -> None:
         process: mp.Process
         for process in self._workers:
             self._logger.debug("Terminating %s", process.pid)
@@ -151,7 +160,8 @@ class RequestHandler:
             process.join(self._client_config.get("worker_kill_timeout", 1.0))
             self._logger.debug("%s ended", process.pid)
 
-        return self._update_rob()
+        self._closing = True
+        self.handle_results()
 
     def _make_worker(self, worker_id: int):
         worker_process = mp.Process(target=init_process,
