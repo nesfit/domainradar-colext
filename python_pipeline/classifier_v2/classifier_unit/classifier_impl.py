@@ -31,6 +31,8 @@ class ProductionClassifier(ClassifierBase):
 
     def init(self):
         self._pipeline = ProductionClassifier.Pipeline(options=self._options)
+        # Initialize the models by making a dummy classification request
+        self.classify(pd.DataFrame({"domain_name": ["i.love.the.feta.cheese"]}))
 
     def classify(self, input_df: pd.DataFrame) -> list[dict]:
         return self._pipeline.classify_domains(input_df)
