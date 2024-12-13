@@ -10,7 +10,7 @@ import pandas as pd
 import pyarrow as pa
 
 from .classifier_impl import make_classifier_impl
-from .types import SimpleMessage, Partition, Offset
+from .types import SimpleMessage
 
 process = None
 
@@ -31,19 +31,38 @@ class WorkerProcess:
 
     def run(self):
         while self._running:
+            partition, offset, value = None, None, None
+
+            # Try consuming a message
+            # Watch for interrupts and errors
             try:
                 partition, offset, value = self._to_process.get(True, 5.0)
                 self._logger.debug("Processing at partition = %s, offset = %s", partition, offset)
-                ret = self._process_message(partition, offset, value)
-                self._processed.put((partition, offset, ret), True, None)
             except queue.Empty:
-                pass
+                continue
             except KeyboardInterrupt:
                 self._logger.info("Interrupted. Shutting down")
                 self._running = False
             except Exception as e:
                 self._logger.error("Unexpected error. Shutting down", exc_info=e)
                 self._running = False
+
+            # A message has been consumed from the input queue
+            # We must ensure it gets back to the processed queue
+            if partition is not None:
+                ret = None
+                try:
+                    # Though if cancellation was requested, don't actually classify the input
+                    if self._running:
+                        ret = self._process_message(partition, offset, value)
+                except KeyboardInterrupt:
+                    self._logger.info("Interrupted. Shutting down")
+                    self._running = False
+                except Exception as e:
+                    self._logger.error("Unexpected error. Shutting down", exc_info=e)
+                    self._running = False
+                finally:
+                    self._processed.put((partition, offset, ret or []), True, None)
 
         self._logger.info("Finished (PID %s)", os.getpid())
 
