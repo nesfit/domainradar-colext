@@ -127,7 +127,7 @@ class RequestHandler:
                         offsets.popitem(index=0)
                         self._in_flight -= 1
                     except KafkaException as e:
-                        self._logger.error("Error commiting transaction for partition = %s, offset = %s",
+                        self._logger.error("Error commiting transaction for p=%s, o=%s",
                                            partition, offset, exc_info=e)
 
                         kafka_error_code: int = e.args[0].code()

@@ -37,7 +37,7 @@ class WorkerProcess:
             # Watch for interrupts and errors
             try:
                 partition, offset, value = self._to_process.get(True, 5.0)
-                self._logger.debug("Processing at partition = %s, offset = %s", partition, offset)
+                self._logger.debug("Processing at p=%s, o=%s", partition, offset)
             except queue.Empty:
                 continue
             except KeyboardInterrupt:
@@ -55,6 +55,7 @@ class WorkerProcess:
                     # Though if cancellation was requested, don't actually classify the input
                     if self._running:
                         ret = self._process_message(partition, offset, value)
+                        self._logger.debug("Classified at p=%s, o=%s", partition, offset)
                 except KeyboardInterrupt:
                     self._logger.info("Interrupted. Shutting down")
                     self._running = False
@@ -63,6 +64,7 @@ class WorkerProcess:
                     self._running = False
                 finally:
                     self._processed.put((partition, offset, ret or []), True, None)
+                    self._logger.debug("Placed to processed q at p=%s, o=%s", partition, offset)
 
         self._logger.info("Finished (PID %s)", os.getpid())
 
@@ -75,7 +77,7 @@ class WorkerProcess:
         try:
             df = pd.read_feather(pa.BufferReader(value))
         except Exception as e:
-            self._logger.error("Cannot read value at partition = %s, offset = %s",
+            self._logger.error("Cannot read value at p=%s, o=%s",
                                partition, offset, exc_info=e)
             return ret
 
@@ -87,7 +89,7 @@ class WorkerProcess:
         result: dict
         for result in results:
             if "domain_name" not in result:
-                self._logger.warning("Missing domain_name in a classification result at partition = %s, offset = %s",
+                self._logger.warning("Missing domain_name in a classification result at p=%s, o=%s",
                                      partition, offset)
                 continue
             ret.append((result["domain_name"].encode("utf-8"), WorkerProcess._serialize(result)))
@@ -100,7 +102,7 @@ class WorkerProcess:
 
         try:
             keys = df["domain_name"].tolist()
-            self._logger.error("Unexpected classifiers exception at partition = %s, offset = %s. Keys: %s",
+            self._logger.error("Unexpected classifiers exception at p=%s, o=%s. Keys: %s",
                                partition, offset, str(keys), exc_info=exc_info)
 
             for dn in keys:
@@ -114,7 +116,7 @@ class WorkerProcess:
 
                 ret.append((dn.encode("utf-8"), WorkerProcess._serialize(result)))
         except Exception as internal_e:
-            self._logger.error("Unexpected error when handling an exception at partition = %s, offset = %s",
+            self._logger.error("Unexpected error when handling an exception at p=%s, o=%s",
                                partition, offset, exc_info=internal_e)
 
         return ret
