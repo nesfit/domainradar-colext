@@ -1,9 +1,7 @@
 import logging
 import typing
 from time import sleep
-
-from classifier_unit.request_handler import RequestHandler
-
+from .request_handler import RequestHandler
 from . import util
 import confluent_kafka as ck
 
@@ -77,16 +75,13 @@ class ClassifierPipelineClient:
                 except KeyboardInterrupt:
                     self._logger.info("Ending")
                     self._running = False
+                    break
                 except Exception as e:
                     self._logger.error("Unexpected consumption error", exc_info=e)
-                    # Die
+                    self._running = False
                     break
         finally:
-            to_confirm = self._request_handler.close()
-            if to_confirm is not None:
-                self._logger.debug("Storing last offsets")
-                self._consumer.store_offsets(offsets=to_confirm)
-
+            self._request_handler.close()
             # Close down the consumer to commit final offsets
             self._logger.info("Closing the consumer")
             self._consumer.close()
