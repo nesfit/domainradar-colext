@@ -1,5 +1,5 @@
-ARG TARGET_UNIT="collector"
-ARG TARGET_MODULE="collectors.rtt"
+ARG TARGET_UNIT="classifier_v2"
+ARG TARGET_MODULE="classifier_unit"
 
 FROM python:3.11-slim-bookworm AS python-base
 ENV PYTHONUNBUFFERED=1 \

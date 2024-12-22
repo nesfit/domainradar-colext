@@ -11,9 +11,9 @@
 
 TAG_PREFIX="domrad"
 
-py_packages=("collector" "collector" "collector" "collector" "collector" "extractor" "classifier" "classifier_v2")
-py_modules=("collectors.zone" "collectors.dns" "collectors.rdap_ip" "collectors.rdap_dn" "collectors.rtt" "extractor" "classifier_unit" "classifier_unit")
-py_tags=("zone" "dns" "rdap-ip" "rdap-dn" "rtt" "extractor" "classifier" "classifier:0.2")
+py_packages=("collector" "collector" "collector" "collector" "collector" "extractor" "classifier_v2")
+py_modules=("collectors.zone" "collectors.dns" "collectors.rdap_ip" "collectors.rdap_dn" "collectors.rtt" "extractor" "classifier_unit")
+py_tags=("zone" "dns" "rdap-ip" "rdap-dn" "rtt" "extractor" "classifier")
 
 FLINK_TAG="merger-flink"
 PARCON_TAG="java-standalone"
@@ -91,7 +91,6 @@ build_python_config_manager() {
 build_python_one() {
     echo "  > Building ${py_modules[i]} <  " >"$OUT_MSG"
     echo "    > Tag: '$TAG_PREFIX/${py_tags[i]}' < " >"$OUT_MSG"
-
 
     if [[ "${py_tags[i]}" =~ classifier.* ]]; then
       echo "Using the classifier Dockerfile"
