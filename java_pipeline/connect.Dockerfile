@@ -2,7 +2,7 @@
 # with the DomainRadar custom extensions included in its plugins.
 # Author: Ondřej Ondryáš <xondry02@vut.cz>
 
-ARG KAFKA_URL=https://downloads.apache.org/kafka/3.7.1/kafka_2.13-3.7.1.tgz
+ARG KAFKA_URL=https://downloads.apache.org/kafka/3.8.1/kafka_2.13-3.8.1.tgz
 
 # Use Eclipse Temurin 21 JDK image as the base
 FROM eclipse-temurin:21-jdk-jammy AS build
