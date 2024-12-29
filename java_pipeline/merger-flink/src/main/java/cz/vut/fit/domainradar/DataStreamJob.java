@@ -1,5 +1,6 @@
 package cz.vut.fit.domainradar;
 
+import cz.vut.fit.domainradar.serialization.TagRegistry;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.utils.ParameterTool;
@@ -39,6 +40,10 @@ public class DataStreamJob {
                 appProperties.setProperty(k, v);
             }
         });
+
+        if (params.getBoolean(MergerConfig.IP_DISABLE_NERD, false)) {
+            TagRegistry.TAGS.remove("nerd");
+        }
 
         // ==== Flink execution environment ====
         final Configuration pipelineConfig = new Configuration();

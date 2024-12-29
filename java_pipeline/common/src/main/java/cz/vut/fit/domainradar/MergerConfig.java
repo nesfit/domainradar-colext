@@ -92,4 +92,14 @@ public class MergerConfig {
     public static final String IP_WAIT_FOR_DOMAIN_DATA_MS_CONFIG
             = "ip.wait.for.domain.data.ms";
     public static final String IP_WAIT_FOR_DOMAIN_DATA_MS_DEFAULT = "60000"; // 1 minute
+
+    /**
+     * An EXPERIMENTAL option to completely remove the notion of the NERD collector from the merger.
+     * When true, the merger will not wait for NERD results and will silently drop them if they come.
+     *
+     * This option will likely be removed in the future.
+     */
+    public static final String IP_DISABLE_NERD
+            = "ip.disable.nerd";
+    public static final String IP_DISABLE_NERD_DEFAULT = "false";
 }

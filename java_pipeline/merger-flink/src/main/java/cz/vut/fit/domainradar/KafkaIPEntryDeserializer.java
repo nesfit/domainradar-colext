@@ -11,12 +11,16 @@ import org.apache.flink.connector.kafka.source.reader.deserializer.KafkaRecordDe
 import org.apache.flink.util.Collector;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.serialization.Deserializer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class KafkaIPEntryDeserializer
         extends CommonDeserializer
         implements KafkaRecordDeserializationSchema<KafkaIPEntry> {
     private transient Deserializer<IPToProcess> _keyDeserializer;
     private transient Deserializer<CommonIPResult<JsonNode>> _ipResultDeserializer;
+
+    private static final Logger LOG = LoggerFactory.getLogger(KafkaIPEntryDeserializer.class);
 
     @Override
     public void deserialize(ConsumerRecord<byte[], byte[]> consumerRecord, Collector<KafkaIPEntry> collector) {
@@ -36,8 +40,13 @@ public class KafkaIPEntryDeserializer
         // TODO: Use tags
         // byte collectorTag = value[value.length - 1];
         var deserialized = _ipResultDeserializer.deserialize(consumerRecord.topic(), value);
-        var collectorTag = TagRegistry.TAGS.get(deserialized.collector()).byteValue();
-
+        var collectorTagOrNull = TagRegistry.TAGS.get(deserialized.collector());
+        if (collectorTagOrNull == null) {
+            LOG.debug("Dropping a received entry from collector {} which was not found in the tag registry.",
+                    deserialized.collector());
+            return;
+        }
+        var collectorTag = collectorTagOrNull.byteValue();
         collector.collect(new KafkaIPEntry(key.dn(), key.ip(), consumerRecord.value(),
                 statusCode, collectorTag, consumerRecord.topic(), consumerRecord.partition(),
                 consumerRecord.offset(), consumerRecord.timestamp()));
