@@ -51,6 +51,8 @@ public class NERDCollector extends IPStandaloneCollector<NERDData> {
     private final Duration _httpTimeout;
     private final int _batchSize;
 
+    private final boolean _disabled;
+
     public NERDCollector(ObjectMapper jsonMapper, String appName, Properties properties) {
         super(jsonMapper, appName, properties);
         _httpTimeout = Duration.ofSeconds(Integer.parseInt(
@@ -60,9 +62,7 @@ public class NERDCollector extends IPStandaloneCollector<NERDData> {
         _batchSize = Integer.parseInt(properties.getProperty(CollectorConfig.NERD_BATCH_SIZE_CONFIG,
                 CollectorConfig.NERD_BATCH_SIZE_DEFAULT));
 
-        if (_token.isBlank())
-            throw new IllegalArgumentException("NERD token is not set.");
-
+        _disabled = _token.isBlank();
         _executor = Executors.newVirtualThreadPerTaskExecutor();
     }
 
@@ -93,6 +93,11 @@ public class NERDCollector extends IPStandaloneCollector<NERDData> {
                     })
                     .map(ConsumerRecord::key)
                     .toList();
+
+            if (_disabled) {
+                sendAboutAll(entries, errorResult(ResultCodes.DISABLED, null));
+                return;
+            }
 
             final var batch = batchCounter.getAndIncrement();
             Logger.trace("Processing batch {}: {}", batch, entries);

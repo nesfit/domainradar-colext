@@ -38,6 +38,12 @@ public final class ResultCodes {
     public static final int INTERNAL_ERROR = 5;
 
     /**
+     * The collector is running and has processed the message but it is configured
+     * not to do anything.
+     */
+    public static final int DISABLED = 6;
+
+    /**
      * Error fetching from remote source.
      */
     public static final int CANNOT_FETCH = 10;
