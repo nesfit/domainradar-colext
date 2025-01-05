@@ -1,19 +1,27 @@
 #!/bin/bash
 
 # Filename of the Java class to be converted
-JAVA_FILE="./java_pipeline/common/src/main/java/cz/vut/fit/domainradar/models/ResultCodes.java"
+JAVA_FILE="./java/common/src/main/java/cz/vut/fit/domainradar/models/ResultCodes.java"
 # Output filename for the Python file
-PYTHON_FILE="./python_pipeline/common/result_codes.py"
+PYTHON_FILE="./python/common/result_codes.py"
 
 # Start with an empty Python file
 true > "$PYTHON_FILE"
 
 # Flag to indicate if we are inside a block comment
 inside_comment=0
+reading_header=true
 current_comment=""
 
 # Read the Java file line by line
 while IFS= read -r line; do
+    if $reading_header; then
+        if [[ $line =~ ^.*ResultCodes.*$ ]]; then
+            reading_header=false
+        fi
+        continue
+    fi
+
     if [[ $line =~ ^[[:space:]]*/\*\* ]]; then
         # Starting a block comment
         inside_comment=1

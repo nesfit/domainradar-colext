@@ -10,6 +10,9 @@ UNSUPPORTED_ADDRESS = 4
 """The IP address is valid but the collector cannot process it."""
 INTERNAL_ERROR = 5
 """A generic error caused inside the collecting system (e.g. invalid state)."""
+DISABLED = 6
+"""The collector is running and has processed the message but it is configured
+not to do anything."""
 CANNOT_FETCH = 10
 """Error fetching from remote source."""
 TIMEOUT = 11
