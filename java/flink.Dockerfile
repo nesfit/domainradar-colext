@@ -3,7 +3,7 @@
 # Author: Ondřej Ondryáš <xondry02@vut.cz>
 
 # Use Eclipse Temurin 21 JDK image as the base for the building process
-FROM eclipse-temurin:21-jdk-jammy AS build
+FROM docker.io/library/eclipse-temurin:21-jdk-jammy AS build
 
 # Install Maven
 RUN apt-get update && \
@@ -43,6 +43,6 @@ RUN --mount=type=cache,target=/root/.m2/ --mount=type=cache,target=/src/target m
     cp "$OUTPUT_JAR" target.jar
 
 # Use the Flink image for runtime
-FROM docker.io/flink:1.20.0-scala_2.12-java17 AS runtime
+FROM docker.io/library/flink:1.20.0-scala_2.12-java17 AS runtime
 COPY --from=build_component /src/target.jar /opt/flink/usrlib/merger-flink.jar
 RUN mkdir /flink-data && chown 9999:9999 /flink-data

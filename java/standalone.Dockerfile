@@ -4,7 +4,7 @@
 ARG TARGET_PKG=standalone-collectors
 
 # Use Eclipse Temurin 21 JDK image as the base for the building process
-FROM eclipse-temurin:21-jdk-jammy AS build
+FROM docker.io/library/eclipse-temurin:21-jdk-jammy AS build
 ARG TARGET_PKG
 ENV TARGET_PKG=${TARGET_PKG}
 
@@ -46,7 +46,7 @@ RUN --mount=type=cache,target=/root/.m2/ --mount=type=cache,target=/src/target m
     cp "$OUTPUT_JAR" target.jar
 
 # Use the JRE variant for runtime
-FROM eclipse-temurin:21-jre AS runtime
+FROM docker.io/library/eclipse-temurin:21-jre AS runtime
 WORKDIR /app
 COPY --from=build_component /src/target.jar ./domainradar-collector.jar
 COPY ./legacy.security ./legacy.security

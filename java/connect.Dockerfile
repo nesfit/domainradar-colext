@@ -5,7 +5,7 @@
 ARG KAFKA_URL=https://downloads.apache.org/kafka/3.8.1/kafka_2.13-3.8.1.tgz
 
 # Use Eclipse Temurin 21 JDK image as the base
-FROM eclipse-temurin:21-jdk-jammy AS build
+FROM docker.io/library/eclipse-temurin:21-jdk-jammy AS build
 
 # Install Maven
 RUN apt-get update && \
@@ -37,7 +37,7 @@ RUN --mount=type=cache,target=/root/.m2/ --mount=type=cache,target=/src/target m
     cd "connect/target" && mv *.jar libs/
 
 # Use the JRE variant for Kafka Connect runtime
-FROM eclipse-temurin:21-jre AS runtime-connect
+FROM docker.io/library/eclipse-temurin:21-jre AS runtime-connect
 ARG KAFKA_URL
 
 RUN apt-get update && \

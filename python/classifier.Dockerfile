@@ -1,7 +1,7 @@
 ARG TARGET_UNIT="classifier_unit"
 ARG TARGET_MODULE="classifier_unit"
 
-FROM python:3.11-slim-bookworm AS python-base
+FROM docker.io/library/python:3.11-slim-bookworm AS python-base
 ENV PYTHONUNBUFFERED=1 \
     # prevents python creating .pyc files
     PYTHONDONTWRITEBYTECODE=1 \
