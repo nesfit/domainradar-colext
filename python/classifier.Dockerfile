@@ -1,4 +1,4 @@
-ARG TARGET_UNIT="classifier_v2"
+ARG TARGET_UNIT="classifier_unit"
 ARG TARGET_MODULE="classifier_unit"
 
 FROM python:3.11-slim-bookworm AS python-base
@@ -42,7 +42,7 @@ ARG TARGET_UNIT
 # Copy project requirement files here to ensure they will be cached
 WORKDIR $PYSETUP_PATH
 COPY ${TARGET_UNIT}/pyproject.toml ./
-COPY ./domainradar-clf/pyproject.toml ../domainradar-clf/pyproject.toml
+COPY ./classifiers/pyproject.toml ../classifiers/pyproject.toml
 
 # Install runtime deps (uses $POETRY_VIRTUALENVS_IN_PROJECT internally)
 RUN --mount=type=cache,target=$POETRY_CACHE_DIR  \
@@ -57,8 +57,9 @@ ENV APP_DATADIR=/app/faust_data
 
 COPY --from=builder $PYSETUP_PATH $PYSETUP_PATH
 COPY ./${TARGET_UNIT} /app
+
 # This is fugly, must be fixed
-COPY ./domainradar-clf/classifiers /opt/pysetup/.venv/lib/python3.11/site-packages/classifiers
+COPY ./classifiers/classifiers /opt/pysetup/.venv/lib/python3.11/site-packages/classifiers
 COPY ./common /app/common
 COPY ./docker_entrypoint.sh /app/docker_entrypoint.sh
 RUN mkdir /app/faust_data

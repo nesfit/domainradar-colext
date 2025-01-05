@@ -1,0 +1,50 @@
+[connection]
+brokers = ["aiokafka://localhost:9092"]
+use_ssl = false
+
+[connection.ssl]
+ca_file = "/path/to/ca.pem"
+server_verification_required = true
+client_cert_file = "/path/to/client_certificate.pem"
+client_key_file = "/path/to/client_key.pem"
+client_key_password = "password for the private key"
+check_hostname = true
+
+[extractor.faust]
+# All keys from this section will be passed directly to the faust.App constructor
+# See common/util.py:make_app for keys that cannot be set from this configuration
+# See https://faust-streaming.github.io/faust/userguide/settings.html#guide-settings
+producer_compression_type = "zstd"
+
+[extractor]
+app_id = "domrad-extractor"
+data_dir = "/path/to/data"
+# Number of records to collect in a buffer and process at once.
+# This should be fairly high, according to the input rate.
+# The downside of batching is that in case of an unhandled exception,
+# the whole batch is lost.
+batch_size = 100
+# Maximum time (in seconds) to wait for a full batch before processing.
+# In other words, the extractor will always process its current buffer
+# `batch_timeout` seconds after the last processed one, even if it's not full.
+batch_timeout = 5
+# This property controls the applied transformations. The order is irelevant, it is set by the code.
+# You probably don't want to change this. Leave the property out to use all available transformations.
+enabled_transformations = ["html", "dns", "ip", "geo", "tls", "lexical", "rdap_dn", "rdap_ip", "drop"]
+# When set to true, the feature extractor will produce the JSON-serialized feature vectors one-by-one to the
+# feature_vectors_json topic. This is useful for debugging and testing the feature extractor, as well as for
+# the "standalone" mode, where the extractor is not connected to the rest of the pipeline.
+produce_jsons = false
+# When set to true, the feature extractor won't produce the binary-serialised dataframes to the feature_vectors topic.
+only_produce_jsons = false
+# == Experimental == #
+# When set to > 1, the extraction process will be executing in a real thread from a thread pool with the specified
+# number of threads, or in another process from a process pool. In normal world, threading would help in parallelizing
+# the extraction, but here, Python's GIL prevents this from happening, so this setting could only benefit from pandas
+# running its computations in native code. However, the current transformations are dumb and mostly performed using
+# .apply() which is executed under the GIL. Using multiprocessing instead may help in large throughputs, though it has
+# not been tested whether the overhead is worth it.
+computation_workers = 1
+# One of 'spawn' / 'fork' / 'forkserver' (uses ProcessPoolExecutor) or 'thread' (uses ThreadPoolExecutor).
+# Refer to https://docs.python.org/3/library/multiprocessing.html#multiprocessing-start-methods
+worker_spawn_method = "forkserver"

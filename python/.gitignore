@@ -8,4 +8,4 @@ config.*.toml
 collector/poetry.lock
 classifier/poetry.lock
 extractor/poetry.lock
-domainradar-clf/
+classifiers/

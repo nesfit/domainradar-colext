@@ -8,8 +8,7 @@ license = "MIT"
 repository = "https://github.com/nesfit/domainradar-colext"
 readme = "README.md"
 packages = [
-    { include = "classifier_unit" },
-    #{ include = "common", from = ".." }
+    { include = "classifier_unit" }
 ]
 
 [tool.poetry.dependencies]
@@ -17,9 +16,8 @@ python = ">=3.11,<3.12"
 confluent-kafka = "^2.6.0"
 pandas = "^2.2.2"
 # classifiers = { git = "https://github.com/nesfit/domainradar-clf.git", branch = "main" }
-classifiers = { path = "../domainradar-clf", develop = true }
+classifiers = { path = "../classifiers", develop = true }
 pyarrow = "^16.1.0"
-#pydantic = "^2.8.2"
 sortedcontainers = "^2.4.0"
 
 [tool.poetry.group.dev.dependencies]

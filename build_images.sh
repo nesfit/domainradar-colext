@@ -11,7 +11,7 @@
 
 TAG_PREFIX="domrad"
 
-py_packages=("collector" "collector" "collector" "collector" "collector" "extractor" "classifier_v2")
+py_packages=("collector" "collector" "collector" "collector" "collector" "extractor" "classifier_unit")
 py_modules=("collectors.zone" "collectors.dns" "collectors.rdap_ip" "collectors.rdap_dn" "collectors.rtt" "extractor" "classifier_unit")
 py_tags=("zone" "dns" "rdap-ip" "rdap-dn" "rtt" "extractor" "classifier")
 
@@ -28,7 +28,7 @@ OUT_MSG=/dev/stdout
 
 build_java() {
   echo ">>> Building images for Java-based pipeline components <<<" >"$OUT_MSG"
-  cd java_pipeline || return 1
+  cd java || return 1
 
   local build_streams=1
   local build_parcon=1
@@ -106,13 +106,15 @@ build_python() {
   # Check if we have an argument specifying a single component (tag)
   if [ -n "$1" ]; then
     if [ "$1" == "$STANDALONE_INPUT_TAG" ]; then
-      cd standalone_input || return 1
+      shift 1
+      cd python/standalone_input || return 1
       build_python_standalone_input "$@"
       exit 0
     fi
 
     if [ "$1" == "$CONFIG_MANAGER_TAG" ]; then
-      cd config_manager || return 1
+      shift 1
+      cd python/config_manager || return 1
       build_python_config_manager "$@"
       exit 0
     fi
@@ -120,7 +122,7 @@ build_python() {
     for i in "${!py_tags[@]}"; do
       if [ "${py_tags[i]}" == "$1" ] ; then
         shift 1
-        cd python_pipeline || return 1
+        cd python || return 1
         build_python_one "$@"
         exit 0
       fi
@@ -128,17 +130,17 @@ build_python() {
   fi
 
   echo ">>> Building images for Python-based pipeline components <<<" >"$OUT_MSG"
-  cd python_pipeline || return 1
+  cd python || return 1
   for i in "${!py_packages[@]}"; do
     build_python_one "$@"
   done
 
-  cd ../standalone_input || return 1
+  cd standalone_input || return 1
   build_python_standalone_input "$@"
+  cd ..
 
-  cd ../config_manager || return 1
+  cd config_manager || return 1
   build_python_config_manager "$@"
-
   cd ..
 }
 
