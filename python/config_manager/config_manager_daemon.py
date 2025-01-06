@@ -1,4 +1,13 @@
 #!/usr/bin/env python3
+#
+# This script opens a UNIX socket for the DomainRadar config_manager service. It listens for up/down commands
+# from the config_manager on this socket and executes "docker compose -f compose.yml (up|down) [service]".
+#
+# The first positional argument (optional) sets the path to the socket.
+#   Default: ./domrad_control.sock
+# The second positional argument (optional) sets the base Docker Compose command.
+#   Default: docker compose -f compose.yml
+#
 
 import os
 import socket
