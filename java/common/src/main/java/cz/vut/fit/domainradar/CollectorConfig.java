@@ -7,16 +7,16 @@ package cz.vut.fit.domainradar;
  */
 @SuppressWarnings("ALL")
 public class CollectorConfig {
-    /* --- GeoIP collector --- */
-    public static final String GEOIP_DIRECTORY_CONFIG = "collectors.geoip.dir";
+    /* --- GEO-ASN collector --- */
+    public static final String GEOIP_DIRECTORY_CONFIG = "collectors.geo-asn.dir";
     public static final String GEOIP_DIRECTORY_DOC = "The path of the directory with the GeoIP mmdb files.";
     public static final String GEOIP_DIRECTORY_DEFAULT = "";
 
-    public static final String GEOIP_CITY_DB_NAME_CONFIG = "collectors.geoip.citydb";
+    public static final String GEOIP_CITY_DB_NAME_CONFIG = "collectors.geo-asn.citydb";
     public static final String GEOIP_CITY_DB_NAME_DOC = "The name of the GeoIP City database file.";
     public static final String GEOIP_CITY_DB_NAME_DEFAULT = "GeoLite2-City.mmdb";
 
-    public static final String GEOIP_ASN_DB_NAME_CONFIG = "collectors.geoip.asndb";
+    public static final String GEOIP_ASN_DB_NAME_CONFIG = "collectors.geo-asn.asndb";
     public static final String GEOIP_ASN_DB_NAME_DOC = "The name of the GeoIP ASN database file.";
     public static final String GEOIP_ASN_DB_NAME_DEFAULT = "GeoLite2-ASN.mmdb";
 

@@ -31,7 +31,7 @@ import java.util.Properties;
  */
 public class GeoAsnCollector extends IPStandaloneCollector<GeoIPData> {
     public static final String NAME = "geo-asn";
-    public static final String COMPONENT_NAME = "collector-geoip"; // weird exception
+    public static final String COMPONENT_NAME = "collector-geo-asn"; // weird exception
     private static final org.slf4j.Logger Logger = Common.getComponentLogger(GeoAsnCollector.class);
 
     private final DatabaseReader _cityReader, _asnReader;
