@@ -71,7 +71,7 @@ class SocketUpDownProvider(BaseUpDownProvider):
 
         try:
             self.sock.sendall(data)
-            self.sock.settimeout(2)
+            self.sock.settimeout(60)
             return int.from_bytes(self.sock.recv(4), byteorder='big', signed=True)
         except (ConnectionResetError, IOError) as e:
             self.logger.warning("Socket error: %s", str(e))
