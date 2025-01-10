@@ -27,6 +27,7 @@ import org.apache.commons.cli.CommandLine;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.IOException;
 import java.net.InetAddress;
 import java.net.URI;
 import java.time.Duration;
@@ -78,6 +79,9 @@ public class VertxQRadarCollector
     private final String _token;
     private final int _batchSize;
     private final boolean _disabled;
+    private final boolean _trustAll;
+
+    private final ExpiringConcurrentCache<InetAddress, SourceAddressContainer> _sourceAddressCache;
 
     public VertxQRadarCollector(@NotNull ObjectMapper jsonMapper, @NotNull String appName,
             @NotNull Properties properties) {
@@ -92,13 +96,20 @@ public class VertxQRadarCollector
         _cacheLifetimeSeconds = Integer
                 .parseInt(properties.getProperty(CollectorConfig.QRADAR_ENTRY_CACHE_LIFETIME_S_CONFIG,
                         CollectorConfig.QRADAR_ENTRY_CACHE_LIFETIME_S_DEFAULT));
+        _trustAll = Boolean.parseBoolean(properties.getProperty(CollectorConfig.QRADAR_TRUST_ALL_CONFIG,
+                CollectorConfig.QRADAR_TRUST_ALL_DEFAULT));
 
-        _disabled = _token.isBlank();
+        _sourceAddressCache = new ExpiringConcurrentCache<>(_cacheLifetimeSeconds, _cacheLifetimeSeconds / 4,
+                TimeUnit.SECONDS);
+
+        var baseUrl = properties.getProperty(CollectorConfig.QRADAR_URL_CONFIG, CollectorConfig.QRADAR_URL_DEFAULT);
+        _disabled = _token.isBlank() || baseUrl.isBlank();
 
         if (_disabled) {
             _baseUrl = "";
+            _sourceAddressCache.close();
+            Logger.warn("No QRadar token or API endpoint provided, collector disabled.");
         } else {
-            var baseUrl = properties.getProperty(CollectorConfig.QRADAR_URL_CONFIG, CollectorConfig.QRADAR_URL_DEFAULT);
             if (!baseUrl.endsWith("/"))
                 baseUrl += "/";
             _baseUrl = baseUrl;
@@ -111,6 +122,11 @@ public class VertxQRadarCollector
 
     @Override
     public void run(CommandLine cmd) {
+        // When this collector is disabled, just keep it running without consuming or
+        // producing anything
+        if (_disabled)
+            return;
+
         buildProcessor(_batchSize, _httpTimeout.toMillis());
 
         // Construct the URIs using placeholders
@@ -119,7 +135,7 @@ public class VertxQRadarCollector
         final var offensesEndpoint = UriTemplate.of(
                 _baseUrl + "siem/offenses?fields=id%2Cdescription%2Cevent_count%2Cflow_count%2Cdevice_count%2Cseverity%2Cmagnitude%2Clast_updated_time%2Cstatus%2Csource_address_ids&filter=id%20in%20%28{filter}%29");
 
-        // Unfortunately, there is no public API for obtaining ParallelConsumer's Vertx
+        // There is no public API for obtaining ParallelConsumer's Vertx
         // context, so we'll extract their Vertx instance and build our own WebClient
         final Object vertxObj;
         try {
@@ -143,13 +159,9 @@ public class VertxQRadarCollector
                 .setReadIdleTimeout(timeoutMs)
                 .setSslHandshakeTimeout(timeoutMs)
                 .setSslHandshakeTimeoutUnit(TimeUnit.MILLISECONDS)
-                .setTrustAll(true); // Debug only
+                .setTrustAll(_trustAll);
 
         final var client = WebClient.create(vertx, webClientOptions);
-
-        // A short-lived cache for source addresses
-        final var sourceAddressesCache = new ExpiringConcurrentCache<InetAddress, SourceAddressContainer>(
-            _cacheLifetimeSeconds, _cacheLifetimeSeconds / 4, TimeUnit.SECONDS);
 
         // Now we use vertxFuture(...) to process each input batch of requests
         _parallelProcessor.subscribe(UniLists.of(Topics.IN_IP));
@@ -187,7 +199,7 @@ public class VertxQRadarCollector
 
             // Kick off the chain of async calls, returning a Future
             Future<ConcurrentHashMap<Long, SourceAddressContainer>> finalFuture = fetchQRadarDataForIPs(ipsToProcess,
-                    sourceAddressesCache, client, sourceAddressesByIPEndpoint, offensesEndpoint);
+                    client, sourceAddressesByIPEndpoint, offensesEndpoint);
 
             // 3) Attach success & failure handlers on the returned future
             finalFuture.onSuccess(sourceAddressesMap -> {
@@ -203,9 +215,6 @@ public class VertxQRadarCollector
             // Return the future so vertxFuture(...) knows when we’re done
             return finalFuture;
         });
-
-        // TODO: Clear the cache after the consumer ends
-        sourceAddressesCache.close();
     }
 
     private void configureQRadarRequest(HttpRequest<?> request) {
@@ -219,7 +228,6 @@ public class VertxQRadarCollector
      */
     private Future<ConcurrentHashMap<Long, SourceAddressContainer>> fetchQRadarDataForIPs(
             Set<InetAddress> ipsToProcess,
-            ExpiringConcurrentCache<InetAddress, SourceAddressContainer> sourceAddressesCache,
             WebClient client,
             UriTemplate sourceAddressesByIPEndpoint,
             UriTemplate offensesEndpoint) {
@@ -229,7 +237,7 @@ public class VertxQRadarCollector
         // Build a QRadar query filter that will retrieve IPs which are not in cache yet
         final var filterBuilder = new StringBuilder();
         for (var ip : ipsToProcess) {
-            var cached = sourceAddressesCache.get(ip);
+            var cached = _sourceAddressCache.get(ip);
             if (cached == null) {
                 filterBuilder.append('"')
                         .append(ip.getHostAddress())
@@ -278,7 +286,7 @@ public class VertxQRadarCollector
                                 saModel,
                                 new ArrayList<>());
                         resultSourceAddresses.put(saModel.id(), container);
-                        sourceAddressesCache.put(container.address, container);
+                        _sourceAddressCache.put(container.address, container);
                     }
 
                     // If no offenses, skip
@@ -396,5 +404,11 @@ public class VertxQRadarCollector
 
     public @NotNull String getName() {
         return NAME;
+    }
+
+    @Override
+    public void close() throws IOException {
+        super.close();
+        _sourceAddressCache.close();
     }
 }

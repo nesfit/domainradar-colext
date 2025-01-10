@@ -63,6 +63,10 @@ public class CollectorConfig {
     public static final String QRADAR_ENTRY_CACHE_LIFETIME_S_DOC = "Source address cache entry lifetime (seconds).";
     public static final String QRADAR_ENTRY_CACHE_LIFETIME_S_DEFAULT = "120";
 
+    public static final String QRADAR_TRUST_ALL_CONFIG = "collectors.qradar.trust.all";
+    public static final String QRADAR_TRUST_ALL_DOC = "If true, the HTTP client will trust self-signed and other untrustworthy certificates provided by the QRadar API.";
+    public static final String QRADAR_TRUST_ALL_DEFAULT = "false";
+
     /* --- General settings for the PC-based standalone collectors --- */
     public static final String CLOSE_TIMEOUT_SEC_CONFIG = "collectors.kafka.close.timeout";
     public static final String CLOSE_TIMEOUT_SEC_DOC =
