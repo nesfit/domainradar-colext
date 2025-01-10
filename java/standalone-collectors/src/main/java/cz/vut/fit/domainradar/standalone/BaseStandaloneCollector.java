@@ -40,8 +40,9 @@ public abstract class BaseStandaloneCollector<KIn, VIn, TProcessor extends Paral
 
     protected final Properties _properties;
     protected final Duration _closeTimeout;
+    protected final int _maxConcurrency;
+    
     private final Duration _commitInterval;
-    private final int _maxConcurrency;
     private final ParallelConsumerOptions.CommitMode _commitMode;
 
     protected final ObjectMapper _jsonMapper;

@@ -56,8 +56,12 @@ public class CollectorConfig {
     public static final String QRADAR_BATCH_SIZE_DEFAULT = "10";
 
     public static final String QRADAR_TIMEOUT_MS_CONFIG = "collectors.qradar.timeout";
-    public static final String QRADAR_TIMEOUT_MS_DOC = "The QRadar request timeout (milliseconds).";
+    public static final String QRADAR_TIMEOUT_MS_DOC = "The QRadar connection/handshake/request timeout (milliseconds).";
     public static final String QRADAR_TIMEOUT_MS_DEFAULT = "5000";
+
+    public static final String QRADAR_ENTRY_CACHE_LIFETIME_S_CONFIG = "collectors.qradar.entry.cache.lifetime";
+    public static final String QRADAR_ENTRY_CACHE_LIFETIME_S_DOC = "Source address cache entry lifetime (seconds).";
+    public static final String QRADAR_ENTRY_CACHE_LIFETIME_S_DEFAULT = "120";
 
     /* --- General settings for the PC-based standalone collectors --- */
     public static final String CLOSE_TIMEOUT_SEC_CONFIG = "collectors.kafka.close.timeout";
