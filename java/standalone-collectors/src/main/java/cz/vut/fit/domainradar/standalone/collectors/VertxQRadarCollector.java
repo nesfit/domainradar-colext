@@ -32,6 +32,7 @@ import java.net.InetAddress;
 import java.net.URI;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Properties;
@@ -180,7 +181,7 @@ public class VertxQRadarCollector
                     return;
                 }
                 try {
-                    var inet = InetAddresses.forString(ipToProcess.ip());
+                    final var inet = InetAddresses.forString(ipToProcess.ip());
                     ipsToProcess.add(inet);
                     dnIpPairsToProcess.add(ipToProcess);
                 } catch (IllegalArgumentException e) {
@@ -198,18 +199,20 @@ public class VertxQRadarCollector
             }
 
             // Kick off the chain of async calls, returning a Future
-            Future<ConcurrentHashMap<Long, SourceAddressContainer>> finalFuture = fetchQRadarDataForIPs(ipsToProcess,
+            var finalFuture = fetchQRadarDataForIPs(ipsToProcess,
                     client, sourceAddressesByIPEndpoint, offensesEndpoint);
 
-            // 3) Attach success & failure handlers on the returned future
-            finalFuture.onSuccess(sourceAddressesMap -> {
-                // Produce final results per IP
-                this.produceResultsForIPs(dnIpPairsToProcess, sourceAddressesMap);
-            }).onFailure(err -> {
+            // Extend the returned future with success & failure handlers
+            finalFuture = finalFuture.andThen(result -> {
+                if (result.succeeded()) {
+                    this.produceResultsForIPs(dnIpPairsToProcess, result.result());
+                }
+            }).otherwise(cause -> {
                 // If anything in the chain failed, produce error result for each IP
-                Logger.error("QRadar data fetch failed: {}", err.getMessage());
+                Logger.error("QRadar data fetch failed: {}", cause.getMessage());
                 sendAboutAll(_producer, Topics.OUT_QRADAR, dnIpPairsToProcess,
-                        errorResult(ResultCodes.INTERNAL_ERROR, err.getMessage()));
+                        errorResult(ResultCodes.INTERNAL_ERROR, cause.getMessage()));
+                return null;
             });
 
             // Return the future so vertxFuture(...) knows when we’re done
@@ -281,10 +284,12 @@ public class VertxQRadarCollector
                                 offensesToFetch.add(offId);
                             }
                         }
+
                         final var container = new SourceAddressContainer(
                                 InetAddresses.forString(saModel.sourceIp),
                                 saModel,
                                 new ArrayList<>());
+
                         resultSourceAddresses.put(saModel.id(), container);
                         _sourceAddressCache.put(container.address, container);
                     }
@@ -325,7 +330,7 @@ public class VertxQRadarCollector
 
                     // Attach offenses to the corresponding IP's container
                     for (var offModel : offenseModels) {
-                        if (offModel.sourceAddressIds == null)
+                        if (offModel.sourceAddressIds == null || offModel.sourceAddressIds.length == 0)
                             continue;
 
                         final var offense = new QRadarOffense(
@@ -337,11 +342,13 @@ public class VertxQRadarCollector
                                 offModel.severity,
                                 offModel.magnitude,
                                 offModel.lastUpdatedTime,
-                                offModel.status);
+                                offModel.status,
+                                uniqueSorted(offModel.sourceAddressIds));
+
                         for (var addrId : offModel.sourceAddressIds) {
                             final var existingContainer = resultSourceAddresses.computeIfAbsent(addrId, id -> {
-                                // Fallback in case an offense references a sourceAddr not in the original input
-                                // list
+                                // Fallback in case an offense references a sourceAddr which was not
+                                // in the original input list
                                 return new SourceAddressContainer(
                                         null,
                                         new SourceAddressesResponseModel(id, null, -1, -1, null),
@@ -399,7 +406,12 @@ public class VertxQRadarCollector
 
     protected void buildProcessor(int batchSize, long timeoutMs) {
         _parallelProcessor = VertxParallelStreamProcessor.createEosStreamProcessor(
-                this.buildProcessorOptions(batchSize, timeoutMs));
+                this.makeProcessorOptionsBuilder(batchSize, timeoutMs)
+                        // For now, we're using static delays equal to the timeout
+                        // In the future, a better alternative to handling WebClient errors should be
+                        // obtained
+                        .retryDelayProvider(ctx -> _httpTimeout)
+                        .build());
     }
 
     public @NotNull String getName() {
@@ -410,5 +422,20 @@ public class VertxQRadarCollector
     public void close() throws IOException {
         super.close();
         _sourceAddressCache.close();
+    }
+
+    private static long[] uniqueSorted(@NotNull long[] input) {
+        Arrays.sort(input);
+
+        // Deduplicate
+        int uniqueCount = 0;
+        for (int i = 0; i < input.length; i++) {
+            if (i == 0 || input[i] != input[i - 1]) {
+                input[uniqueCount++] = input[i];
+            }
+        }
+
+        // Return array with unique values only
+        return Arrays.copyOf(input, uniqueCount);
     }
 }

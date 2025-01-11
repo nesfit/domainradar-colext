@@ -6,6 +6,7 @@ import cz.vut.fit.domainradar.models.results.Result;
 import io.confluent.parallelconsumer.ParallelConsumer;
 import io.confluent.parallelconsumer.ParallelConsumerOptions;
 import io.confluent.parallelconsumer.ParallelStreamProcessor;
+import io.confluent.parallelconsumer.ParallelConsumerOptions.ParallelConsumerOptionsBuilder;
 import io.confluent.parallelconsumer.internal.DrainingCloseable;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.Options;
@@ -132,8 +133,7 @@ public abstract class BaseStandaloneCollector<KIn, VIn, TProcessor extends Paral
     }
 
     /**
-     * Builds the ParallelStreamProcessor with the specified batch size.
-     * Uses the properties loaded in the constructor.
+     * Builds the {@link ParallelConsumerOptions} using {@link #makeProcessorOptionsBuilder()}.
      *
      * @param batchSize The batch size for processing records. If greater than 0,
      *                  the processor will be configured to use the specified batch size.
@@ -142,6 +142,20 @@ public abstract class BaseStandaloneCollector<KIn, VIn, TProcessor extends Paral
      *                  time spent in the queue of the parallel consumer before issuing a warning.
      */
     protected ParallelConsumerOptions<KIn, VIn> buildProcessorOptions(int batchSize, long timeoutMs) {
+        return this.makeProcessorOptionsBuilder(batchSize, timeoutMs).build();
+    }
+
+    /**
+     * Creates a {@link ParallelConsumerOptionsBuilder} with the specified batch size, timeout and options.
+     * loaded in the constructor.
+     *
+     * @param batchSize The batch size for processing records. If greater than 0,
+     *                  the processor will be configured to use the specified batch size.
+     * @param timeoutMs The base timeout guaranteed by the collection process, in milliseconds.
+     *                  This value will be multiplied by a small coefficient to set the threshold for
+     *                  time spent in the queue of the parallel consumer before issuing a warning.
+     */
+    protected ParallelConsumerOptionsBuilder<KIn, VIn> makeProcessorOptionsBuilder(int batchSize, long timeoutMs) {
         var optionsBuilder = ParallelConsumerOptions.<KIn, VIn>builder()
                 .ordering(ParallelConsumerOptions.ProcessingOrder.KEY)
                 .consumer(_consumer)
@@ -153,7 +167,7 @@ public abstract class BaseStandaloneCollector<KIn, VIn, TProcessor extends Paral
         if (batchSize > 0)
             optionsBuilder = optionsBuilder.batchSize(batchSize);
 
-        return optionsBuilder.build();
+        return optionsBuilder;
     }
 
     /**

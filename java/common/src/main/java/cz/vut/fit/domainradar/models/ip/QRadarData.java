@@ -20,7 +20,8 @@ public record QRadarData(
             double severity,
             double magnitude,
             long lastUpdatedTime,
-            @Nullable String status
+            @Nullable String status,
+            long[] sourceAddressIds
     ) {
     }
 }
