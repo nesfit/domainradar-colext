@@ -13,10 +13,13 @@ import cz.vut.fit.domainradar.models.ip.QRadarData;
 import cz.vut.fit.domainradar.models.ip.QRadarData.QRadarOffense;
 import cz.vut.fit.domainradar.models.requests.IPRequest;
 import cz.vut.fit.domainradar.standalone.IPStandaloneCollector;
+import cz.vut.fit.domainradar.standalone.InvalidResponseCodeThrowable;
+import cz.vut.fit.domainradar.standalone.InvalidResponseThrowable;
 import io.confluent.parallelconsumer.vertx.VertxParallelEoSStreamProcessor;
 import io.confluent.parallelconsumer.vertx.VertxParallelStreamProcessor;
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
+import io.vertx.core.json.DecodeException;
 import io.vertx.ext.web.client.HttpRequest;
 import io.vertx.ext.web.client.WebClient;
 import io.vertx.ext.web.client.WebClientOptions;
@@ -32,17 +35,31 @@ import java.net.InetAddress;
 import java.net.URI;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
+/**
+ * A collector that fetches QRadar "Offense Source Address" information for the input IP addresses.
+ * The collector operates on batches. It retrieves the Source Address models for all IPs in the batch,
+ * and then it retrieves the Offense models for all the discovered Source Addresses.
+ * <p>
+ * While this is an IP-based collector, it stands out as it does not publish to {@link Topics#OUT_IP}
+ * but instead to its own output topic {@link Topics#OUT_QRADAR}. This is because the QRadar data do not
+ * participate in the Data Merging operation, nor are they used in classification.
+ *
+ * @author Ondřej Ondryáš
+ */
 public class VertxQRadarCollector
         extends IPStandaloneCollector<QRadarData, VertxParallelStreamProcessor<IPToProcess, IPRequest>> {
 
+    /**
+     * A model for a single item of the array returned by the QRadar API at /siem/source_addresses.
+     */
     public record SourceAddressesResponseModel(
             @JsonProperty("id") long id,
             @JsonProperty("source_ip") @NotNull String sourceIp,
@@ -51,12 +68,9 @@ public class VertxQRadarCollector
             @JsonProperty("offense_ids") long[] offenseIds) {
     }
 
-    private record SourceAddressContainer(
-            InetAddress address,
-            SourceAddressesResponseModel sourceAddressModel,
-            List<QRadarOffense> offenses) {
-    };
-
+    /**
+     * A model for a single item of the array returned by the QRadar API at /siem/offenses.
+     */
     public record OffenseResponseModel(
             @JsonProperty("id") int id,
             @JsonProperty("description") @Nullable String description,
@@ -70,12 +84,21 @@ public class VertxQRadarCollector
             @JsonProperty("source_address_ids") long[] sourceAddressIds) {
     }
 
+    /**
+     * An internal record that links together an IP, its corresponding SourceAddress model from QRadar
+     * and a list of Offenses that originated from the address.
+     */
+    private record SourceAddressContainer(
+            InetAddress address,
+            SourceAddressesResponseModel sourceAddressModel,
+            List<QRadarOffense> offenses) {
+    }
+
     public static final String NAME = "qradar";
     public static final String COMPONENT_NAME = "collector-" + NAME;
     private static final org.slf4j.Logger Logger = Common.getComponentLogger(VertxQRadarCollector.class);
 
     private final Duration _httpTimeout;
-    private final int _cacheLifetimeSeconds;
     private final String _baseUrl;
     private final String _token;
     private final int _batchSize;
@@ -85,7 +108,7 @@ public class VertxQRadarCollector
     private final ExpiringConcurrentCache<InetAddress, SourceAddressContainer> _sourceAddressCache;
 
     public VertxQRadarCollector(@NotNull ObjectMapper jsonMapper, @NotNull String appName,
-            @NotNull Properties properties) {
+                                @NotNull Properties properties) {
         super(jsonMapper, appName, properties);
 
         _httpTimeout = Duration.ofMillis(Long.parseLong(
@@ -94,13 +117,15 @@ public class VertxQRadarCollector
         _token = properties.getProperty(CollectorConfig.QRADAR_TOKEN_CONFIG, CollectorConfig.QRADAR_TOKEN_DEFAULT);
         _batchSize = Integer.parseInt(properties.getProperty(CollectorConfig.QRADAR_BATCH_SIZE_CONFIG,
                 CollectorConfig.QRADAR_BATCH_SIZE_DEFAULT));
-        _cacheLifetimeSeconds = Integer
-                .parseInt(properties.getProperty(CollectorConfig.QRADAR_ENTRY_CACHE_LIFETIME_S_CONFIG,
-                        CollectorConfig.QRADAR_ENTRY_CACHE_LIFETIME_S_DEFAULT));
+
         _trustAll = Boolean.parseBoolean(properties.getProperty(CollectorConfig.QRADAR_TRUST_ALL_CONFIG,
                 CollectorConfig.QRADAR_TRUST_ALL_DEFAULT));
 
-        _sourceAddressCache = new ExpiringConcurrentCache<>(_cacheLifetimeSeconds, _cacheLifetimeSeconds / 4,
+        // Create a shared concurrent cache for previously fetched QRadar Source Addresses
+        int cacheLifetimeSeconds = Integer
+                .parseInt(properties.getProperty(CollectorConfig.QRADAR_ENTRY_CACHE_LIFETIME_S_CONFIG,
+                        CollectorConfig.QRADAR_ENTRY_CACHE_LIFETIME_S_DEFAULT));
+        _sourceAddressCache = new ExpiringConcurrentCache<>(cacheLifetimeSeconds, cacheLifetimeSeconds / 4,
                 TimeUnit.SECONDS);
 
         var baseUrl = properties.getProperty(CollectorConfig.QRADAR_URL_CONFIG, CollectorConfig.QRADAR_URL_DEFAULT);
@@ -195,7 +220,7 @@ public class VertxQRadarCollector
 
             // If no valid IP to process, return an empty future right away
             if (ipsToProcess.isEmpty()) {
-                return Future.succeededFuture(new ConcurrentHashMap<Long, SourceAddressContainer>());
+                return Future.succeededFuture(null);
             }
 
             // Kick off the chain of async calls, returning a Future
@@ -210,8 +235,10 @@ public class VertxQRadarCollector
             }).otherwise(cause -> {
                 // If anything in the chain failed, produce error result for each IP
                 Logger.error("QRadar data fetch failed: {}", cause.getMessage());
+                var resultCode = getResultCodeForError(cause);
+
                 sendAboutAll(_producer, Topics.OUT_QRADAR, dnIpPairsToProcess,
-                        errorResult(ResultCodes.INTERNAL_ERROR, cause.getMessage()));
+                        errorResult(resultCode, cause.getMessage()));
                 return null;
             });
 
@@ -252,7 +279,7 @@ public class VertxQRadarCollector
         }
 
         // If all IPs were cached, skip directly to success
-        if (filterBuilder.length() == 0) {
+        if (filterBuilder.isEmpty()) {
             return Future.succeededFuture(resultSourceAddresses);
         }
 
@@ -267,10 +294,16 @@ public class VertxQRadarCollector
         final var offensesResponseFuture = sourceAddrRequest
                 .send()
                 .compose(res -> {
+                    if (res.statusCode() != 200) {
+                        return Future.failedFuture(new InvalidResponseCodeThrowable(res.statusCode()));
+                    }
+
                     var responseModels = res.bodyAsJson(SourceAddressesResponseModel[].class);
                     if (responseModels == null) {
-                        return Future.failedFuture("Invalid response from /siem/source_addresses");
+                        return Future.failedFuture(
+                                new InvalidResponseThrowable("Invalid response from /siem/source_addresses"));
                     }
+
                     if (responseModels.length == 0) {
                         // Means no source address found for these IPs
                         return Future.succeededFuture(null);
@@ -314,18 +347,23 @@ public class VertxQRadarCollector
                 });
 
         // Parse the /siem/offenses response, update and return our result map
-        final var resultFuture = offensesResponseFuture
-                .map(offensesRes -> {
+        return offensesResponseFuture
+                .compose(offensesRes -> {
                     // If previous request returned null, there were no addresses to fetch
                     // Just return the result map
                     if (offensesRes == null) {
-                        return resultSourceAddresses;
+                        return Future.succeededFuture(resultSourceAddresses);
+                    }
+
+                    if (offensesRes.statusCode() != 200) {
+                        return Future.failedFuture(new InvalidResponseCodeThrowable(offensesRes.statusCode()));
                     }
 
                     // Deserialize response
                     final var offenseModels = offensesRes.bodyAsJson(OffenseResponseModel[].class);
                     if (offenseModels == null) {
-                        throw new IllegalStateException("Invalid response from /siem/offenses");
+                        return Future.failedFuture(
+                                new InvalidResponseThrowable("Invalid response from /siem/offenses"));
                     }
 
                     // Attach offenses to the corresponding IP's container
@@ -343,7 +381,7 @@ public class VertxQRadarCollector
                                 offModel.magnitude,
                                 offModel.lastUpdatedTime,
                                 offModel.status,
-                                uniqueSorted(offModel.sourceAddressIds));
+                                Common.uniqueSortedLongArray(offModel.sourceAddressIds));
 
                         for (var addrId : offModel.sourceAddressIds) {
                             final var existingContainer = resultSourceAddresses.computeIfAbsent(addrId, id -> {
@@ -351,16 +389,15 @@ public class VertxQRadarCollector
                                 // in the original input list
                                 return new SourceAddressContainer(
                                         null,
-                                        new SourceAddressesResponseModel(id, null, -1, -1, null),
+                                        new SourceAddressesResponseModel(id, "0.0.0.0", -1, -1, null),
                                         new ArrayList<>());
                             });
                             existingContainer.offenses().add(offense);
                         }
                     }
-                    return resultSourceAddresses;
-                });
 
-        return resultFuture;
+                    return Future.succeededFuture(resultSourceAddresses);
+                });
     }
 
     /**
@@ -386,7 +423,7 @@ public class VertxQRadarCollector
                     .orElse(null);
             var saModel = container == null ? null : container.sourceAddressModel();
 
-            if (saModel == null || saModel.sourceIp() == null) {
+            if (saModel == null || saModel.sourceIp().isBlank()) {
                 // Not found
                 _producer.send(resultRecord(
                         Topics.OUT_QRADAR,
@@ -424,18 +461,18 @@ public class VertxQRadarCollector
         _sourceAddressCache.close();
     }
 
-    private static long[] uniqueSorted(@NotNull long[] input) {
-        Arrays.sort(input);
+    private static int getResultCodeForError(Throwable cause) {
+        int resultCode;
 
-        // Deduplicate
-        int uniqueCount = 0;
-        for (int i = 0; i < input.length; i++) {
-            if (i == 0 || input[i] != input[i - 1]) {
-                input[uniqueCount++] = input[i];
-            }
+        if (cause instanceof DecodeException || cause instanceof InvalidResponseThrowable) {
+            resultCode = ResultCodes.INVALID_RESPONSE;
+        } else if (cause instanceof InvalidResponseCodeThrowable) {
+            resultCode = ResultCodes.CANNOT_FETCH;
+        } else if (cause instanceof TimeoutException) {
+            resultCode = ResultCodes.TIMEOUT;
+        } else {
+            resultCode = ResultCodes.INTERNAL_ERROR;
         }
-
-        // Return array with unique values only
-        return Arrays.copyOf(input, uniqueCount);
+        return resultCode;
     }
 }
