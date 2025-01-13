@@ -7,8 +7,8 @@
         </Console>
     </Appenders>
     <Loggers>
-        <Logger name="org.apache" level="INFO"/>
-        <Logger name="cz.vut.fit.domainradar" level="INFO"/>
+        <Logger name="org.apache" level="WARN"/>
+        <Logger name="cz.vut.fit.domainradar" level="TRACE"/>
         <Root level="TRACE">
             <AppenderRef ref="Console"/>
         </Root>

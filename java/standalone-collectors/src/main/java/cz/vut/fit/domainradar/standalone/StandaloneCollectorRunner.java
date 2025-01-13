@@ -2,7 +2,10 @@ package cz.vut.fit.domainradar.standalone;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import cz.vut.fit.domainradar.Common;
-import cz.vut.fit.domainradar.standalone.collectors.*;
+import cz.vut.fit.domainradar.standalone.collectors.GeoAsnCollector;
+import cz.vut.fit.domainradar.standalone.collectors.NERDCollector;
+import cz.vut.fit.domainradar.standalone.collectors.TLSCollector;
+import cz.vut.fit.domainradar.standalone.collectors.VertxQRadarCollector;
 import org.apache.commons.cli.*;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.jetbrains.annotations.NotNull;
@@ -66,6 +69,7 @@ public class StandaloneCollectorRunner {
         try {
             // Wait for the shutdown signal
             latch.await();
+            Logger.info("Exiting");
             // Close the collectors
             for (var component : toRun) {
                 try {
@@ -80,7 +84,7 @@ public class StandaloneCollectorRunner {
             System.exit(1);
         }
     }
-    
+
     /**
      * Initializes the list of collectors based on the command line options.
      *
@@ -90,10 +94,10 @@ public class StandaloneCollectorRunner {
      * @return A list of initialized BaseStandaloneCollector instances.
      */
     @NotNull
-    private static List<BaseStandaloneCollector<?, ?>> initCollectors(CommandLine cmd, ObjectMapper mapper, Properties properties) {
+    private static List<BaseStandaloneCollector<?, ?, ?>> initCollectors(CommandLine cmd, ObjectMapper mapper, Properties properties) {
         var appId = cmd.getOptionValue("id");
         var useAll = cmd.hasOption("a");
-        var components = new ArrayList<BaseStandaloneCollector<?, ?>>();
+        var components = new ArrayList<BaseStandaloneCollector<?, ?, ?>>();
 
         try {
             if (useAll || cmd.hasOption("col-tls")) {
@@ -106,6 +110,10 @@ public class StandaloneCollectorRunner {
 
             if (useAll || cmd.hasOption("col-geo")) {
                 components.add(new GeoAsnCollector(mapper, appId, properties));
+            }
+
+            if (useAll || cmd.hasOption("col-qradar")) {
+                components.add(new VertxQRadarCollector(mapper, appId, properties));
             }
         } catch (Exception e) {
             Logger.error("Failed to initialize a collector", e);
@@ -160,6 +168,7 @@ public class StandaloneCollectorRunner {
         options.addOption(null, "col-tls", false, "Use the TLS collector");
         options.addOption(null, "col-nerd", false, "Use the NERD collector");
         options.addOption(null, "col-geo", false, "Use the GEO-ASN collector");
+        options.addOption(null, "col-qradar", false, "Use the QRadar Offense collector");
 
         options.addOption(Option.builder("id")
                 .longOpt("app-id")

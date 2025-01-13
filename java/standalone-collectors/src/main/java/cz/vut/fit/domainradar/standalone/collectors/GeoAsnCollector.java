@@ -13,8 +13,10 @@ import cz.vut.fit.domainradar.Topics;
 import cz.vut.fit.domainradar.models.IPToProcess;
 import cz.vut.fit.domainradar.models.ResultCodes;
 import cz.vut.fit.domainradar.models.ip.GeoIPData;
+import cz.vut.fit.domainradar.models.requests.IPRequest;
 import cz.vut.fit.domainradar.models.results.CommonIPResult;
 import cz.vut.fit.domainradar.standalone.IPStandaloneCollector;
+import io.confluent.parallelconsumer.ParallelStreamProcessor;
 import org.apache.commons.cli.CommandLine;
 import org.jetbrains.annotations.NotNull;
 import pl.tlinkowski.unij.api.UniLists;
@@ -29,7 +31,7 @@ import java.util.Properties;
  *
  * @author Ondřej Ondryáš
  */
-public class GeoAsnCollector extends IPStandaloneCollector<GeoIPData> {
+public class GeoAsnCollector extends IPStandaloneCollector<GeoIPData, ParallelStreamProcessor<IPToProcess, IPRequest>> {
     public static final String NAME = "geo-asn";
     public static final String COMPONENT_NAME = "collector-geo-asn"; // weird exception
     private static final org.slf4j.Logger Logger = Common.getComponentLogger(GeoAsnCollector.class);
@@ -120,6 +122,12 @@ public class GeoAsnCollector extends IPStandaloneCollector<GeoIPData> {
             Logger.error("Error while reading GeoIP data for {}", ip, e);
             return errorResult(ResultCodes.CANNOT_FETCH, e.getMessage());
         }
+    }
+
+    protected void buildProcessor(int batchSize, long timeoutMs) {
+        _parallelProcessor = ParallelStreamProcessor.createEosStreamProcessor(
+                this.buildProcessorOptions(batchSize, timeoutMs)
+        );
     }
 
     @Override

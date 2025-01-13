@@ -43,9 +43,29 @@ public class CollectorConfig {
     public static final String TLS_MAX_REDIRECTS_DEFAULT = "2";
 
     /* --- QRadar collector --- */
+    public static final String QRADAR_URL_CONFIG = "collectors.qradar.url";
+    public static final String QRADAR_URL_DOC = "The QRadar RESTful API base URL.";
+    public static final String QRADAR_URL_DEFAULT = "";
+
     public static final String QRADAR_TOKEN_CONFIG = "collectors.qradar.token";
-    public static final String QRADAR_TOKEN_DOC = "The IBM QRadar RESTful API access token.";
+    public static final String QRADAR_TOKEN_DOC = "The QRadar RESTful API access token.";
     public static final String QRADAR_TOKEN_DEFAULT = "";
+
+    public static final String QRADAR_BATCH_SIZE_CONFIG = "collectors.qradar.batch.size";
+    public static final String QRADAR_BATCH_SIZE_DOC = "The number of IPs to process in a single QRadar query.";
+    public static final String QRADAR_BATCH_SIZE_DEFAULT = "10";
+
+    public static final String QRADAR_TIMEOUT_MS_CONFIG = "collectors.qradar.timeout";
+    public static final String QRADAR_TIMEOUT_MS_DOC = "The QRadar connection/handshake/request timeout (milliseconds).";
+    public static final String QRADAR_TIMEOUT_MS_DEFAULT = "5000";
+
+    public static final String QRADAR_ENTRY_CACHE_LIFETIME_S_CONFIG = "collectors.qradar.entry.cache.lifetime";
+    public static final String QRADAR_ENTRY_CACHE_LIFETIME_S_DOC = "Source address cache entry lifetime (seconds).";
+    public static final String QRADAR_ENTRY_CACHE_LIFETIME_S_DEFAULT = "120";
+
+    public static final String QRADAR_TRUST_ALL_CONFIG = "collectors.qradar.trust.all";
+    public static final String QRADAR_TRUST_ALL_DOC = "If true, the HTTP client will trust self-signed and other untrustworthy certificates provided by the QRadar API.";
+    public static final String QRADAR_TRUST_ALL_DEFAULT = "false";
 
     /* --- General settings for the PC-based standalone collectors --- */
     public static final String CLOSE_TIMEOUT_SEC_CONFIG = "collectors.kafka.close.timeout";

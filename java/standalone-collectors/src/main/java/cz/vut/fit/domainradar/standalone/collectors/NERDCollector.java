@@ -8,8 +8,10 @@ import cz.vut.fit.domainradar.Topics;
 import cz.vut.fit.domainradar.models.IPToProcess;
 import cz.vut.fit.domainradar.models.ResultCodes;
 import cz.vut.fit.domainradar.models.ip.NERDData;
+import cz.vut.fit.domainradar.models.requests.IPRequest;
 import cz.vut.fit.domainradar.models.results.CommonIPResult;
 import cz.vut.fit.domainradar.standalone.IPStandaloneCollector;
+import io.confluent.parallelconsumer.ParallelStreamProcessor;
 import org.apache.commons.cli.CommandLine;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.jetbrains.annotations.NotNull;
@@ -37,7 +39,7 @@ import java.util.concurrent.atomic.AtomicLong;
  *
  * @author Ondřej Ondryáš
  */
-public class NERDCollector extends IPStandaloneCollector<NERDData> {
+public class NERDCollector extends IPStandaloneCollector<NERDData, ParallelStreamProcessor<IPToProcess, IPRequest>> {
     public static final String NAME = "nerd";
     public static final String COMPONENT_NAME = "collector-" + NAME;
     private static final org.slf4j.Logger Logger = Common.getComponentLogger(NERDCollector.class);
@@ -222,6 +224,12 @@ public class NERDCollector extends IPStandaloneCollector<NERDData> {
     @Override
     public @NotNull String getName() {
         return NAME;
+    }
+
+    protected void buildProcessor(int batchSize, long timeoutMs) {
+        _parallelProcessor = ParallelStreamProcessor.createEosStreamProcessor(
+                this.buildProcessorOptions(batchSize, timeoutMs)
+        );
     }
 
     @Override

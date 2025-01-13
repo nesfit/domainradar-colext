@@ -20,6 +20,7 @@ public final class Topics {
     public static final String OUT_RDAP_DN = "processed_RDAP_DN";
     public static final String OUT_TLS = "processed_TLS";
     public static final String OUT_IP = "collected_IP_data";
+    public static final String OUT_QRADAR = "processed_QRadar";
 
     public static final String OUT_MERGE_ALL = "all_collected_data";
 
