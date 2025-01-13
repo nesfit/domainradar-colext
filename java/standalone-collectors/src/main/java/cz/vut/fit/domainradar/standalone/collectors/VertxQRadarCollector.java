@@ -19,6 +19,7 @@ import io.confluent.parallelconsumer.vertx.VertxParallelEoSStreamProcessor;
 import io.confluent.parallelconsumer.vertx.VertxParallelStreamProcessor;
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
+import io.vertx.core.http.HttpClosedException;
 import io.vertx.core.json.DecodeException;
 import io.vertx.ext.web.client.HttpRequest;
 import io.vertx.ext.web.client.WebClient;
@@ -459,9 +460,11 @@ public class VertxQRadarCollector
     private static int getResultCodeForError(Throwable cause) {
         int resultCode;
 
-        if (cause instanceof DecodeException || cause instanceof InvalidResponseThrowable) {
+        if (cause instanceof DecodeException
+                || cause instanceof InvalidResponseThrowable
+                || cause instanceof IllegalArgumentException) {
             resultCode = ResultCodes.INVALID_RESPONSE;
-        } else if (cause instanceof InvalidResponseCodeThrowable) {
+        } else if (cause instanceof InvalidResponseCodeThrowable || cause instanceof HttpClosedException) {
             resultCode = ResultCodes.CANNOT_FETCH;
         } else if (cause instanceof TimeoutException) {
             resultCode = ResultCodes.TIMEOUT;
