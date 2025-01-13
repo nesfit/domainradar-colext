@@ -24,21 +24,16 @@ import io.vertx.ext.web.client.HttpRequest;
 import io.vertx.ext.web.client.WebClient;
 import io.vertx.ext.web.client.WebClientOptions;
 import io.vertx.uritemplate.UriTemplate;
-import pl.tlinkowski.unij.api.UniLists;
-
 import org.apache.commons.cli.CommandLine;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import pl.tlinkowski.unij.api.UniLists;
 
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.URI;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Properties;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -175,7 +170,7 @@ public class VertxQRadarCollector
         }
 
         final var vertx = (Vertx) vertxObj;
-        final var timeoutMs = (int) _httpTimeout.toMillis();
+        final var timeoutMs = (int) (_httpTimeout.toMillis() * 3 / 4);
         WebClientOptions webClientOptions = new WebClientOptions()
                 .setMaxPoolSize(_maxConcurrency)
                 .setHttp2MaxPoolSize(_maxConcurrency)
