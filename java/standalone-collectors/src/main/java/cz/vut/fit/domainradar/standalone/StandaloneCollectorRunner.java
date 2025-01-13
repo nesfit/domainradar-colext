@@ -69,6 +69,7 @@ public class StandaloneCollectorRunner {
         try {
             // Wait for the shutdown signal
             latch.await();
+            Logger.info("Exiting");
             // Close the collectors
             for (var component : toRun) {
                 try {

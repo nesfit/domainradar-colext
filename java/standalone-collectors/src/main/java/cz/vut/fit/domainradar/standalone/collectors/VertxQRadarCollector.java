@@ -207,7 +207,7 @@ public class VertxQRadarCollector
                 } catch (IllegalArgumentException e) {
                     // Invalid address
                     _producer.send(resultRecord(
-                            Topics.OUT_IP,
+                            Topics.OUT_QRADAR,
                             ipToProcess,
                             errorResult(ResultCodes.INVALID_ADDRESS, e.getMessage())));
                 }

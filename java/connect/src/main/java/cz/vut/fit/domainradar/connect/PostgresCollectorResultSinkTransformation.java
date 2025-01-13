@@ -67,7 +67,7 @@ public class PostgresCollectorResultSinkTransformation<R extends ConnectRecord<R
             throw new DataException("Expected the BYTES schema for both the key and the value");
 
         final var topic = record.topic();
-        final var isIpResult = topic.equals(Topics.OUT_IP);
+        final var isIpResult = topic.equals(Topics.OUT_IP) || topic.equals(Topics.OUT_QRADAR);
         final var key = (byte[]) record.key();
         final var value = (byte[]) record.value();
 
