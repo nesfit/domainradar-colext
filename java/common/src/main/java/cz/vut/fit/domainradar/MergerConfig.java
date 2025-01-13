@@ -13,7 +13,7 @@ public class MergerConfig {
      * Set to zero if the timestamps are always monotonously rising.
      */
     public static final String DN_MAX_OUT_OF_ORDERNESS_MS_CONFIG = "dn.max.out.of.orderness.ms";
-    public static final String DN_MAX_OUT_OF_ORDERNESS_MS_DEFAULT = "0";
+    public static final String DN_MAX_OUT_OF_ORDERNESS_MS_DEFAULT = "1000";
 
     /**
      * The idleness time (in seconds) for the domain-based Kafka sources.
@@ -30,7 +30,7 @@ public class MergerConfig {
      * Set to zero if the timestamps are always monotonously rising.
      */
     public static final String IP_MAX_OUT_OF_ORDERNESS_MS_CONFIG = "ip.max.out.of.orderness.ms";
-    public static final String IP_MAX_OUT_OF_ORDERNESS_MS_DEFAULT = "0";
+    public static final String IP_MAX_OUT_OF_ORDERNESS_MS_DEFAULT = "1000";
 
     /**
      * The idleness time (in seconds) for the IP-based Kafka sources.
