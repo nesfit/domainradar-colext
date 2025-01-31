@@ -1,0 +1,68 @@
+[connection]
+brokers = ["localhost:9092"]
+use_ssl = false
+
+[connection.ssl]
+ca_file = "/path/to/ca.pem"
+client_cert_file = "/path/to/client_certificate.pem"
+client_key_file = "/path/to/client_key.pem"
+client_key_password = "password for the private key"
+check_hostname = true
+
+[consumer]
+# Options passed directly to confluent-kafka and its underlying librdkafka library.
+# The dotted keys must be enclosed in "".
+# See: https://github.com/confluentinc/librdkafka/blob/master/CONFIGURATION.md
+"session.timeout.ms" = 10000
+"auto.commit.interval.ms" = 3000
+
+[producer]
+# Same as above.
+"compression.codec" = "zstd"
+"linger.ms" = 1000
+"batch.num.messages" = 10000
+"request.required.acks" = "all"
+"message.send.max.retries" = 100
+
+[logging.client]
+min_level = "DEBUG"
+stdout_level = "DEBUG"
+stderr_level = "ERROR"
+
+[logging.worker]
+min_level = "DEBUG"
+stdout_level = "DEBUG"
+stderr_level = "ERROR"
+
+[client]
+app_id = "domrad-classifier-unit"
+mp_start_method = "forkserver"
+# Number of worker processes
+workers = 2
+# How long to wait in a single Kafka consume request
+poll_timeout = 2.0
+# How long to wait for a worker to finish (seconds)
+worker_kill_timeout = 5.0
+# How often check if all worker processes live (seconds)
+liveliness_check_interval = 10.0
+# How long to wait for the worker processes to initialize before starting to consume input requests (seconds)
+init_wait = 1.0
+# How long an entry can wait in the to-process queue before a warning is logged (seconds)
+entry_late_warning_threshold = 1.2
+# How long an entry can wait in the to-process queue before the whole system gives up (seconds)
+max_entry_time_in_queue = 2
+# The maximum input queue size
+max_queued_items = 9
+# After reaching the maximum input queue size specified above, this number of input entries must be processed
+# and produced before new items are added to the queue
+resume_after_freed_items = 2
+# The maximum number of items to retrieve from the processed queue in a single cycle (livelock prevention threshold)
+max_entries_to_confirm = 10
+
+[metrics]
+enabled = true
+
+[metrics.server]
+# Options passed as kwargs for prometheus_client.start_http_server
+port = 8080
+addr = "127.0.0.1"
