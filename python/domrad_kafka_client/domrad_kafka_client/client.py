@@ -2,7 +2,8 @@ import logging
 import typing
 from time import sleep
 from .worker_manager import WorkerManager
-from . import util, ProcessorBase
+from .message_processor import ProcessorBase
+from . import util
 import confluent_kafka as ck
 
 

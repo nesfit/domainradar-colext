@@ -157,7 +157,10 @@ class WorkerManager:
         process: mp.Process
         for process in self._workers:
             self._logger.debug("Terminating %s", process.pid)
-            os.kill(process.pid, signal.SIGINT)
+            try:
+                os.kill(process.pid, signal.SIGINT)
+            except ProcessLookupError:
+                pass
 
         for process in self._workers:
             # self._logger.debug("Waiting for %s", process.pid)

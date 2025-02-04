@@ -20,7 +20,7 @@ class WorkerProcess:
         self._processed = processed
         self._running = True
 
-        self._logger.info("Initializing pipeline")
+        self._logger.info("Initializing worker")
         self._processor = processor_type(config)
         self._processor.init()
 
