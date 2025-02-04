@@ -8,8 +8,8 @@ from typing import Type
 
 from confluent_kafka import KafkaException, KafkaError
 
-from .message_processor import ProcessorBase
 from .worker_process import init_process
+from .message_processor import AnyProcessor
 from .types import *
 from .util import get_worker_logger_config
 
@@ -18,7 +18,7 @@ import confluent_kafka as ck
 
 class WorkerManager:
 
-    def __init__(self, config: dict, topic_in: str, processor_type: Type[ProcessorBase],
+    def __init__(self, config: dict, topic_in: str, processor_type: Type[AnyProcessor],
                  consumer: ck.Consumer, producer: ck.Producer):
         self._config = config
         self._topic_in = topic_in

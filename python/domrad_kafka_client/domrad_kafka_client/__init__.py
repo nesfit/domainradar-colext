@@ -4,10 +4,10 @@ import multiprocessing as mp
 from . import util
 
 from .client import KafkaClient
-from .message_processor import ProcessorBase
+from .message_processor import *
 
 
-def run_client(input_topic: str, processor_type: Type[ProcessorBase]):
+def run_client(input_topic: str, processor_type: Type[AnyProcessor]):
     config = util.read_config()
     mp.set_start_method(config.get("client", {}).get("mp_start_method", "forkserver"))
 
@@ -20,5 +20,7 @@ def run_client(input_topic: str, processor_type: Type[ProcessorBase]):
 __all__ = [
     "run_client",
     "KafkaClient",
-    "ProcessorBase"
+    "AnyProcessor",
+    "ProcessorBase",
+    "AsyncProcessorBase"
 ]
