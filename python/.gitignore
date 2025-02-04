@@ -1,6 +1,7 @@
 config.toml
 config.*.toml
 !config*.example.toml
+*.log
 
 # Sometimes you want to spawn poetry shells in the respective
 # directories but we don't need these component-wise poetry lockfiles

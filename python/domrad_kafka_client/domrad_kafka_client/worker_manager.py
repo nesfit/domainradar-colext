@@ -11,6 +11,7 @@ from confluent_kafka import KafkaException, KafkaError
 from .message_processor import ProcessorBase
 from .worker_process import init_process
 from .types import *
+from .util import get_worker_logger_config
 
 import confluent_kafka as ck
 
@@ -27,7 +28,6 @@ class WorkerManager:
 
         self._client_config = config.get("client", {})
         self._logger = logging.getLogger("req-handler")
-        mp.set_start_method(self._client_config.get("mp_start_method", "forkserver"))
 
         self._robs_for_partitions: ROBContainer = {}
         self._in_flight = 0
@@ -174,7 +174,7 @@ class WorkerManager:
         worker_process = mp.Process(target=init_process,
                                     name="worker-{}".format(worker_id),
                                     args=(worker_id, self._config, self._processor_type,
-                                          self._to_process, self._processed))
+                                          self._to_process, self._processed, get_worker_logger_config()))
         self._workers.append(worker_process)
         worker_process.daemon = True
         worker_process.start()

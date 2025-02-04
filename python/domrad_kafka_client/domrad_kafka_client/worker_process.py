@@ -1,5 +1,6 @@
 import json
 import logging
+import logging.config
 import multiprocessing as mp
 import os
 import queue
@@ -8,14 +9,14 @@ from typing import Type
 
 from .message_processor import ProcessorBase
 
-process = None
+_process: mp.Process | None = None
 
 
 class WorkerProcess:
     def __init__(self, worker_id: int, config: dict, processor_type: Type[ProcessorBase],
                  to_process: mp.Queue, processed: mp.Queue):
         self._config = config
-        self._logger = logging.getLogger(f"worker-{worker_id}")
+        self._logger = logging.getLogger(f"worker")
         self._to_process = to_process
         self._processed = processed
         self._running = True
@@ -72,19 +73,17 @@ class WorkerProcess:
 
 
 def sigterm_handler(signal_num, stack_frame):
-    global process
-    if process is not None:
-        # noinspection PyUnresolvedReferences
-        process.close()
-        process = None
+    global _process
+    if _process is not None:
+        _process.close()
+        _process = None
 
 
 def init_process(worker_id: int, config: dict, processor_type: Type[ProcessorBase],
-                 to_process: mp.Queue, processed: mp.Queue):
-    global process
-    from . import util
+                 to_process: mp.Queue, processed: mp.Queue, logger_config: dict):
+    global _process
 
-    util.setup_logging(config, "worker", True)
+    logging.config.dictConfig(logger_config)
     signal.signal(signal.SIGTERM, sigterm_handler)
-    process = WorkerProcess(worker_id, config, processor_type, to_process, processed)
-    process.run()
+    _process = WorkerProcess(worker_id, config, processor_type, to_process, processed)
+    _process.run()
