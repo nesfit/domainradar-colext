@@ -5,11 +5,14 @@ from . import util
 
 from .client import KafkaClient
 from .message_processor import *
+from .types import SimpleMessage
 
 
-def run_client(input_topic: str, processor_type: Type[AnyProcessor]):
+def run_client(input_topic: str, processor_type: Type[AnyProcessor], app_id_override: str | None = None):
     config = util.read_config()
     mp.set_start_method(config.get("client", {}).get("mp_start_method", "forkserver"))
+    if app_id_override:
+        config["client"]["app_id"] = app_id_override
 
     util.init_logging()
     kafka_client = KafkaClient(config, input_topic, processor_type)
@@ -22,5 +25,6 @@ __all__ = [
     "KafkaClient",
     "AnyProcessor",
     "ProcessorBase",
-    "AsyncProcessorBase"
+    "AsyncProcessorBase",
+    "SimpleMessage"
 ]

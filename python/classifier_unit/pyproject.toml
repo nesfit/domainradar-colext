@@ -13,12 +13,11 @@ packages = [
 
 [tool.poetry.dependencies]
 python = ">=3.11,<3.12"
-confluent-kafka = "^2.6.0"
 pandas = "^2.2.2"
 # classifiers = { git = "https://github.com/nesfit/domainradar-clf.git", branch = "main" }
 classifiers = { path = "../classifiers", develop = true }
 pyarrow = "^16.1.0"
-sortedcontainers = "^2.4.0"
+domrad-kafka-client = { path = "../domrad_kafka_client", develop = true }
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0.0"

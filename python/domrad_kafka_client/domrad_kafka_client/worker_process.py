@@ -23,7 +23,6 @@ class WorkerProcess:
 
         self._logger.info("Initializing worker")
         self._processor = processor_type(config)
-        self._processor.init()
 
     def run(self):
         while self._running:
@@ -73,7 +72,7 @@ class WorkerProcess:
 
 
 class AioWorkerProcess(WorkerProcess):
-    SLEEP = 0.1
+    SLEEP = 0.05
 
     def __init__(self, worker_id: int, config: dict, processor_type: Type[AsyncProcessorBase],
                  to_process: mp.Queue, processed: mp.Queue):
@@ -82,7 +81,12 @@ class AioWorkerProcess(WorkerProcess):
     def run(self):
         import asyncio
         self._logger.info("Starting AIO loop")
-        asyncio.run(self._run_async())
+        try:
+            asyncio.run(self._run_async())
+        except KeyboardInterrupt:
+            self._logger.info("Interrupted. Shutting down")
+            self._running = False
+
         self._logger.info("Finished (PID %s)", os.getpid())
 
     async def _run_async(self):
@@ -119,7 +123,7 @@ class AioWorkerProcess(WorkerProcess):
                     if self._running:
                         ret = await self._processor.process(key, value, partition, offset)
                         self._logger.debug("Processed at p=%s, o=%s", partition, offset)
-                except KeyboardInterrupt | asyncio.CancelledError:
+                except (KeyboardInterrupt, asyncio.CancelledError):
                     self._logger.info("Interrupted. Shutting down")
                     self._running = False
                 except Exception as e:

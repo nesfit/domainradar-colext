@@ -21,7 +21,7 @@ COMPONENT_NAME = EXTRACTOR
 # Read the config
 config = read_config()
 component_config = config.get(EXTRACTOR, {})
-logger = log.init(COMPONENT_NAME, config)
+logger = log.init(COMPONENT_NAME)
 
 BATCH_SIZE = component_config.get("batch_size", 50)
 BATCH_TIMEOUT = component_config.get("batch_timeout", 5)

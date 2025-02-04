@@ -1,4 +1,4 @@
-"""zone.py: The Faust application for the zone collector."""
+"""zone.py: The processor for the zone collector."""
 __author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
 
 import dns.exception
@@ -6,48 +6,38 @@ from dns.resolver import Cache
 
 import common.result_codes as rc
 from collectors.dns_options import DNSCollectorOptions
-from collectors.util import handle_top_level_exception
+from collectors.util import make_top_level_exception_result
 from collectors.zone.resolver import ZoneResolver
-from common import read_config, make_app, log
-from common.models import RDAPDomainRequest, RDAPDomainResult, ZoneRequest, ZoneResult, DNSRequest
-from common.util import ensure_model
+from common import log
+from common.models import RDAPDomainRequest, ZoneRequest, ZoneResult, DNSRequest
+from common.util import ensure_model, dump_model
+from domrad_kafka_client import AsyncProcessorBase, SimpleMessage
 
 COLLECTOR = "zone"
 COMPONENT_NAME = "collector-" + COLLECTOR
 
-# Read the config
-config = read_config()
-component_config = config.get(COLLECTOR, {})
-logger = log.init(COMPONENT_NAME, config)
 
-DNS_OPTIONS = DNSCollectorOptions.from_config(component_config)
-CONCURRENCY = component_config.get("concurrency", 16)
+class ZoneProcessor(AsyncProcessorBase):
 
-# The Faust application
-zone_app = make_app(COLLECTOR, config)
+    def __init__(self, config: dict):
+        super().__init__(config)
+        self._logger = log.init("worker")
 
-# The input and output topics
-topic_to_process = zone_app.topic('to_process_zone', key_type=str, key_serializer='str', allow_empty=True)
+        component_config = config.get(COLLECTOR, {})
+        self._dns_options = DNSCollectorOptions.from_config(component_config)
 
-topic_processed_zone = zone_app.topic('processed_zone', key_type=str, key_serializer='str')
+        cache = Cache()
+        self._collector = ZoneResolver(self._dns_options, self._logger, cache)
 
-topic_dns_requests = zone_app.topic('to_process_DNS', key_type=str, key_serializer='str')
+    async def process(self, key: bytes, value: bytes, partition: int, offset: int) -> list[SimpleMessage]:
+        logger = self._logger
+        dn = None
+        ret = []
 
-topic_rdap_requests = zone_app.topic('to_process_RDAP_DN', key_type=str, key_serializer='str')
-
-
-# The Zone processor
-@zone_app.agent(topic_to_process, concurrency=CONCURRENCY)
-async def process_entries(stream):
-    cache = Cache()
-    collector = ZoneResolver(DNS_OPTIONS, logger, cache)
-
-    # Main message processing loop
-    # dn is the domain name, req is the optional ZoneRequest object
-    async for dn, req in stream.items():
         try:
+            dn = key.decode("utf-8")
             logger.k_trace("Processing zone", dn)
-            req = ensure_model(ZoneRequest, req)
+            req = ensure_model(ZoneRequest, value)
 
             if dn.endswith(".arpa"):
                 result = ZoneResult(status_code=rc.INVALID_DOMAIN_NAME,
@@ -55,10 +45,11 @@ async def process_entries(stream):
                                     zone=None)
             else:
                 try:
-                    zone_info = await collector.get_zone_info(dn)
+                    zone_info = await self._collector.get_zone_info(dn)
                 except dns.exception.Timeout:
                     logger.k_debug("Timeout", dn)
-                    result = ZoneResult(status_code=rc.TIMEOUT, error=f"Timeout ({DNS_OPTIONS.timeout} s)", zone=None)
+                    result = ZoneResult(status_code=rc.TIMEOUT,
+                                        error=f"Timeout ({self._dns_options.timeout} s)", zone=None)
                 except dns.resolver.NoNameservers as e:
                     logger.k_debug("No nameservers", dn)
                     result = ZoneResult(status_code=rc.CANNOT_FETCH, error="SERVFAIL: " + str(e), zone=None)
@@ -70,7 +61,7 @@ async def process_entries(stream):
                         logger.k_trace("Zone found: %s", dn, zone_info.zone)
                         result = ZoneResult(status_code=0, zone=zone_info)
 
-            await topic_processed_zone.send(key=dn, value=result)
+            ret.append(('processed_zone', key, dump_model(result)))
 
             if result.status_code == 0:
                 if not req or req.collect_dns:
@@ -79,12 +70,13 @@ async def process_entries(stream):
                     dns_req = DNSRequest(dns_types_to_collect=to_collect,
                                          dns_types_to_process_IPs_from=to_process,
                                          zone_info=result.zone)
-                    await topic_dns_requests.send(key=dn, value=dns_req)
+                    ret.append(('to_process_DNS', key, dump_model(dns_req)))
 
                 if not req or req.collect_RDAP:
                     rdap_req = RDAPDomainRequest(zone=result.zone.zone)
-                    await topic_rdap_requests.send(key=dn, value=rdap_req)
-
+                    ret.append(('to_process_RDAP_DN', key, dump_model(rdap_req)))
         except Exception as e:
             logger.k_unhandled_error(e, dn)
-            await handle_top_level_exception(e, COMPONENT_NAME, dn, RDAPDomainResult, topic_processed_zone)
+            ret.append(make_top_level_exception_result('processed_zone', e, COMPONENT_NAME, dn, ZoneResult))
+
+        return ret

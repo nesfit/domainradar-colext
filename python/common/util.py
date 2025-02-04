@@ -1,6 +1,7 @@
 """util.py: A collection of shared utility functions for all the components."""
 __author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
 
+import json
 import logging
 import os
 import ssl
@@ -10,6 +11,7 @@ from datetime import datetime
 from typing import TypeVar, Type, Any, cast
 
 import faust
+import pydantic
 from faust.serializers import codecs
 from pydantic import ValidationError
 
@@ -202,7 +204,7 @@ def check_config_changes(component_id: str, app):
         _last_config_modify_time = stamp
         _config = None
         config = read_config()
-        log.init(component_id, config)
+        log.init(component_id)
         log.inject_handler(log.get(component_id), app.logger, config.get(component_id, {}))
 
 
@@ -229,7 +231,7 @@ def timestamp_now_millis() -> int:
 TModel = TypeVar('TModel')
 
 
-def ensure_model(model_class: Type[TModel], data: dict | None) -> TModel | None:
+def ensure_model(model_class: Type[TModel], data: dict | str | bytes | None) -> TModel | None:
     """
     Validates the provided data against the specified Pydantic model class.
 
@@ -249,6 +251,12 @@ def ensure_model(model_class: Type[TModel], data: dict | None) -> TModel | None:
     if data is None:
         return None
 
+    if isinstance(data, bytes) or isinstance(data, str):
+        if len(data) == 0:
+            return None
+        else:
+            data = json.loads(data)
+
     try:
         return model_class.model_validate(data)
     except ValidationError as e:
@@ -259,3 +267,11 @@ def ensure_model(model_class: Type[TModel], data: dict | None) -> TModel | None:
         _logger.error("Error validating model", exc_info=e,
                       extra={"properties": {"input_data": data, "model": model_class.__name__}})
         return None
+
+
+def dump_model(obj: Any) -> bytes:
+    if isinstance(obj, pydantic.BaseModel):
+        return obj.model_dump_json(indent=None, by_alias=True,
+                                   context={"separators": (',', ':')}).encode('utf-8', errors='ignore')
+    else:
+        return json.dumps(obj, indent=None, separators=(',', ':')).encode('utf-8', errors='ignore')

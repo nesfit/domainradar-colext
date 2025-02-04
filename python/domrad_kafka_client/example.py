@@ -6,8 +6,6 @@ from domrad_kafka_client.types import SimpleMessage
 
 
 class ExampleProcessor(ProcessorBase):
-    def init(self) -> None:
-        self._logger.info("Starting example processor")
 
     def process(self, key: bytes, value: bytes, partition: int, offset: int) -> list[SimpleMessage]:
         if not key:
@@ -20,9 +18,6 @@ class ExampleProcessor(ProcessorBase):
 
 
 class ExampleAsyncProcessor(AsyncProcessorBase):
-
-    def init(self) -> None:
-        self._logger.info("Starting example async processor")
 
     async def process(self, key: bytes, value: bytes, partition: int, offset: int) -> list[SimpleMessage]:
         import asyncio

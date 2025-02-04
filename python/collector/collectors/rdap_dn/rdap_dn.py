@@ -28,7 +28,7 @@ COMPONENT_NAME = "collector-" + COLLECTOR
 # Read the config
 config = read_config()
 component_config = config.get(COLLECTOR, {})
-logger = log.init(COMPONENT_NAME, config)
+logger = log.init(COMPONENT_NAME)
 
 HTTP_TIMEOUT = component_config.get("http_timeout", 5)
 CONCURRENCY = component_config.get("concurrency", 4)

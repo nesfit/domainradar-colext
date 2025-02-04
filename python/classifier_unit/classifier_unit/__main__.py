@@ -1,8 +1,9 @@
-if __name__ == '__main__':
-    from . import util
-    from . import client
+import domrad_kafka_client
+from . import classifier_impl
 
-    config = util.read_config()
-    util.setup_logging(config, "client")
-    client = client.ClassifierPipelineClient(config)
-    client.run()
+def main():
+    domrad_kafka_client.run_client("feature_vectors", classifier_impl.ClassifierProcessor)
+
+
+if __name__ == '__main__':
+    main()

@@ -1,6 +1,7 @@
 """scanner.py: The DNS scanner."""
 __author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
 
+import asyncio
 import ipaddress
 import socket
 from logging import Logger
@@ -86,18 +87,23 @@ class DNSScanner:
         ret["errors"] = dict()
         ret_ips = list()
 
+        all_requests = []
+
         if 'A' in types:
-            await self._resolve_a_or_aaaa(domain, 'A', primary_ns_ips, ret, ret_ips, 'A' in adr_types)
+            all_requests.append(self._resolve_a_or_aaaa(domain, 'A', primary_ns_ips, ret, ret_ips, 'A' in adr_types))
         if 'AAAA' in types:
-            await self._resolve_a_or_aaaa(domain, 'AAAA', primary_ns_ips, ret, ret_ips, 'AAAA' in adr_types)
+            all_requests.append(
+                self._resolve_a_or_aaaa(domain, 'AAAA', primary_ns_ips, ret, ret_ips, 'AAAA' in adr_types))
         if 'CNAME' in types:
-            await self._resolve_cname(domain, primary_ns_ips, ret, ret_ips, 'CNAME' in adr_types)
+            all_requests.append(self._resolve_cname(domain, primary_ns_ips, ret, ret_ips, 'CNAME' in adr_types))
         if 'MX' in types:
-            await self._resolve_mx(domain, primary_ns_ips, ret, ret_ips, 'MX' in adr_types)
+            all_requests.append(self._resolve_mx(domain, primary_ns_ips, ret, ret_ips, 'MX' in adr_types))
         if 'NS' in types:
-            await self._resolve_ns(domain, primary_ns_ips, ret, ret_ips, 'NS' in adr_types)
+            all_requests.append(self._resolve_ns(domain, primary_ns_ips, ret, ret_ips, 'NS' in adr_types))
         if 'TXT' in types:
-            await self._resolve_txt(domain, primary_ns_ips, ret)
+            all_requests.append(self._resolve_txt(domain, primary_ns_ips, ret))
+
+        await asyncio.gather(*all_requests)
 
         ret_errors = ret['errors']
         if len(ret_errors) == 0:

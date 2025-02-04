@@ -57,6 +57,11 @@ def init_logging() -> None:
     global _log_queue, _log_queue_listener, _config
     assert _config is not None
 
+    trace_const = logging.DEBUG - 5
+    if not hasattr(logging, "TRACE"):
+        logging.addLevelName(trace_const, 'TRACE')
+        setattr(logging, "TRACE", trace_const)
+
     class PassthroughHandler:
         def handle(self, record):
             if record.name == "root":
@@ -99,7 +104,7 @@ def get_worker_logger_config() -> dict:
 
     return {
         'version': 1,
-        'disable_existing_loggers': True,
+        'disable_existing_loggers': False,
         'handlers': {
             'queue': {
                 'class': 'logging.handlers.QueueHandler',
