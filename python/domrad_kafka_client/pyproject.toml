@@ -11,7 +11,7 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = ">=3.11,<3.12"
+python = ">=3.11"
 confluent-kafka = "^2.7.0"
 sortedcontainers = "^2.4.0"
 
