@@ -78,7 +78,7 @@ class _CustomLoggerT(logging.Logger):
         """
         pass
 
-    def k_warning(self, message: str, key: str | None = None, *args, e: Exception = None, **kwargs):
+    def k_warning(self, message: str, key: str | None = None, *args, e: BaseException = None, **kwargs):
         """
         Logs a warning level message with a key.
 
@@ -88,13 +88,13 @@ class _CustomLoggerT(logging.Logger):
         Args:
             message (str): The message to be logged.
             key (str | None): The key to be included in the log output. If None, a default key is used.
-            e (Exception, optional): The exception to be logged. If provided, the traceback is included in the log output.
+            e (BaseException, optional): The exception to be logged. If provided, the traceback is included in the log output.
             *args: Variable length argument list.
             **kwargs: Arbitrary keyword arguments.
         """
         pass
 
-    def k_unhandled_error(self, e: Exception, key: str | None = None, **kwargs):
+    def k_unhandled_error(self, e: BaseException, key: str | None = None, **kwargs):
         """
         Logs an error level message for an unhandled exception with a key.
 
@@ -102,7 +102,7 @@ class _CustomLoggerT(logging.Logger):
         of the exception.
 
         Args:
-            e (Exception): The unhandled exception to be logged.
+            e (BaseException): The unhandled exception to be logged.
             key (str | None): The key to be included in the log output. If None, a default key is used.
             **kwargs: Arbitrary keyword arguments.
         """
@@ -145,11 +145,11 @@ def init(component_id: str) -> _CustomLoggerT:
     def k_info(self, message: str, key: str | None = None, *args, **kwargs):
         self.info(message, *args, extra={"event_key": key or NO_KEY_STR, "properties": kwargs})
 
-    def k_warning(self, message: str, key: str | None = None, *args, e: Exception = None, **kwargs):
+    def k_warning(self, message: str, key: str | None = None, *args, e: BaseException = None, **kwargs):
         self.warning(message, *args, exc_info=e,
                      extra={"event_key": key or NO_KEY_STR, "properties": kwargs})
 
-    def k_unhandled_error(self, e: Exception, key: str | None = None, **kwargs):
+    def k_unhandled_error(self, e: BaseException, key: str | None = None, **kwargs):
         self.error("Unexpected error!", exc_info=e, stack_info=True,
                    extra={"event_key": key or NO_KEY_STR, "properties": kwargs})
 

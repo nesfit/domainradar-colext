@@ -8,7 +8,7 @@ from .message_processor import *
 from .types import SimpleMessage
 
 
-def run_client(input_topic: str, processor_type: Type[AnyProcessor], app_id_override: str | None = None):
+def run_client(input_topic: str, processor_type: Type[KafkaMessageProcessor], app_id_override: str | None = None):
     config = util.read_config()
     mp.set_start_method(config.get("client", {}).get("mp_start_method", "forkserver"))
     if app_id_override:
@@ -23,9 +23,9 @@ def run_client(input_topic: str, processor_type: Type[AnyProcessor], app_id_over
 __all__ = [
     "run_client",
     "KafkaClient",
-    "AnyProcessor",
-    "ProcessorBase",
-    "AsyncProcessorBase",
+    "KafkaMessageProcessor",
+    "SyncKafkaMessageProcessor",
+    "AsyncKafkaMessageProcessor",
     "SimpleMessage",
     "Message"
 ]

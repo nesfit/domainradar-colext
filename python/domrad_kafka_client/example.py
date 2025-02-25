@@ -2,11 +2,11 @@ import sys
 import time
 from random import random
 
-from domrad_kafka_client import ProcessorBase, run_client, AsyncProcessorBase, Message, TKey, TValue
+from domrad_kafka_client import SyncKafkaMessageProcessor, run_client, AsyncKafkaMessageProcessor, Message, TKey, TValue
 from domrad_kafka_client.types import SimpleMessage
 
 
-class ExampleProcessor(ProcessorBase[str, str]):
+class ExampleProcessor(SyncKafkaMessageProcessor[str, str]):
 
     def get_rl_bucket_key(self, message: Message[str, str]) -> str | None:
         if message.key:

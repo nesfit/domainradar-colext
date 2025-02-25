@@ -8,13 +8,13 @@ from collectors.util import should_omit_ip, make_top_level_exception_result
 from common import log
 from common.models import IPToProcess, IPProcessRequest, RTTResult, RTTData
 from common.util import ensure_model, dump_model
-from domrad_kafka_client import AsyncProcessorBase, SimpleMessage
+from domrad_kafka_client import AsyncKafkaMessageProcessor, SimpleMessage
 
 COLLECTOR = "rtt"
 COMPONENT_NAME = "collector-" + COLLECTOR
 
 
-class RTTProcessor(AsyncProcessorBase):
+class RTTProcessor(AsyncKafkaMessageProcessor):
     def __init__(self, config: dict):
         super().__init__(config)
         self._logger = log.init("worker")

@@ -102,7 +102,7 @@ def make_classifier_impl(config: dict) -> ClassifierBase:
         raise ValueError(f"Invalid classifier implementation: {impl}. Valid values are 'dummy' and 'production'.")
 
 
-class ClassifierProcessor(domrad_kafka_client.ProcessorBase):
+class ClassifierProcessor(domrad_kafka_client.SyncKafkaMessageProcessor):
     OUTPUT_TOPIC = "classification_results"
 
     def __init__(self, config: dict):

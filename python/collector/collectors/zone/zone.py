@@ -11,13 +11,13 @@ from collectors.zone.resolver import ZoneResolver
 from common import log
 from common.models import RDAPDomainRequest, ZoneRequest, ZoneResult, DNSRequest
 from common.util import ensure_model, dump_model
-from domrad_kafka_client import AsyncProcessorBase, SimpleMessage
+from domrad_kafka_client import AsyncKafkaMessageProcessor, SimpleMessage
 
 COLLECTOR = "zone"
 COMPONENT_NAME = "collector-" + COLLECTOR
 
 
-class ZoneProcessor(AsyncProcessorBase):
+class ZoneProcessor(AsyncKafkaMessageProcessor):
 
     def __init__(self, config: dict):
         super().__init__(config)

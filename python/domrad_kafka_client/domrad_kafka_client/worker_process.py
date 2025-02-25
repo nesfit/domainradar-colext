@@ -15,9 +15,28 @@ from typing import Type, Union, Awaitable
 from pyrate_limiter import BucketFactory, RateItem, AbstractBucket, TimeClock, RedisBucket, Rate, Limiter, \
     LimiterDelayException, BucketFullException, InMemoryBucket, MonotonicClock
 
-from .message_processor import AnyProcessor, AsyncProcessorBase, Message, ProcessorBase
+from .message_processor import KafkaMessageProcessor, AsyncKafkaMessageProcessor, Message, SyncKafkaMessageProcessor
 
 _process: mp.Process | None = None
+
+
+def _get_rate_limiter_section(config: dict, bucket_key: str) -> dict | None:
+    """
+    Get the rate limiter configuration section for the given bucket key.
+    :param config: The application configuration.
+    :param bucket_key: The bucket key to get the configuration for.
+    :return: The rate limiter configuration section for the given bucket key or None if not found (or not a dictionary).
+    """
+    assert bucket_key is not None
+    assert config is not None
+
+    rate_limiter_config = config.get("rate_limiter", {})
+    rl_config_for_key = rate_limiter_config.get(bucket_key)
+    if (rl_config_for_key is None or not isinstance(rl_config_for_key, dict)) and bucket_key is not "default":
+        rl_config_for_key = rate_limiter_config.get("default", None)
+    if not isinstance(rl_config_for_key, dict):
+        return None
+    return rl_config_for_key
 
 
 class _LoopError(Exception):
@@ -39,9 +58,9 @@ class _CustomBucketFactory(BucketFactory):
         self._pool = redis_pool
 
     def get_rates(self, bucket_key: str):
-        rl_config_for_key = self._config.get("rate_limiter", {}).get(bucket_key, None)
-        if rl_config_for_key is None: rl_config_for_key = self._config.get("rate_limiter", {}).get("default", None)
-        if rl_config_for_key is None or not isinstance(rl_config_for_key, dict): return []
+        rl_config_for_key = _get_rate_limiter_section(self._config, bucket_key)
+        if rl_config_for_key is None:
+            return []
         config = rl_config_for_key.get("rates", [])
         if config is None or not isinstance(config, list):
             return []
@@ -78,7 +97,7 @@ class _CustomBucketFactory(BucketFactory):
 
 
 class WorkerProcess:
-    def __init__(self, worker_id: int, config: dict, processor_type: Type[AnyProcessor],
+    def __init__(self, worker_id: int, config: dict, processor_type: Type[KafkaMessageProcessor],
                  to_process: mp.Queue, processed: mp.Queue):
         self._config = config
         self._logger = logging.getLogger(f"worker")
@@ -155,7 +174,7 @@ class WorkerProcess:
         # Rate limiting
         if self.rate_limiter_enabled:
             if not self._do_rate_limit(message):
-                ret = self._processor.process_error(message, ProcessorBase.ERROR_RATE_LIMITED)
+                ret = self._processor.process_error(message, SyncKafkaMessageProcessor.ERROR_RATE_LIMITED)
                 raise _LoopError(ret)
 
         # User processing function
@@ -175,8 +194,7 @@ class WorkerProcess:
         limiter = self._limiters.get(bucket_key, None)
         if limiter is not None: return limiter
 
-        rl_config_for_key = self._config.get("rate_limiter", {}).get(bucket_key, None)
-        if rl_config_for_key is None: rl_config_for_key = self._config.get("rate_limiter", {}).get("default", {})
+        rl_config_for_key = _get_rate_limiter_section(self._config, bucket_key)
         imm = rl_config_for_key.get("immediate", False)
         delay = None
         if not imm:
@@ -219,7 +237,7 @@ class WorkerProcess:
 class AioWorkerProcess(WorkerProcess):
     SLEEP = 0.05
 
-    def __init__(self, worker_id: int, config: dict, processor_type: Type[AsyncProcessorBase],
+    def __init__(self, worker_id: int, config: dict, processor_type: Type[AsyncKafkaMessageProcessor],
                  to_process: mp.Queue, processed: mp.Queue):
         super().__init__(worker_id, config, processor_type, to_process, processed)
 
@@ -271,7 +289,7 @@ class AioWorkerProcess(WorkerProcess):
         # Rate limiting
         if self.rate_limiter_enabled:
             if not await self._do_rate_limit(message):
-                ret = self._processor.process_error(message, ProcessorBase.ERROR_RATE_LIMITED)
+                ret = self._processor.process_error(message, SyncKafkaMessageProcessor.ERROR_RATE_LIMITED)
                 raise _LoopError(ret)
 
         # User processing function
@@ -350,13 +368,13 @@ def sigterm_handler(signal_num, stack_frame):
         _process = None
 
 
-def init_process(worker_id: int, config: dict, processor_type: Type[AnyProcessor],
+def init_process(worker_id: int, config: dict, processor_type: Type[KafkaMessageProcessor],
                  to_process: mp.Queue, processed: mp.Queue, logger_config: dict):
     global _process
 
     logging.config.dictConfig(logger_config)
     signal.signal(signal.SIGTERM, sigterm_handler)
-    if issubclass(processor_type, AsyncProcessorBase):
+    if issubclass(processor_type, AsyncKafkaMessageProcessor):
         _process = AioWorkerProcess(worker_id, config, processor_type, to_process, processed)
     else:
         _process = WorkerProcess(worker_id, config, processor_type, to_process, processed)

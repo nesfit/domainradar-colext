@@ -2,13 +2,13 @@ import logging
 import typing
 from time import sleep
 from .worker_manager import WorkerManager
-from .message_processor import AnyProcessor
+from .message_processor import KafkaMessageProcessor
 from . import util
 import confluent_kafka as ck
 
 
 class KafkaClient:
-    def __init__(self, config: dict, input_topic: str, processor_type: typing.Type[AnyProcessor]):
+    def __init__(self, config: dict, input_topic: str, processor_type: typing.Type[KafkaMessageProcessor]):
         self._config = config
         self._input_topic = input_topic
         self._processor_type = processor_type

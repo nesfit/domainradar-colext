@@ -30,7 +30,8 @@ async def handle_top_level_exception(exc_info, component_id, key, result_class, 
                                                 original_error=error_msg, topic=topic)
 
 
-def make_top_level_exception_result(topic: str, exc_info, component_id, key, result_class):
+def make_top_level_exception_result(topic: str, exc_info, component_id, key, result_class) \
+        -> tuple[str | None, bytes, bytes]:
     error_msg = str(exc_info)
     key_bytes = key if isinstance(key, bytes) else key.encode("utf-8")
 
@@ -44,3 +45,4 @@ def make_top_level_exception_result(topic: str, exc_info, component_id, key, res
     except Exception as e:
         log.get(component_id).k_unhandled_error(e, key, desc="Error sending the error message to the output topic",
                                                 original_error=error_msg, topic=topic)
+        return None, b'', b''

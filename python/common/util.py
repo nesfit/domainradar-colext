@@ -13,7 +13,7 @@ from typing import TypeVar, Type, Any, cast
 import faust
 import pydantic
 from faust.serializers import codecs
-from pydantic import ValidationError
+from pydantic import ValidationError, BaseModel
 
 from .custom_codecs import StringCodec, PydanticCodec
 
@@ -228,7 +228,7 @@ def timestamp_now_millis() -> int:
     return int(datetime.now().timestamp() * 1e3)
 
 
-TModel = TypeVar('TModel')
+TModel = TypeVar('TModel', bound=BaseModel)
 
 
 def ensure_model(model_class: Type[TModel], data: dict | str | bytes | None) -> TModel | None:
