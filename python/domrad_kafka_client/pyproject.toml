@@ -11,9 +11,11 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = ">=3.11"
+python = ">=3.11,<4.0"
 confluent-kafka = "^2.7.0"
 sortedcontainers = "^2.4.0"
+pyrate-limiter = "^3.7.0"
+redis = "^5.2.1"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.4"

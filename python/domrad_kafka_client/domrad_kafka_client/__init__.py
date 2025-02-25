@@ -26,5 +26,6 @@ __all__ = [
     "AnyProcessor",
     "ProcessorBase",
     "AsyncProcessorBase",
-    "SimpleMessage"
+    "SimpleMessage",
+    "Message"
 ]

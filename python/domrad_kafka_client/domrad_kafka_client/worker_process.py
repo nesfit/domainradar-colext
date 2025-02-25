@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import logging.config
@@ -5,11 +6,75 @@ import multiprocessing as mp
 import os
 import queue
 import signal
-from typing import Type
+from inspect import isawaitable
+from time import sleep
 
-from .message_processor import AnyProcessor, AsyncProcessorBase
+import redis
+from typing import Type, Union, Awaitable
+
+from pyrate_limiter import BucketFactory, RateItem, AbstractBucket, TimeClock, RedisBucket, Rate, Limiter, \
+    LimiterDelayException, BucketFullException, InMemoryBucket, MonotonicClock
+
+from .message_processor import AnyProcessor, AsyncProcessorBase, Message, ProcessorBase
 
 _process: mp.Process | None = None
+
+
+class _LoopError(Exception):
+    def __init__(self, error_messages_to_send: list | None = None):
+        self._error_messages_to_send = error_messages_to_send
+
+    @property
+    def error_messages_to_send(self) -> list | None:
+        return self._error_messages_to_send
+
+
+class _CustomBucketFactory(BucketFactory):
+
+    def __init__(self, config: dict, redis_pool: redis.ConnectionPool | redis.asyncio.ConnectionPool) -> None:
+        super().__init__()
+        self._config = config
+        self._clock = MonotonicClock()
+        self._buckets: dict[str, AbstractBucket | Awaitable[AbstractBucket]] = {}
+        self._pool = redis_pool
+
+    def get_rates(self, bucket_key: str):
+        rl_config_for_key = self._config.get("rate_limiter", {}).get(bucket_key, None)
+        if rl_config_for_key is None: rl_config_for_key = self._config.get("rate_limiter", {}).get("default", None)
+        if rl_config_for_key is None or not isinstance(rl_config_for_key, dict): return []
+        config = rl_config_for_key.get("rates", [])
+        if config is None or not isinstance(config, list):
+            return []
+
+        return [Rate(x["requests"], x["interval_ms"]) for x in config]
+
+    def wrap_item(self, name: str, weight: int = 1) -> Union[RateItem, Awaitable[RateItem]]:
+        return RateItem(name=name, timestamp=self._clock.now(), weight=1)
+
+    def get(self, item: RateItem) -> Union[AbstractBucket, Awaitable[AbstractBucket]]:
+        bucket = self._buckets.get(item.name, None)
+        if bucket is not None: return bucket
+
+        # b = InMemoryBucket(self.get_rates(item.name))
+        # self.schedule_leak(b, self._clock)
+        # self._buckets[item.name] = b
+        # return b
+
+        if isinstance(self._pool, redis.asyncio.ConnectionPool):
+            async def make_bucket():
+                async_redis_db = redis.asyncio.Redis(connection_pool=self._pool, db=0)
+                async_bucket = await RedisBucket.init(self.get_rates(item.name), async_redis_db, item.name)
+                self.schedule_leak(async_bucket, self._clock)
+                self._buckets[item.name] = async_bucket
+                return async_bucket
+
+            return make_bucket()
+        else:
+            redis_db = redis.Redis(connection_pool=self._pool, db=0)
+            bucket = RedisBucket.init(self.get_rates(item.name), redis_db, item.name)
+            self.schedule_leak(bucket, self._clock)
+            self._buckets[item.name] = bucket
+            return bucket
 
 
 class WorkerProcess:
@@ -19,19 +84,24 @@ class WorkerProcess:
         self._logger = logging.getLogger(f"worker")
         self._to_process = to_process
         self._processed = processed
-        self._running = True
 
+        self._limiters: dict[str, Limiter] = {}
+        self._bucket_factory = None
+        if config.get("client", {}).get("enable_rate_limiter"):
+            self._init_rate_limiting()
+
+        self._running = True
         self._logger.info("Initializing worker")
         self._processor = processor_type(config)
 
     def run(self):
         while self._running:
-            partition, offset, key, value = None, None, None, None
+            partition, offset, key_bytes, value_bytes = None, None, None, None
 
             # Try consuming a message
             # Watch for interrupts and errors
             try:
-                partition, offset, key, value = self._to_process.get(True, 5.0)
+                partition, offset, key_bytes, value_bytes = self._to_process.get(True, 5.0)
                 self._logger.debug("Processing at p=%s, o=%s", partition, offset)
             except queue.Empty:
                 continue
@@ -46,14 +116,19 @@ class WorkerProcess:
             # We must ensure it gets back to the processed queue
             if partition is not None:
                 ret = None
+
                 try:
                     # Though if cancellation was requested, don't actually classify the input
                     if self._running:
-                        ret = self._processor.process(key, value, partition, offset)
-                        self._logger.debug("Processed at p=%s, o=%s", partition, offset)
+                        ret = self._process(key_bytes, value_bytes, partition, offset)
+                        assert not isawaitable(ret)
                 except KeyboardInterrupt:
                     self._logger.info("Interrupted. Shutting down")
                     self._running = False
+                except _LoopError as e:
+                    self._logger.debug("Processed with error at p=%s, o=%s", partition, offset,
+                                       exc_info=e.__cause__)
+                    ret = e.error_messages_to_send
                 except Exception as e:
                     self._logger.error("Unexpected error. Shutting down", exc_info=e)
                     self._running = False
@@ -65,6 +140,76 @@ class WorkerProcess:
 
     def close(self):
         self._running = False
+
+    def _process(self, key_bytes, value_bytes, partition, offset) -> list | Awaitable[list]:
+        message = Message(key_bytes, value_bytes, None, None, partition, offset)
+
+        # Deserialize the message using user code
+        # The user code should populate the 'key' and 'value' fields of the Message object
+        try:
+            self._processor.deserialize(message)
+        except Exception as e:
+            ret = self._processor.process_error(message, e)
+            raise _LoopError(ret) from e
+
+        # Rate limiting
+        if self.rate_limiter_enabled:
+            if not self._do_rate_limit(message):
+                ret = self._processor.process_error(message, ProcessorBase.ERROR_RATE_LIMITED)
+                raise _LoopError(ret)
+
+        # User processing function
+        try:
+            ret = self._processor.process(message)
+            self._logger.debug("Processed at p=%s, o=%s", partition, offset)
+            return ret
+        except Exception as e:
+            ret = self._processor.process_error(message, e)
+            raise _LoopError(ret) from e
+
+    def _init_rate_limiting(self):
+        redis_pool = redis.ConnectionPool.from_url(self._config.get("client", {}).get("redis_uri"))
+        self._bucket_factory = _CustomBucketFactory(config=self._config, redis_pool=redis_pool)
+
+    def _get_limiter(self, bucket_key: str) -> Limiter:
+        limiter = self._limiters.get(bucket_key, None)
+        if limiter is not None: return limiter
+
+        rl_config_for_key = self._config.get("rate_limiter", {}).get(bucket_key, None)
+        if rl_config_for_key is None: rl_config_for_key = self._config.get("rate_limiter", {}).get("default", {})
+        imm = rl_config_for_key.get("immediate", False)
+        delay = None
+        if not imm:
+            delay = rl_config_for_key.get("max_wait", 10)
+
+        limiter = Limiter(self._bucket_factory, TimeClock(), raise_when_fail=True,
+                          max_delay=(delay * 1000) if delay else None)
+        self._limiters[bucket_key] = limiter
+        return limiter
+
+    def _do_rate_limit(self, message) -> bool:
+        rl_bucket_key = self._processor.get_rl_bucket_key(message)
+        if rl_bucket_key is None:
+            return True
+
+        limiter = self._get_limiter(rl_bucket_key)
+
+        while True:
+            try:
+                limiter.try_acquire(rl_bucket_key)
+                return True
+            except (LimiterDelayException, BucketFullException) as e:
+                self._logger.debug("Rate limited: " + str(e))
+                return False
+            except AssertionError as e:
+                # Re-acquire not successful due to a race
+                self._logger.warning("Rate limiter assertion error, trying again", exc_info=e)
+                sleep(0.1)
+                continue
+
+    @property
+    def rate_limiter_enabled(self):
+        return self._bucket_factory is not None
 
     @staticmethod
     def _serialize(value: dict) -> bytes:
@@ -88,6 +233,55 @@ class AioWorkerProcess(WorkerProcess):
             self._running = False
 
         self._logger.info("Finished (PID %s)", os.getpid())
+
+    def _init_rate_limiting(self):
+        redis_pool = redis.asyncio.ConnectionPool.from_url(self._config.get("client", {}).get("redis_uri"))
+        self._bucket_factory = _CustomBucketFactory(config=self._config, redis_pool=redis_pool)
+
+    async def _do_rate_limit(self, message) -> bool:
+        rl_bucket_key = self._processor.get_rl_bucket_key(message)
+        if rl_bucket_key is None:
+            return True
+
+        limiter = self._get_limiter(rl_bucket_key)
+        while True:
+            try:
+                await limiter.try_acquire(rl_bucket_key)
+                return True
+            except (LimiterDelayException, BucketFullException):
+                self._logger.debug("Rate limited")
+                return False
+            except AssertionError as e:
+                # Re-acquire not successful due to a race
+                self._logger.warning("Rate limiter assertion error, trying again", exc_info=e)
+                await asyncio.sleep(0.1)
+                continue
+
+    async def _process(self, key_bytes, value_bytes, partition, offset) -> list:
+        message = Message(key_bytes, value_bytes, None, None, partition, offset)
+
+        # Deserialize the message using user code
+        # The user code should populate the 'key' and 'value' fields of the Message object
+        try:
+            self._processor.deserialize(message)
+        except Exception as e:
+            ret = self._processor.process_error(message, e)
+            raise _LoopError(ret) from e
+
+        # Rate limiting
+        if self.rate_limiter_enabled:
+            if not await self._do_rate_limit(message):
+                ret = self._processor.process_error(message, ProcessorBase.ERROR_RATE_LIMITED)
+                raise _LoopError(ret)
+
+        # User processing function
+        try:
+            ret = await self._processor.process(message)
+            self._logger.debug("Processed at p=%s, o=%s", partition, offset)
+            return ret
+        except Exception as e:
+            ret = self._processor.process_error(message, e)
+            raise _LoopError(ret) from e
 
     async def _run_async(self):
         import asyncio
@@ -121,11 +315,16 @@ class AioWorkerProcess(WorkerProcess):
                 try:
                     # Though if cancellation was requested, don't actually classify the input
                     if self._running:
-                        ret = await self._processor.process(key, value, partition, offset)
-                        self._logger.debug("Processed at p=%s, o=%s", partition, offset)
+                        ret_awaitable = self._process(key, value, partition, offset)
+                        assert isawaitable(ret_awaitable)
+                        ret = await ret_awaitable
                 except (KeyboardInterrupt, asyncio.CancelledError):
                     self._logger.info("Interrupted. Shutting down")
                     self._running = False
+                except _LoopError as e:
+                    self._logger.debug("Processed with error at p=%s, o=%s", partition, offset,
+                                       exc_info=e.__cause__)
+                    ret = e.error_messages_to_send
                 except Exception as e:
                     self._logger.error("Unexpected error. Shutting down", exc_info=e)
                     self._running = False
