@@ -26,7 +26,8 @@ class _KafkaMessageProcessorBase(Generic[TKey, TValue], abc.ABC):
     and asynchronous Kafka message processors. Derived classes must implement the abstract
     methods for deserialization, processing, and error handling.
     """
-    ERROR_RATE_LIMITED = 1
+    ERROR_RATE_LIMITED_IMMEDIATE = 1
+    ERROR_RATE_LIMITED_WITH_TIMEOUT = 2
 
     def __init__(self, config: dict):
         """

@@ -11,17 +11,19 @@ import common.result_codes as rc
 
 TCollectorKey = TypeVar('TCollectorKey')
 TCollectorRequest = TypeVar('TCollectorRequest', bound=BaseModel)
+TCollectorResponse = TypeVar('TCollectorResponse', bound=BaseModel)
 
 
 class BaseAsyncCollectorProcessor(AsyncKafkaMessageProcessor[TCollectorKey, TCollectorRequest], abc.ABC):
 
     def __init__(self, config: dict, component_name: str, output_topic: str, key_class: Type[TCollectorKey],
-                 value_class: Type[TCollectorRequest]):
+                 value_class: Type[TCollectorRequest], result_class: Type[TCollectorResponse]):
         super().__init__(config)
         self._component_name = component_name
         self._output_topic = output_topic
         self._key_class = key_class
         self._value_class = value_class
+        self._result_class = result_class
 
     def deserialize(self, message: Message[TCollectorKey, TCollectorRequest]):
         if issubclass(self._key_class, str):
@@ -35,16 +37,17 @@ class BaseAsyncCollectorProcessor(AsyncKafkaMessageProcessor[TCollectorKey, TCol
         if isinstance(error, BaseException):
             self._logger.k_unhandled_error(error, message.key)
             res = make_top_level_exception_result(self._output_topic, error, self._component_name, message.key_raw,
-                                                  self._value_class)
-        elif error == self.ERROR_RATE_LIMITED:
+                                                  self._result_class)
+        elif error == self.ERROR_RATE_LIMITED_IMMEDIATE or error == self.ERROR_RATE_LIMITED_WITH_TIMEOUT:
             self._logger.k_info("Rate limited", message.key)
+            status_code = rc.LOCAL_RATE_LIMIT if error == self.ERROR_RATE_LIMITED_IMMEDIATE else rc.LRL_TIMEOUT
             return [
-                (self._output_topic, message.key_raw, dump_model(self._value_class(status_code=rc.LOCAL_RATE_LIMIT)))
+                (self._output_topic, message.key_raw, dump_model(self._result_class(status_code=status_code)))
             ]
         else:
             self._logger.k_unhandled_error(ValueError(), message.key, error_id=error)
             res = make_top_level_exception_result(self._output_topic, f"Error {error}",
-                                                  self._component_name, message.key_raw, self._value_class)
+                                                  self._component_name, message.key_raw, self._result_class)
 
         if res[0] is None: return []
         return [res]

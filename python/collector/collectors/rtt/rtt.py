@@ -4,46 +4,42 @@ __author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
 from icmplib import async_ping, ICMPSocketError, DestinationUnreachable, TimeExceeded
 
 import common.result_codes as rc
+from collectors.processor import BaseAsyncCollectorProcessor
 from collectors.util import should_omit_ip, make_top_level_exception_result
 from common import log
 from common.models import IPToProcess, IPProcessRequest, RTTResult, RTTData
-from common.util import ensure_model, dump_model
-from domrad_kafka_client import AsyncKafkaMessageProcessor, SimpleMessage
+from common.util import dump_model
+from domrad_kafka_client import SimpleMessage, Message
 
 COLLECTOR = "rtt"
 COMPONENT_NAME = "collector-" + COLLECTOR
 
 
-class RTTProcessor(AsyncKafkaMessageProcessor):
+class RTTProcessor(BaseAsyncCollectorProcessor[IPToProcess, IPProcessRequest]):
     def __init__(self, config: dict):
-        super().__init__(config)
+        super().__init__(config, COMPONENT_NAME, 'collected_IP_data', IPToProcess, IPProcessRequest, RTTResult)
         self._logger = log.init("worker")
 
         component_config = config.get(COLLECTOR, {})
         self._count = component_config.get("ping_count", 5)
         self._privileged = component_config.get("privileged", False)
 
-    async def process(self, key: bytes, value: bytes, partition: int, offset: int) -> list[SimpleMessage]:
+    async def process(self, message: Message[IPToProcess, IPProcessRequest]) -> list[SimpleMessage]:
         logger = self._logger
-
-        dn_ip = ensure_model(IPToProcess, key)
-        process_request = ensure_model(IPProcessRequest, value)
+        dn_ip = message.key
+        process_request = message.value
 
         if dn_ip is None:
             return []
 
-        try:
-            # Omit the DN if the collector is not in the list of collectors to process
-            if should_omit_ip(process_request, COLLECTOR):
-                logger.k_trace("Omitting IP %s", dn_ip.domain_name, dn_ip.ip)
-                return []
+        # Omit the DN if the collector is not in the list of collectors to process
+        if should_omit_ip(process_request, COLLECTOR):
+            logger.k_trace("Omitting IP %s", dn_ip.domain_name, dn_ip.ip)
+            return []
 
-            logger.k_trace("Processing %s", dn_ip.domain_name, dn_ip.ip)
-            result = await self.process_entry(dn_ip)
-            return [('collected_IP_data', key, dump_model(result))]
-        except Exception as e:
-            logger.k_unhandled_error(e, str(dn_ip))
-            return [make_top_level_exception_result('collected_IP_data', e, COMPONENT_NAME, dn_ip, RTTResult)]
+        logger.k_trace("Processing %s", dn_ip.domain_name, dn_ip.ip)
+        result = await self.process_entry(dn_ip)
+        return [(self._output_topic, message.key_raw, dump_model(result))]
 
     async def process_entry(self, dn_ip) -> RTTResult:
         rtt_data = None

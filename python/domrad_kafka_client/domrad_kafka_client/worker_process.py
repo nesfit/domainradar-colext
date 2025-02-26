@@ -173,8 +173,9 @@ class WorkerProcess:
 
         # Rate limiting
         if self.rate_limiter_enabled:
-            if not self._do_rate_limit(message):
-                ret = self._processor.process_error(message, SyncKafkaMessageProcessor.ERROR_RATE_LIMITED)
+            rl_result = self._do_rate_limit(message)
+            if rl_result != 0:
+                ret = self._processor.process_error(message, rl_result)
                 raise _LoopError(ret)
 
         # User processing function
@@ -205,7 +206,7 @@ class WorkerProcess:
         self._limiters[bucket_key] = limiter
         return limiter
 
-    def _do_rate_limit(self, message) -> bool:
+    def _do_rate_limit(self, message) -> int:
         rl_bucket_key = self._processor.get_rl_bucket_key(message)
         if rl_bucket_key is None:
             return True
@@ -215,15 +216,17 @@ class WorkerProcess:
         while True:
             try:
                 limiter.try_acquire(rl_bucket_key)
-                return True
+                return 0
             except (LimiterDelayException, BucketFullException) as e:
                 self._logger.debug("Rate limited: " + str(e))
-                return False
+                return SyncKafkaMessageProcessor.ERROR_RATE_LIMITED_IMMEDIATE if limiter.max_delay is None \
+                    else SyncKafkaMessageProcessor.ERROR_RATE_LIMITED_WITH_TIMEOUT
             except AssertionError as e:
                 # Re-acquire not successful due to a race
                 self._logger.warning("Rate limiter assertion error, trying again", exc_info=e)
                 sleep(0.1)
                 continue
+        return 0
 
     @property
     def rate_limiter_enabled(self):
@@ -256,7 +259,7 @@ class AioWorkerProcess(WorkerProcess):
         redis_pool = redis.asyncio.ConnectionPool.from_url(self._config.get("client", {}).get("redis_uri"))
         self._bucket_factory = _CustomBucketFactory(config=self._config, redis_pool=redis_pool)
 
-    async def _do_rate_limit(self, message) -> bool:
+    async def _do_rate_limit(self, message) -> int:
         rl_bucket_key = self._processor.get_rl_bucket_key(message)
         if rl_bucket_key is None:
             return True
@@ -265,15 +268,17 @@ class AioWorkerProcess(WorkerProcess):
         while True:
             try:
                 await limiter.try_acquire(rl_bucket_key)
-                return True
+                return 0
             except (LimiterDelayException, BucketFullException):
                 self._logger.debug("Rate limited")
-                return False
+                return SyncKafkaMessageProcessor.ERROR_RATE_LIMITED_IMMEDIATE if limiter.max_delay is None \
+                    else SyncKafkaMessageProcessor.ERROR_RATE_LIMITED_WITH_TIMEOUT
             except AssertionError as e:
                 # Re-acquire not successful due to a race
                 self._logger.warning("Rate limiter assertion error, trying again", exc_info=e)
                 await asyncio.sleep(0.1)
                 continue
+        return 0
 
     async def _process(self, key_bytes, value_bytes, partition, offset) -> list:
         message = Message(key_bytes, value_bytes, None, None, partition, offset)
@@ -288,8 +293,9 @@ class AioWorkerProcess(WorkerProcess):
 
         # Rate limiting
         if self.rate_limiter_enabled:
-            if not await self._do_rate_limit(message):
-                ret = self._processor.process_error(message, SyncKafkaMessageProcessor.ERROR_RATE_LIMITED)
+            rl_result = await self._do_rate_limit(message)
+            if rl_result != 0:
+                ret = self._processor.process_error(message, rl_result)
                 raise _LoopError(ret)
 
         # User processing function
