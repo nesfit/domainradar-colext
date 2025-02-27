@@ -8,6 +8,7 @@ import queue
 import signal
 from inspect import isawaitable
 from time import sleep
+from . import util
 
 import redis
 from typing import Type, Union, Awaitable
@@ -32,7 +33,7 @@ def _get_rate_limiter_section(config: dict, bucket_key: str) -> dict | None:
 
     rate_limiter_config = config.get("rate_limiter", {})
     rl_config_for_key = rate_limiter_config.get(bucket_key)
-    if (rl_config_for_key is None or not isinstance(rl_config_for_key, dict)) and bucket_key is not "default":
+    if (rl_config_for_key is None or not isinstance(rl_config_for_key, dict)) and bucket_key != "default":
         rl_config_for_key = rate_limiter_config.get("default", None)
     if not isinstance(rl_config_for_key, dict):
         return None
@@ -163,26 +164,24 @@ class WorkerProcess:
     def _process(self, key_bytes, value_bytes, partition, offset) -> list | Awaitable[list]:
         message = Message(key_bytes, value_bytes, None, None, partition, offset)
 
-        # Deserialize the message using user code
-        # The user code should populate the 'key' and 'value' fields of the Message object
         try:
+            # Deserialize the message using user code
+            # The user code should populate the 'key' and 'value' fields of the Message object
             self._processor.deserialize(message)
-        except Exception as e:
-            ret = self._processor.process_error(message, e)
-            raise _LoopError(ret) from e
 
-        # Rate limiting
-        if self.rate_limiter_enabled:
-            rl_result = self._do_rate_limit(message)
-            if rl_result != 0:
-                ret = self._processor.process_error(message, rl_result)
-                raise _LoopError(ret)
+            # Rate limiting
+            if self.rate_limiter_enabled:
+                rl_result = self._do_rate_limit(message)
+                if rl_result != 0:
+                    ret = self._processor.process_error(message, rl_result)
+                    raise _LoopError(ret)
 
-        # User processing function
-        try:
+            # User processing function
             ret = self._processor.process(message)
             self._logger.debug("Processed at p=%s, o=%s", partition, offset)
             return ret
+        except _LoopError as e:
+            raise e
         except Exception as e:
             ret = self._processor.process_error(message, e)
             raise _LoopError(ret) from e
@@ -209,7 +208,7 @@ class WorkerProcess:
     def _do_rate_limit(self, message) -> int:
         rl_bucket_key = self._processor.get_rl_bucket_key(message)
         if rl_bucket_key is None:
-            return True
+            return 0
 
         limiter = self._get_limiter(rl_bucket_key)
 
@@ -262,7 +261,7 @@ class AioWorkerProcess(WorkerProcess):
     async def _do_rate_limit(self, message) -> int:
         rl_bucket_key = self._processor.get_rl_bucket_key(message)
         if rl_bucket_key is None:
-            return True
+            return 0
 
         limiter = self._get_limiter(rl_bucket_key)
         while True:
@@ -283,26 +282,24 @@ class AioWorkerProcess(WorkerProcess):
     async def _process(self, key_bytes, value_bytes, partition, offset) -> list:
         message = Message(key_bytes, value_bytes, None, None, partition, offset)
 
-        # Deserialize the message using user code
-        # The user code should populate the 'key' and 'value' fields of the Message object
         try:
+            # Deserialize the message using user code
+            # The user code should populate the 'key' and 'value' fields of the Message object
             self._processor.deserialize(message)
-        except Exception as e:
-            ret = self._processor.process_error(message, e)
-            raise _LoopError(ret) from e
 
-        # Rate limiting
-        if self.rate_limiter_enabled:
-            rl_result = await self._do_rate_limit(message)
-            if rl_result != 0:
-                ret = self._processor.process_error(message, rl_result)
-                raise _LoopError(ret)
+            # Rate limiting
+            if self.rate_limiter_enabled:
+                rl_result = await self._do_rate_limit(message)
+                if rl_result != 0:
+                    ret = self._processor.process_error(message, rl_result)
+                    raise _LoopError(ret)
 
-        # User processing function
-        try:
+            # User processing function
             ret = await self._processor.process(message)
             self._logger.debug("Processed at p=%s, o=%s", partition, offset)
             return ret
+        except _LoopError as e:
+            raise e
         except Exception as e:
             ret = self._processor.process_error(message, e)
             raise _LoopError(ret) from e
@@ -310,6 +307,7 @@ class AioWorkerProcess(WorkerProcess):
     async def _run_async(self):
         import asyncio
 
+        await self._processor.init_async()
         while self._running:
             partition, offset, key, value = None, None, None, None
 
@@ -365,6 +363,7 @@ class AioWorkerProcess(WorkerProcess):
                                 break
 
                     self._logger.debug("Placed to processed q at p=%s, o=%s", partition, offset)
+        await self._processor.close_async()
 
 
 def sigterm_handler(signal_num, stack_frame):
@@ -378,6 +377,7 @@ def init_process(worker_id: int, config: dict, processor_type: Type[KafkaMessage
                  to_process: mp.Queue, processed: mp.Queue, logger_config: dict):
     global _process
 
+    util.add_logging_trace_level()
     logging.config.dictConfig(logger_config)
     signal.signal(signal.SIGTERM, sigterm_handler)
     if issubclass(processor_type, AsyncKafkaMessageProcessor):

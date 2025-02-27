@@ -5,6 +5,7 @@ import os
 import tomllib
 import platform
 import multiprocessing as mp
+from logging import Handler
 from typing import Optional
 
 _config_file = None
@@ -53,16 +54,28 @@ def read_config() -> dict:
         return _config
 
 
+def add_logging_trace_level() -> None:
+    # Define the new "trace" method
+    def trace(self, message, *args, **kwargs):
+        if self.isEnabledFor(trace_const):
+            self._log(trace_const, message, args, **kwargs)
+
+    trace_const = logging.DEBUG - 5
+    logger_class = logging.getLoggerClass()
+
+    if not hasattr(logging, "TRACE"):
+        logging.addLevelName(trace_const, 'TRACE')
+        setattr(logging, "TRACE", trace_const)
+        setattr(logger_class, "trace", trace)
+
+
 def init_logging() -> None:
     global _log_queue, _log_queue_listener, _config
     assert _config is not None
 
-    trace_const = logging.DEBUG - 5
-    if not hasattr(logging, "TRACE"):
-        logging.addLevelName(trace_const, 'TRACE')
-        setattr(logging, "TRACE", trace_const)
+    add_logging_trace_level()
 
-    class PassthroughHandler:
+    class PassthroughHandler(Handler):
         def handle(self, record):
             if record.name == "root":
                 logger = logging.getLogger()
@@ -97,14 +110,11 @@ def get_worker_logger_config() -> dict:
     assert _config is not None
     assert _log_queue is not None
 
-    level = (_config.get("logging", {})
-             .get("loggers", {})
-             .get("worker", {})
-             .get("level", "INFO"))
+    level = _config.get("logging", {}).get("worker_level", "INFO")
 
     return {
         'version': 1,
-        'disable_existing_loggers': False,
+        'disable_existing_loggers': True,
         'handlers': {
             'queue': {
                 'class': 'logging.handlers.QueueHandler',

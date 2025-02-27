@@ -97,6 +97,12 @@ class SyncKafkaMessageProcessor(_KafkaMessageProcessorBase[TKey, TValue]):
 
 
 class AsyncKafkaMessageProcessor(_KafkaMessageProcessorBase[TKey, TValue]):
+    async def init_async(self):
+        pass
+
+    async def close_async(self):
+        pass
+
     @abc.abstractmethod
     async def process(self, message: Message[TKey, TValue]) -> list[SimpleMessage]:
         pass
