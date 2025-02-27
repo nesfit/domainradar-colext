@@ -417,7 +417,7 @@ class LexicalTransformation(Transformation):
         self._malware_ngram_freq = dict()
         self._dga_ngram_freq = dict()
 
-        data_path = config.get("data_path", "data")
+        data_path = config.get("data_dir", "data")
         # N-grams
         with open(os.path.join(data_path, 'ngram_freq_phishing.json')) as f:
             self._phishing_ngram_freq = json.load(f)
