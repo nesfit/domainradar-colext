@@ -35,11 +35,6 @@ class RDAPIPProcessor(BaseAsyncCollectorProcessor[IPToProcess, IPProcessRequest]
         self._ipv4_client = None
         self._ipv6_client = None
 
-        # TODO: Closing the client on shutdown
-        # await ipv4_client.aio_close()
-        # await ipv6_client.aio_close()
-        # await httpx_client.aclose()
-
     def get_rl_bucket_key(self, message: Message[IPToProcess, IPProcessRequest]) -> str | Literal['default'] | None:
         ip = ipaddress.ip_address(message.key.ip)
         # noinspection PyProtectedMember
@@ -47,21 +42,23 @@ class RDAPIPProcessor(BaseAsyncCollectorProcessor[IPToProcess, IPProcessRequest]
             else self._ipv6_client._get_rdap_server(ip)
         return rdap_target
 
-    async def _init_rdap_client(self):
+    async def init_async(self):
         while True:
             try:
                 self._ipv4_client = await whodap.IPv4Client.new_aio_client(httpx_client=self._httpx_client)
                 self._ipv6_client = await whodap.IPv6Client.new_aio_client(httpx_client=self._httpx_client)
                 break
             except Exception as e:
-                self._logger.error("Error initializing RDAP clients. Retrying in 10 seconds.", exc_info=e)
-                await asyncio.sleep(10)
+                self._logger.error("Error initializing RDAP clients. Retrying in 5 seconds.", exc_info=e)
+                await asyncio.sleep(5)
+
+    async def close_async(self):
+        await self._ipv4_client.aio_close()
+        await self._ipv6_client.aio_close()
+        await self._httpx_client.aclose()
 
     async def process(self, message: Message[IPToProcess, IPProcessRequest]) -> list[SimpleMessage]:
         logger = self._logger
-        if not self._ipv4_client:
-            await self._init_rdap_client()
-
         dn_ip = message.key
         process_request = message.value
 

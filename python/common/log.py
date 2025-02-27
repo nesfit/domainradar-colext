@@ -135,9 +135,6 @@ class ExtraFormatter(logging.Formatter):
 
 
 def init(component_id: str) -> _CustomLoggerT:
-    # Define a constant for the trace logging level
-    trace_const = logging.DEBUG - 5
-
     # Define the implementations of the custom logging methods to extend Python's logger with
     def k_debug(self, message: str, key: str | None = None, *args, **kwargs):
         self.debug(message, *args, extra={"event_key": key or NO_KEY_STR, "properties": kwargs})
@@ -153,24 +150,19 @@ def init(component_id: str) -> _CustomLoggerT:
         self.error("Unexpected error!", exc_info=e, stack_info=True,
                    extra={"event_key": key or NO_KEY_STR, "properties": kwargs})
 
-    def trace(self, message, *args, **kwargs):
-        if self.isEnabledFor(trace_const):
-            self._log(trace_const, message, args, **kwargs)
-
     def k_trace(self, message: str, key: str | None = None, *args, **kwargs):
         self.trace(message, *args, extra={"event_key": key or "no key", "properties": kwargs})
 
     # Add the custom logging methods to the logger class if they don't already exist
     logger_class = logging.getLoggerClass()
     if not hasattr(logger_class, "k_unhandled_error"):
-        setattr(logger_class, "trace", trace)
         setattr(logger_class, "k_trace", k_trace)
         setattr(logger_class, "k_debug", k_debug)
         setattr(logger_class, "k_info", k_info)
         setattr(logger_class, "k_warning", k_warning)
         setattr(logger_class, "k_unhandled_error", k_unhandled_error)
 
-    # Get the logger for the component and set its level
+    # Get the logger for the component
     logger = logging.getLogger(component_id)
 
     # Return the configured logger

@@ -15,7 +15,6 @@ class DNSCollectorOptions:
         types_to_scan (list): The types of DNS records to scan. Not used in the zone collector.
         types_to_process_IPs_from (list): The types of DNS records to process IPs from. Not used in the zone collector.
         max_record_retries (int): The maximum number of retries for each record. Not used in the zone collector.
-        use_one_socket (bool): Whether to use a single socket for all queries. Not used in the zone collector.
     """
 
     @classmethod
@@ -28,11 +27,10 @@ class DNSCollectorOptions:
         types_to_scan = component_config.get("types_to_scan", ['A', 'AAAA', 'CNAME', 'MX', 'NS', 'TXT'])
         types_to_process_ips_from = component_config.get("types_to_process_IPs_from", ['A', 'AAAA', 'CNAME'])
         max_record_retries = component_config.get("max_record_retries", 2)
-        use_one_socket = component_config.get("use_one_socket", True)
 
         return cls(dns_servers=dns_servers, timeout=timeout, rotate_nameservers=rotate_nameservers,
                    types_to_scan=types_to_scan, types_to_process_IPs_from=types_to_process_ips_from,
-                   max_record_retries=max_record_retries, use_one_socket=use_one_socket)
+                   max_record_retries=max_record_retries)
 
     def __init__(self, **kwargs):
         """
@@ -49,4 +47,3 @@ class DNSCollectorOptions:
         self.types_to_scan = kwargs.get('types_to_scan')
         self.types_to_process_IPs_from = kwargs.get('types_to_process_IPs_from')
         self.max_record_retries = kwargs.get('max_record_retries')
-        self.use_one_socket = kwargs.get('use_one_socket')

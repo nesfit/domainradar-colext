@@ -5,7 +5,7 @@ from icmplib import async_ping, ICMPSocketError, DestinationUnreachable, TimeExc
 
 import common.result_codes as rc
 from collectors.processor import BaseAsyncCollectorProcessor
-from collectors.util import should_omit_ip, make_top_level_exception_result
+from collectors.util import should_omit_ip
 from common import log
 from common.models import IPToProcess, IPProcessRequest, RTTResult, RTTData
 from common.util import dump_model
@@ -23,6 +23,8 @@ class RTTProcessor(BaseAsyncCollectorProcessor[IPToProcess, IPProcessRequest]):
         component_config = config.get(COLLECTOR, {})
         self._count = component_config.get("ping_count", 5)
         self._privileged = component_config.get("privileged", False)
+        self._timeout = component_config.get("timeout_ms", 1000) / 1000
+        self._interval = component_config.get("interval_ms", 1000) / 1000
 
     async def process(self, message: Message[IPToProcess, IPProcessRequest]) -> list[SimpleMessage]:
         logger = self._logger
@@ -44,7 +46,8 @@ class RTTProcessor(BaseAsyncCollectorProcessor[IPToProcess, IPProcessRequest]):
     async def process_entry(self, dn_ip) -> RTTResult:
         rtt_data = None
         try:
-            ping_result = await async_ping(dn_ip.ip, count=self._count, privileged=self._privileged)
+            ping_result = await async_ping(dn_ip.ip, count=self._count, timeout=self._timeout, interval=self._interval,
+                                           privileged=self._privileged)
             rtt_data = RTTData(min=ping_result.min_rtt, avg=ping_result.avg_rtt, max=ping_result.max_rtt,
                                sent=ping_result.packets_sent, received=ping_result.packets_received,
                                jitter=ping_result.jitter)

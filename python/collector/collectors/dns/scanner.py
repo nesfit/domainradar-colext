@@ -40,7 +40,6 @@ class DNSScanner:
         self._dns.timeout = options.timeout
         self._dns.lifetime = options.timeout * 1.2
         self._dns.cache = cache
-        self._udp_sock = None
 
         self._timeout_error = f"Timeout ({options.timeout} s)"
 
@@ -62,8 +61,6 @@ class DNSScanner:
         Returns:
             DNSResult: The result of the DNS scan, including any collected DNS records and any errors that occurred.
         """
-        if self._options.use_one_socket and self._udp_sock is None:
-            self._udp_sock = await dns.asyncbackend.get_default_backend().make_socket(socket.AF_INET, socket.SOCK_DGRAM)
 
         zone = request.zone_info
         try:
@@ -286,7 +283,7 @@ class DNSScanner:
             # noinspection PyBroadException
             try:
                 response, _ = await dns.asyncquery.udp_with_fallback(query, ns_to_try, self._options.timeout,
-                                                                     udp_sock=self._udp_sock)
+                                                                     udp_sock=None)
                 res_data, res_sig = get_response_pair(response)
                 return res_data, res_sig, True, None
             except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer, KeyError):

@@ -38,10 +38,6 @@ class RDAPDNProcessor(BaseAsyncCollectorProcessor[str, RDAPDomainRequest]):
 
         self._rate_limiters = config.get("rate_limiter", {})
 
-        # TODO: Closing the client on shutdown
-        # await rdap_client.aio_close()
-        # await httpx_client.aclose()
-
     # def deserialize(self, message: Message[str, RDAPDomainRequest]):
     #     super().deserialize(message)
     #     # TODO: pre-process TLD?
@@ -52,19 +48,21 @@ class RDAPDNProcessor(BaseAsyncCollectorProcessor[str, RDAPDomainRequest]):
             return endpoint
         return tld
 
-    async def _init_rdap_client(self):
+    async def init_async(self):
         while True:
             try:
                 self._rdap_client = await whodap.DNSClient.new_aio_client(httpx_client=self._httpx_client)
                 break
             except Exception as e:
-                self._logger.error("Error initializing RDAP client. Retrying in 10 seconds.", exc_info=e)
-                await asyncio.sleep(10)
+                self._logger.error("Error initializing RDAP client. Retrying in 5 seconds.", exc_info=e)
+                await asyncio.sleep(5)
+
+    async def close_async(self):
+        await self._rdap_client.aio_close()
+        await self._httpx_client.aclose()
 
     async def process(self, message: Message[str, RDAPDomainRequest]) -> list[SimpleMessage]:
         logger = self._logger
-        if not self._rdap_client:
-            await self._init_rdap_client()
 
         # Main message processing loop
         dn = message.key
@@ -197,6 +195,9 @@ class RDAPDNProcessor(BaseAsyncCollectorProcessor[str, RDAPDomainRequest]):
         except ConnectionResetError as e:
             logger.k_debug("WHOIS connection reset error", domain_name)
             return None, None, rc.CANNOT_FETCH, str(e)
+        except TimeoutError as e:
+            logger.k_debug("WHOIS timeout", domain_name)
+            return None, None, rc.TIMEOUT, str(e)
         except Exception as e:
             logger.k_warning("Unhandled WHOIS exception", domain_name, e=e)
             if isinstance(e, IOError):
