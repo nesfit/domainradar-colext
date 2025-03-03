@@ -5,5 +5,5 @@ from domrad_kafka_client import run_client
 from .rdap_ip import RDAPIPProcessor
 
 if __name__ == '__main__':
-    run_client('to_process_IP', RDAPIPProcessor, 'domrad-test-rdap-ip')
+    run_client('to_process_IP', RDAPIPProcessor)
 

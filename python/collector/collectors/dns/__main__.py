@@ -5,4 +5,4 @@ from domrad_kafka_client import run_client
 from .dnscol import DNSProcessor
 
 if __name__ == '__main__':
-    run_client('to_process_DNS', DNSProcessor, 'domrad-test-dns')
+    run_client('to_process_DNS', DNSProcessor)

@@ -1,9 +1,8 @@
-import domrad_kafka_client
-from . import classifier_impl
+"""__main__.py: The entry point file for running as a module using python -m."""
+__author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
 
-def main():
-    domrad_kafka_client.run_client("feature_vectors", classifier_impl.ClassifierProcessor)
-
+from domrad_kafka_client import run_client
+from .classifier_impl import ClassifierProcessor
 
 if __name__ == '__main__':
-    main()
+    run_client('feature_vectors', ClassifierProcessor)

@@ -5,4 +5,4 @@ from domrad_kafka_client import run_client
 from .zone import ZoneProcessor
 
 if __name__ == '__main__':
-    run_client('to_process_zone', ZoneProcessor, 'domrad-test-zone')
+    run_client('to_process_zone', ZoneProcessor)

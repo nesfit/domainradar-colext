@@ -49,4 +49,4 @@ if __name__ == '__main__':
         extract_one(sys.argv[1])
         exit()
 
-    run_client('all_collected_data', ExtractorProcessor, 'domrad-test-extractor')
+    run_client('all_collected_data', ExtractorProcessor)
