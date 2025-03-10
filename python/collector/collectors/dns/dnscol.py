@@ -51,7 +51,7 @@ class DNSProcessor(BaseAsyncCollectorProcessor[str, DNSRequest]):
             ip_for_tls = self.get_ip_for_tls(result.dns_data)
             if ip_for_tls is not None:
                 logger.k_trace("Sending TLS request", dn)
-                ret.append(('to_process_TLS', message.key_raw, dump_model(ip_for_tls)))
+                ret.append(('to_process_TLS', message.key_raw, ip_for_tls.encode('utf-8')))
 
         return ret
 
