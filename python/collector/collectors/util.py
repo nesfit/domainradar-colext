@@ -37,7 +37,10 @@ def make_top_level_exception_result(topic: str, exc_info, component_id, key, res
 
     try:
         try:
-            result = result_class(status_code=rc.INTERNAL_ERROR, error=error_msg)
+            if issubclass(result_class, IPResult):
+                result = result_class(status_code=rc.INTERNAL_ERROR, error=error_msg, collector=component_id)
+            else:
+                result = result_class(status_code=rc.INTERNAL_ERROR, error=error_msg)
         except ValidationError:
             result = Result(status_code=rc.INTERNAL_ERROR, error=error_msg)
 
