@@ -7,7 +7,7 @@ from datetime import datetime
 import domrad_kafka_client.util
 import pandas as pd
 import pyarrow as pa
-from domrad_kafka_client.types import SimpleMessage
+from domrad_kafka_client import SyncKafkaMessageProcessor, Message, SimpleMessage
 
 
 class ClassifierBase(abc.ABC):
@@ -102,46 +102,53 @@ def make_classifier_impl(config: dict) -> ClassifierBase:
         raise ValueError(f"Invalid classifier implementation: {impl}. Valid values are 'dummy' and 'production'.")
 
 
-class ClassifierProcessor(domrad_kafka_client.SyncKafkaMessageProcessor):
+class ClassifierProcessor(SyncKafkaMessageProcessor[None, pd.DataFrame]):
     OUTPUT_TOPIC = "classification_results"
 
     def __init__(self, config: dict):
         super().__init__(config)
         self._pipeline = make_classifier_impl(self._config)
+        self._pipeline.init()
 
-    def process(self, key: bytes, value: bytes, partition: int, offset: int) -> list[SimpleMessage]:
+    def deserialize(self, message: Message[None, pd.DataFrame]):
+        message.value = pd.read_feather(pa.BufferReader(message.value_raw))
+
+    def process_error(self, message: Message[None, pd.DataFrame], error: BaseException | int) -> list[SimpleMessage]:
+        if isinstance(message.value, pd.DataFrame) and "domain_name" in message.value:
+            return self._process_erroneous_df(message.partition, message.offset, message.value, error)
+        else:
+            self._logger.error("Unexpected classifier processor exception at p=%s, o=%s. Keys: %s",
+                    partition, offset, str(keys), exc_info=(error if isinstance(error, BaseException) else None))
+            return []
+        
+
+    def process(self, message: Message[None, pd.DataFrame]) -> list[SimpleMessage]:
         ret = []
 
         try:
-            df = pd.read_feather(pa.BufferReader(value))
+            results = self._pipeline.classify(message.value)
         except Exception as e:
-            self._logger.error("Cannot read value at p=%s, o=%s",
-                               partition, offset, exc_info=e)
-            return ret
-
-        try:
-            results = self._pipeline.classify(df)
-        except Exception as e:
-            return self._process_erroneous_df(partition, offset, df, e)
+            return self._process_erroneous_df(message.partition, message.offset, df, e)
 
         result: dict
         for result in results:
             if "domain_name" not in result:
                 self._logger.warning("Missing domain_name in a classification result at p=%s, o=%s",
-                                     partition, offset)
+                                     message.partition, message.offset)
                 continue
             ret.append((self.OUTPUT_TOPIC, result["domain_name"].encode("utf-8"), self._serialize(result)))
 
         return ret
 
     def _process_erroneous_df(self, partition: int, offset: int, df: pd.DataFrame,
-                              exc_info: Exception) -> list[SimpleMessage]:
+                              exc_info: BaseException | int) -> list[SimpleMessage]:
         ret = []
 
         try:
             keys = df["domain_name"].tolist()
             self._logger.error("Unexpected classifiers exception at p=%s, o=%s. Keys: %s",
-                               partition, offset, str(keys), exc_info=exc_info)
+                               partition, offset, str(keys),
+                               exc_info=(exc_info if isinstance(exc_info, BaseException) else None))
 
             for dn in keys:
                 result = {
