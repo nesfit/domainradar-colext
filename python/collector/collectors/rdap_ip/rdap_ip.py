@@ -14,7 +14,6 @@ from whodap.response import IPv4Response, IPv6Response
 import common.result_codes as rc
 from collectors.processor import BaseAsyncCollectorProcessor, TCollectorKey, TCollectorRequest
 from collectors.rdap_util import make_rdap_ssl_context
-from collectors.util import should_omit_ip
 from common import log
 from common.models import IPToProcess, IPProcessRequest, RDAPIPResult
 from common.util import dump_model
@@ -66,8 +65,7 @@ class RDAPIPProcessor(BaseAsyncCollectorProcessor[IPToProcess, IPProcessRequest]
             return []
 
         # Omit the DN if the collector is not in the list of collectors to process
-        if should_omit_ip(process_request, COLLECTOR):
-            logger.k_trace("Omitting IP %s", dn_ip.domain_name, dn_ip.ip)
+        if self._should_omit_ip(process_request):
             return []
 
         logger.k_trace("Processing %s", dn_ip.domain_name, dn_ip.ip)

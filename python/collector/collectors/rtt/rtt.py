@@ -5,7 +5,6 @@ from icmplib import async_ping, ICMPSocketError, DestinationUnreachable, TimeExc
 
 import common.result_codes as rc
 from collectors.processor import BaseAsyncCollectorProcessor
-from collectors.util import should_omit_ip
 from common import log
 from common.models import IPToProcess, IPProcessRequest, RTTResult, RTTData
 from common.util import dump_model
@@ -35,8 +34,7 @@ class RTTProcessor(BaseAsyncCollectorProcessor[IPToProcess, IPProcessRequest]):
             return []
 
         # Omit the DN if the collector is not in the list of collectors to process
-        if should_omit_ip(process_request, COLLECTOR):
-            logger.k_trace("Omitting IP %s", dn_ip.domain_name, dn_ip.ip)
+        if self._should_omit_ip(process_request):
             return []
 
         logger.k_trace("Processing %s", dn_ip.domain_name, dn_ip.ip)

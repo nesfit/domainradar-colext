@@ -4,7 +4,7 @@ from typing import TypeVar, Type
 from pydantic import BaseModel
 
 from common import ensure_model, dump_model
-from common.models import IPResult
+from common.models import IPResult, IPProcessRequest
 from domrad_kafka_client import AsyncKafkaMessageProcessor, Message, SimpleMessage
 import common.result_codes as rc
 
@@ -76,3 +76,9 @@ class BaseAsyncCollectorProcessor(AsyncKafkaMessageProcessor[TCollectorKey, TCol
         except Exception as e:
             self._logger.error("Cannot serialize top-level error response", exc_info=e)
             return None, b'', b''
+
+    def _should_omit_ip(self, request: IPProcessRequest | None) -> bool:
+        result = request is not None and request.collectors is not None and self._collector_name not in request.collectors
+        if result:
+            self._logger.k_trace("Omitting IP %s", dn_ip.domain_name, dn_ip.ip)
+        return result
