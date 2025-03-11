@@ -1,7 +1,7 @@
 ARG TARGET_UNIT="collector"
 ARG TARGET_MODULE="collectors.rtt"
 
-FROM docker.io/library/python:3.11-slim-bookworm AS python-base
+FROM docker.io/library/python:3.11-bookworm AS python-base
 ENV PYTHONUNBUFFERED=1 \
     # pip
     PIP_DISABLE_PIP_VERSION_CHECK=on \
@@ -25,7 +25,11 @@ RUN apt-get update && \
     # deps for pulling deps from git
     git openssh-client \
     # deps for building python deps
-    build-essential && \
+    build-essential \
+    # certificates
+    ca-certificates && \
+    update-ca-certificates && \
+    # clean package cache
     rm -rf /var/lib/apt/lists/*
 
 # Install poetry
