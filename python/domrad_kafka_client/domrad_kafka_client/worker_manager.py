@@ -87,24 +87,20 @@ class WorkerManager:
                 return False
 
     def _update_rob(self) -> None:
-        try:
-            processed: ProcessedEntry = self._processed.get_nowait()
-        except queue.Empty:
-            return None
-
         livelock_prevention_counter = 0
-        while processed is not None and livelock_prevention_counter < self._max_entries_to_confirm:
-            livelock_prevention_counter += 1
+        while livelock_prevention_counter < self._max_entries_to_confirm:
+            try:
+                processed: ProcessedEntry = self._processed.get_nowait()
+            except queue.Empty:
+                break
+
             partition_rob = self._robs_for_partitions.get(processed[0])
             if partition_rob is None:
                 partition_rob = SortedDict()
                 self._robs_for_partitions[processed[0]] = partition_rob
 
             partition_rob[processed[1]] = processed[2]
-            try:
-                processed = self._processed.get_nowait()
-            except queue.Empty:
-                break
+            livelock_prevention_counter += 1
 
     def _produce_results(self) -> None:
         partition: int
