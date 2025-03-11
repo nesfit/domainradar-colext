@@ -5,6 +5,8 @@ import io
 import time
 from json import loads, JSONDecodeError
 
+import pandas as pd
+
 from common import log
 from domrad_kafka_client import SyncKafkaMessageProcessor, Message, SimpleMessage
 from . import extractor
@@ -90,7 +92,7 @@ class ExtractorProcessor(SyncKafkaMessageProcessor[str, dict]):
                             time.time() - self._last_batch_send_time >= self._batch_timeout:
                         if len(self._current_batch_dfs) > 1:
                             # Concatenate all the dataframes in the batch
-                            df = df.concat(self._current_batch_dfs, ignore_index=True)
+                            df = pd.concat(self._current_batch_dfs, ignore_index=True)
                         # Reset the batch
                         self._current_batch_dfs.clear()
                         self._last_batch_send_time = time.time()
