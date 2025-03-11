@@ -54,21 +54,12 @@ ENV TARGET_MODULE=${TARGET_MODULE}
 COPY --from=builder /app/${TARGET_UNIT}/.venv /app/${TARGET_UNIT}/.venv
 
 WORKDIR /app
-COPY ./${TARGET_UNIT} ./${TARGET_UNIT}
-COPY ./common ./${TARGET_UNIT}/common
 COPY ./docker_entrypoint.sh ./${TARGET_UNIT}/docker_entrypoint.sh
 COPY ./domrad_kafka_client ./domrad_kafka_client
+COPY ./common ./${TARGET_UNIT}/common
+COPY ./${TARGET_UNIT} ./${TARGET_UNIT}
 
 ENV PATH="/app/${TARGET_UNIT}/.venv/bin:$PATH"
 
 WORKDIR /app/${TARGET_UNIT}
 ENTRYPOINT [ "/bin/bash", "-c", "./docker_entrypoint.sh $TARGET_MODULE"]
-
-
-# FROM poetry-base AS builder
-# ARG TARGET_UNIT
-
-# WORKDIR ${PYSETUP_PATH}
-# COPY domrad_kafka_client ./domrad_kafka_client
-# COPY common ./common
-# COPY ${TARGET_UNIT} ./${TARGET_UNIT} 
