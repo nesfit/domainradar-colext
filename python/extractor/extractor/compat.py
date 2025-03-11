@@ -59,7 +59,7 @@ class CompatibilityTransformation:
     }
 
     def __init__(self):
-        self.whoisit_bootstrap = Bootstrap(allow_insecure_ssl=True)
+        self.whoisit_bootstrap = Bootstrap(allow_insecure_ssl=False)
         try:
             self.whoisit_bootstrap.bootstrap(True, True)
             # TODO: save bootstrap data?
