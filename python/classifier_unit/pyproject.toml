@@ -18,6 +18,7 @@ pandas = "^2.2.2"
 classifiers = { path = "../classifiers", develop = true }
 pyarrow = "^16.1.0"
 domrad-kafka-client = { path = "../domrad_kafka_client", develop = true }
+pydantic = "^2.8.2"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0.0"
