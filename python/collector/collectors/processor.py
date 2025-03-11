@@ -3,9 +3,8 @@ from typing import TypeVar, Type
 
 from pydantic import BaseModel
 
-from collectors.util import make_top_level_exception_result
-from common import ensure_model
-from common.util import dump_model
+from common import ensure_model, dump_model
+from common.models import IPResult
 from domrad_kafka_client import AsyncKafkaMessageProcessor, Message, SimpleMessage
 import common.result_codes as rc
 
@@ -20,6 +19,12 @@ class BaseAsyncCollectorProcessor(AsyncKafkaMessageProcessor[TCollectorKey, TCol
                  value_class: Type[TCollectorRequest], result_class: Type[TCollectorResponse]):
         super().__init__(config)
         self._component_name = component_name
+
+        if component_name.startswith("collector-"):
+            self._collector_name = component_name[10:]
+        else:
+            self._collector_name = component_name
+
         self._output_topic = output_topic
         self._key_class = key_class
         self._value_class = value_class
@@ -36,18 +41,38 @@ class BaseAsyncCollectorProcessor(AsyncKafkaMessageProcessor[TCollectorKey, TCol
             -> list[SimpleMessage]:
         if isinstance(error, BaseException):
             self._logger.k_unhandled_error(error, message.key)
-            res = make_top_level_exception_result(self._output_topic, error, self._component_name, message.key_raw,
-                                                  self._result_class)
+            res = self._make_result(error, message.key_raw)
         elif error == self.ERROR_RATE_LIMITED_IMMEDIATE or error == self.ERROR_RATE_LIMITED_WITH_TIMEOUT:
             self._logger.k_info("Rate limited", message.key)
             status_code = rc.LOCAL_RATE_LIMIT if error == self.ERROR_RATE_LIMITED_IMMEDIATE else rc.LRL_TIMEOUT
-            return [
-                (self._output_topic, message.key_raw, dump_model(self._result_class(status_code=status_code)))
-            ]
+            res = self._make_result(None, message.key_raw, status_code)
         else:
             self._logger.k_unhandled_error(ValueError(), message.key, error_id=error)
-            res = make_top_level_exception_result(self._output_topic, f"Error {error}",
-                                                  self._component_name, message.key_raw, self._result_class)
+            res = self._make_result(f"Unknown error ID: {error}", message.key_raw)
 
         if res[0] is None: return []
         return [res]
+
+    def _make_result(self, error: BaseException | str | None, key_raw: bytes, code: int | None = None) \
+        -> tuple[str | None, bytes, bytes]:
+
+        error_msg = str(error) if error is not None else None
+        code = code if code is not None else rc.INTERNAL_ERROR
+        is_ip_result = issubclass(self._result_class, IPResult)
+
+        try:
+            if is_ip_result:
+                result = self._result_class(status_code=code, error=error_msg, collector=self._collector_name)
+            else:
+                result = self._result_class(status_code=code, error=error_msg)
+        except ValidationError:
+            if is_ip_result:
+                result = IPResult(status_code=code, error=error_msg, collector=self._collector_name)
+            else:
+                result = Result(status_code=code, error=error_msg)
+
+        try:
+            return self._output_topic, key_raw, dump_model(result)
+        except Exception as e:
+            self._logger.error("Cannot serialize top-level error response", exc_info=e)
+            return None, b'', b''
