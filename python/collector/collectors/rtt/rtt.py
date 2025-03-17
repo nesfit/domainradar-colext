@@ -34,7 +34,7 @@ class RTTProcessor(BaseAsyncCollectorProcessor[IPToProcess, IPProcessRequest]):
             return []
 
         # Omit the DN if the collector is not in the list of collectors to process
-        if self._should_omit_ip(process_request):
+        if self._should_omit_ip(dn_ip, process_request):
             return []
 
         logger.k_trace("Processing %s", dn_ip.domain_name, dn_ip.ip)

@@ -3,7 +3,6 @@ __author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
 
 import asyncio
 import ipaddress
-import socket
 from logging import Logger
 from typing import Optional, Literal, Any
 
