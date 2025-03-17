@@ -43,7 +43,7 @@ class BaseAsyncCollectorProcessor(AsyncKafkaMessageProcessor[TCollectorKey, TCol
             self._logger.k_unhandled_error(error, message.key)
             res = self._make_result(error, message.key_raw)
         elif error == self.ERROR_RATE_LIMITED_IMMEDIATE or error == self.ERROR_RATE_LIMITED_WITH_TIMEOUT:
-            self._logger.k_info("Rate limited", message.key)
+            self._logger.k_debug("Rate limited", message.key)
             status_code = rc.LOCAL_RATE_LIMIT if error == self.ERROR_RATE_LIMITED_IMMEDIATE else rc.LRL_TIMEOUT
             res = self._make_result(None, message.key_raw, status_code)
         else:
