@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import cz.vut.fit.domainradar.Common;
 import cz.vut.fit.domainradar.Topics;
 import cz.vut.fit.domainradar.models.IPToProcess;
+import org.apache.kafka.common.config.AbstractConfig;
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.connect.connector.ConnectRecord;
 import org.apache.kafka.connect.data.Schema;
@@ -17,6 +18,7 @@ import org.jetbrains.annotations.Nullable;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -31,6 +33,7 @@ import java.util.Map;
  * <p>
  * The value follows {@link #VALUE_SCHEMA} that contains the status code, the error message and the raw result data,
  * i.e. the entire JSON string with the result.
+ *
  * @author Ondřej Ondryáš
  */
 public class PostgresCollectorResultSinkTransformation<R extends ConnectRecord<R>> implements Transformation<R> {
@@ -41,6 +44,11 @@ public class PostgresCollectorResultSinkTransformation<R extends ConnectRecord<R
             @Nullable String collector
     ) {
     }
+
+    public static final String ALLOWED_COLLECTORS = "allowed.collectors";
+    public static final ConfigDef CONFIG_DEF = new ConfigDef()
+            .define(ALLOWED_COLLECTORS, ConfigDef.Type.LIST, List.<String>of(),
+                    ConfigDef.Importance.LOW, "Allowed collectors");
 
     public static final Schema KEY_SCHEMA = SchemaBuilder.struct()
             .name("cz.vut.fit.domainradar.PostgresCollectedDataKey")
@@ -54,7 +62,10 @@ public class PostgresCollectorResultSinkTransformation<R extends ConnectRecord<R
             .field("status_code", Schema.INT16_SCHEMA)
             .field("error", Schema.OPTIONAL_STRING_SCHEMA)
             .field("raw_data", Schema.OPTIONAL_STRING_SCHEMA);
+
     private final ObjectMapper _mapper;
+    private List<String> _allowedCollectors = null;
+    private boolean _hasAllowedCollectors = false;
 
     public PostgresCollectorResultSinkTransformation() {
         _mapper = Common.makeMapper().build();
@@ -86,6 +97,10 @@ public class PostgresCollectorResultSinkTransformation<R extends ConnectRecord<R
                 collector = Topics.TOPICS_TO_COLLECTOR_ID.get(topic);
             }
 
+            if (_hasAllowedCollectors && !_allowedCollectors.contains(collector)) {
+                return null;
+            }
+
             final var keyStruct = new Struct(KEY_SCHEMA);
             final var valueStruct = new Struct(VALUE_SCHEMA);
 
@@ -111,10 +126,13 @@ public class PostgresCollectorResultSinkTransformation<R extends ConnectRecord<R
 
     @Override
     public ConfigDef config() {
-        return new ConfigDef();
+        return CONFIG_DEF;
     }
 
     @Override
     public void configure(Map<String, ?> configs) {
+        final AbstractConfig config = new AbstractConfig(CONFIG_DEF, configs, false);
+        _allowedCollectors = config.getList(ALLOWED_COLLECTORS);
+        _hasAllowedCollectors = _allowedCollectors != null && !_allowedCollectors.isEmpty();
     }
 }
