@@ -37,7 +37,7 @@ import java.util.function.Consumer;
  * @author Ondřej Ondryáš
  */
 public abstract class BaseStandaloneCollector<KIn, VIn, TProcessor extends ParallelConsumer<KIn, VIn>>
-        implements Closeable {
+        implements Closeable, CollectorInterface {
 
     protected final Properties _properties;
     protected final Duration _closeTimeout;

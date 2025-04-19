@@ -91,13 +91,13 @@ public class StandaloneCollectorRunner {
      * @param cmd        The parsed command line arguments.
      * @param mapper     The ObjectMapper instance to use for serialization and deserialization.
      * @param properties The Properties instance containing configuration settings.
-     * @return A list of initialized BaseStandaloneCollector instances.
+     * @return A list of initialized collector instances that implement the CollectorInterface.
      */
     @NotNull
-    private static List<BaseStandaloneCollector<?, ?, ?>> initCollectors(CommandLine cmd, ObjectMapper mapper, Properties properties) {
+    private static List<CollectorInterface> initCollectors(CommandLine cmd, ObjectMapper mapper, Properties properties) {
         var appId = cmd.getOptionValue("id");
         var useAll = cmd.hasOption("a");
-        var components = new ArrayList<BaseStandaloneCollector<?, ?, ?>>();
+        var components = new ArrayList<CollectorInterface>();
 
         try {
             if (useAll || cmd.hasOption("col-tls")) {
