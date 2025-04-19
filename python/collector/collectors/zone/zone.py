@@ -1,5 +1,5 @@
 """zone.py: The Faust application for the zone collector."""
-__author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
+__authors__ = ["Ondřej Ondryáš <xondry02@vut.cz>", "Matěj Čech <xcechm15@stud.fit.vut.cz>"]
 
 import dns.exception
 from dns.resolver import Cache
@@ -9,7 +9,7 @@ from collectors.dns_options import DNSCollectorOptions
 from collectors.util import handle_top_level_exception
 from collectors.zone.resolver import ZoneResolver
 from common import read_config, make_app, log
-from common.models import RDAPDomainRequest, RDAPDomainResult, ZoneRequest, ZoneResult, DNSRequest
+from common.models import RDAPDomainRequest, RDAPDomainResult, ZoneRequest, ZoneResult, DNSRequest, DNToProcess
 from common.util import ensure_model
 
 COLLECTOR = "zone"
@@ -34,6 +34,8 @@ topic_processed_zone = zone_app.topic('processed_zone', key_type=str, key_serial
 topic_dns_requests = zone_app.topic('to_process_DNS', key_type=str, key_serializer='str')
 
 topic_rdap_requests = zone_app.topic('to_process_RDAP_DN', key_type=str, key_serializer='str')
+
+topic_dn_requests = zone_app.topic('to_process_DN', allow_empty=True, value_type=bytes, value_serializer='raw')
 
 
 # The Zone processor
@@ -84,6 +86,10 @@ async def process_entries(stream):
                 if not req or req.collect_RDAP:
                     rdap_req = RDAPDomainRequest(zone=result.zone.zone)
                     await topic_rdap_requests.send(key=dn, value=rdap_req)
+
+                if not req or req.collect_dn_data:
+                    dn_to_process = DNToProcess(domain_name=dn)
+                    await topic_dn_requests.send(key=dn_to_process, value=None)
 
         except Exception as e:
             logger.k_unhandled_error(e, dn)

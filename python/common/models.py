@@ -1,5 +1,5 @@
 """models.py: Pydantic models for the common data structures used in the components."""
-__author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
+__authors__ = ["Ondřej Ondryáš <xondry02@vut.cz>", "Matěj Čech <xcechm15@stud.fit.vut.cz>"]
 
 from typing import Optional
 
@@ -28,6 +28,13 @@ class IPToProcess(CustomBaseModel):
 
     def __str__(self):
         return f"{self.domain_name}/{self.ip}"
+
+
+class DNToProcess(CustomBaseModel):
+    domain_name: str = Field(alias="dn")
+
+    def __str__(self):
+        return self.domain_name
 
 
 class RTTData(CustomBaseModel):
