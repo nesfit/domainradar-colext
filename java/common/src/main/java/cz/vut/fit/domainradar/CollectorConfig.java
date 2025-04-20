@@ -91,6 +91,11 @@ public class CollectorConfig {
     public static final String GOOGLESAFEBROWSING_TOKEN_DOC = "The Google Safe Browsing access token.";
     public static final String GOOGLESAFEBROWSING_TOKEN_DEFAULT = "";
 
+    /* --- URLVoid collector --- */
+    public static final String URLVOID_HTTP_TIMEOUT_CONFIG = "collectors.urlvoid.timeout";
+    public static final String URLVOID_HTTP_TIMEOUT_DOC = "The request timeout to use in the URLVoid collector (seconds).";
+    public static final String URLVOID_HTTP_TIMEOUT_DEFAULT = "5";
+
     /* --- TLS collector --- */
     public static final String TLS_TIMEOUT_MS_CONFIG = "collectors.tls.timeout";
     public static final String TLS_TIMEOUT_MS_DOC = "The TLS socket timeout (milliseconds).";
