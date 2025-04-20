@@ -121,6 +121,10 @@ public class StandaloneCollectorRunner {
                 components.add(new VirusTotalCollector(mapper, appId, properties));
             }
 
+            if (useAll || cmd.hasOption("col-pulsedive")) {
+                components.add(new PulsediveCollector(mapper, appId, properties));
+            }
+
             if (useAll || cmd.hasOption("col-hybridanalysis")) {
                 components.add(new HybridAnalysisCollector(mapper, appId, properties));
             }
@@ -216,6 +220,7 @@ public class StandaloneCollectorRunner {
         options.addOption(null, "col-qradar", false, "Use the QRadar Offense collector");
         options.addOption(null, "col-abuseipdb", false, "Use the AbuseIPDB collector");
         options.addOption(null, "col-virustotal", false, "Use the VirusTotal collector");
+        options.addOption(null, "col-pulsedive", false, "Use the Pulsedive collector");
         options.addOption(null, "col-hybridanalysis", false, "Use the HybridAnalysis collector");
         options.addOption(null, "col-greynoise", false, "Use the Greynoise collector");
         options.addOption(null, "col-cloudflareradar", false, "Use the Cloudflare Radar collector");

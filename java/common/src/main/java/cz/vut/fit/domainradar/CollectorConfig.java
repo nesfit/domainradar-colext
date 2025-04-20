@@ -52,6 +52,15 @@ public class CollectorConfig {
     public static final String VIRUSTOTAL_TOKEN_DOC = "The VirusTotal access token.";
     public static final String VIRUSTOTAL_TOKEN_DEFAULT = "";
 
+    /* --- Pulsedive collector --- */
+    public static final String PULSEDIVE_HTTP_TIMEOUT_CONFIG = "collectors.pulsedive.timeout";
+    public static final String PULSEDIVE_HTTP_TIMEOUT_DOC = "The request timeout to use in the Pulsedive collector (seconds).";
+    public static final String PULSEDIVE_HTTP_TIMEOUT_DEFAULT = "5";
+
+    public static final String PULSEDIVE_TOKEN_CONFIG = "collectors.pulsedive.token";
+    public static final String PULSEDIVE_TOKEN_DOC = "The Pulsedive access token.";
+    public static final String PULSEDIVE_TOKEN_DEFAULT = "";
+
     /* --- Hybrid-analysis collector --- */
     public static final String HYBRIDANALYSIS_HTTP_TIMEOUT_CONFIG = "collectors.hybridanalysis.timeout";
     public static final String HYBRIDANALYSIS_HTTP_TIMEOUT_DOC = "The request timeout to use in the Hybrid-analysis collector (seconds).";
