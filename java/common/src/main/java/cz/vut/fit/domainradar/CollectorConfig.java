@@ -128,6 +128,11 @@ public class CollectorConfig {
     public static final String PROJECTHONEYPOT_HTTP_TIMEOUT_DOC = "The request timeout to use in the ProjectHoneypot collector (seconds).";
     public static final String PROJECTHONEYPOT_HTTP_TIMEOUT_DEFAULT = "5";
 
+    /* --- Fortiguard collector --- */
+    public static final String FORTIGUARD_HTTP_TIMEOUT_CONFIG = "collectors.fortiguard.timeout";
+    public static final String FORTIGUARD_HTTP_TIMEOUT_DOC = "The request timeout to use in the Fortiguard collector (seconds).";
+    public static final String FORTIGUARD_HTTP_TIMEOUT_DEFAULT = "5";
+
     /* --- TLS collector --- */
     public static final String TLS_TIMEOUT_MS_CONFIG = "collectors.tls.timeout";
     public static final String TLS_TIMEOUT_MS_DOC = "The TLS socket timeout (milliseconds).";

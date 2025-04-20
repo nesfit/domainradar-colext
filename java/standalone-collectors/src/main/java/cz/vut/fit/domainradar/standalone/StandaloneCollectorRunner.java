@@ -149,6 +149,10 @@ public class StandaloneCollectorRunner {
                 components.add(new GoogleSafeBrowsingCollector(mapper, appId, properties));
             }
 
+            if (useAll || cmd.hasOption("col-fortiguard")) {
+                components.add(new FortiguardCollector(mapper, appId, properties));
+            }
+
             if (useAll || cmd.hasOption("col-urlvoid")) {
                 components.add(new UrlvoidCollector(mapper, appId, properties));
             }
@@ -219,6 +223,7 @@ public class StandaloneCollectorRunner {
         options.addOption(null, "col-threatfox", false, "Use the Threatfox collector");
         options.addOption(null, "col-criminalip", false, "Use the CriminalIP collector");
         options.addOption(null, "col-googlesafebrowsing", false, "Use the Google Safe browsing collector");
+        options.addOption(null, "col-fortiguard", false, "Use the Fortiguard collector");
         options.addOption(null, "col-urlvoid", false, "Use the URLVoid collector");
         options.addOption(null, "col-projecthoneypot", false, "Use the ProjectHoneypot collector");
 
