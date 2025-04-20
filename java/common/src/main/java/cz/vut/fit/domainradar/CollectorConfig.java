@@ -52,6 +52,15 @@ public class CollectorConfig {
     public static final String VIRUSTOTAL_TOKEN_DOC = "The VirusTotal access token.";
     public static final String VIRUSTOTAL_TOKEN_DEFAULT = "";
 
+    /* --- Hybrid-analysis collector --- */
+    public static final String HYBRIDANALYSIS_HTTP_TIMEOUT_CONFIG = "collectors.hybridanalysis.timeout";
+    public static final String HYBRIDANALYSIS_HTTP_TIMEOUT_DOC = "The request timeout to use in the Hybrid-analysis collector (seconds).";
+    public static final String HYBRIDANALYSIS_HTTP_TIMEOUT_DEFAULT = "5";
+
+    public static final String HYBRIDANALYSIS_TOKEN_CONFIG = "collectors.hybridanalysis.token";
+    public static final String HYBRIDANALYSIS_TOKEN_DOC = "The Hybrid-analysis access token.";
+    public static final String HYBRIDANALYSIS_TOKEN_DEFAULT = "";
+
     /* --- TLS collector --- */
     public static final String TLS_TIMEOUT_MS_CONFIG = "collectors.tls.timeout";
     public static final String TLS_TIMEOUT_MS_DOC = "The TLS socket timeout (milliseconds).";

@@ -12,7 +12,7 @@ import org.json.JSONObject;
 import java.util.Properties;
 
 /**
- * A collector that processes IP or DN data using the VirusTotal API.
+ * A collector that processes IP and DN data using the VirusTotal API.
  *
  * @author Matěj Čech
  */
