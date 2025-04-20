@@ -132,6 +132,10 @@ public class StandaloneCollectorRunner {
             if (useAll || cmd.hasOption("col-opentipkaspersky")) {
                 components.add(new OpentipKasperskyCollector(mapper, appId, properties));
             }
+
+            if (useAll || cmd.hasOption("col-googlesafebrowsing")) {
+                components.add(new GoogleSafeBrowsingCollector(mapper, appId, properties));
+            }
         } catch (Exception e) {
             Logger.error("Failed to initialize a collector", e);
             System.exit(4);
@@ -191,6 +195,7 @@ public class StandaloneCollectorRunner {
         options.addOption(null, "col-hybridanalysis", false, "Use the HybridAnalysis collector");
         options.addOption(null, "col-cloudflareradar", false, "Use the Cloudflare Radar collector");
         options.addOption(null, "col-opentipkaspersky", false, "Use the Opentip Kaspersky collector");
+        options.addOption(null, "col-googlesafebrowsing", false, "Use the Google Safe browsing collector");
 
         options.addOption(Option.builder("id")
                 .longOpt("app-id")

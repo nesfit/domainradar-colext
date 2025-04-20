@@ -82,6 +82,15 @@ public class CollectorConfig {
     public static final String OPENTIPKASPERSKY_TOKEN_DOC = "The Opentip Kaspersky access token.";
     public static final String OPENTIPKASPERSKY_TOKEN_DEFAULT = "";
 
+    /* --- Google Safe Browsing collector --- */
+    public static final String GOOGLESAFEBROWSING_HTTP_TIMEOUT_CONFIG = "collectors.googlesafebrowsing.timeout";
+    public static final String GOOGLESAFEBROWSING_HTTP_TIMEOUT_DOC = "The request timeout to use in the Google Safe Browsing collector (seconds).";
+    public static final String GOOGLESAFEBROWSING_HTTP_TIMEOUT_DEFAULT = "5";
+
+    public static final String GOOGLESAFEBROWSING_TOKEN_CONFIG = "collectors.googlesafebrowsing.token";
+    public static final String GOOGLESAFEBROWSING_TOKEN_DOC = "The Google Safe Browsing access token.";
+    public static final String GOOGLESAFEBROWSING_TOKEN_DEFAULT = "";
+
     /* --- TLS collector --- */
     public static final String TLS_TIMEOUT_MS_CONFIG = "collectors.tls.timeout";
     public static final String TLS_TIMEOUT_MS_DOC = "The TLS socket timeout (milliseconds).";
