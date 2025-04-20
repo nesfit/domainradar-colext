@@ -73,6 +73,15 @@ public class CollectorConfig {
     public static final String CLOUDFLARERADAR_ACCOUNTID_CONFIG = "collectors.cloudflareradar.accountid";
     public static final String CLOUDFLARERADAR_ACCOUNTID_DOC = "The Cloudflare Radar account identifier.";
 
+    /* --- Opentip Kaspersky collector --- */
+    public static final String OPENTIPKASPERSKY_HTTP_TIMEOUT_CONFIG = "collectors.opentipkaspersky.timeout";
+    public static final String OPENTIPKASPERSKY_HTTP_TIMEOUT_DOC = "The request timeout to use in the Opentip Kaspersky collector (seconds).";
+    public static final String OPENTIPKASPERSKY_HTTP_TIMEOUT_DEFAULT = "5";
+
+    public static final String OPENTIPKASPERSKY_TOKEN_CONFIG = "collectors.opentipkaspersky.token";
+    public static final String OPENTIPKASPERSKY_TOKEN_DOC = "The Opentip Kaspersky access token.";
+    public static final String OPENTIPKASPERSKY_TOKEN_DEFAULT = "";
+
     /* --- TLS collector --- */
     public static final String TLS_TIMEOUT_MS_CONFIG = "collectors.tls.timeout";
     public static final String TLS_TIMEOUT_MS_DOC = "The TLS socket timeout (milliseconds).";
