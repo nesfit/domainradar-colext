@@ -67,8 +67,8 @@ public abstract class BaseIPRepSystemAPICollector<TData>
                     getAuthTokenHeaderName(),
                     getLogger(),
                     (input, result) -> _producer.send(resultRecord(Topics.OUT_IP, input, successResult(result))),
-                    (input, error) -> _producer.send(resultRecord(Topics.OUT_IP, input,
-                            errorResult(ResultCodes.CANNOT_FETCH, error))),
+                    (input, errorCode, errorMsg) -> _producer.send(resultRecord(Topics.OUT_IP, input,
+                            errorResult(errorCode, errorMsg))),
                     this::mapResponseToData,
                     getCollectorName(),
                     processingTimeout

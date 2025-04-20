@@ -1,5 +1,7 @@
 package cz.vut.fit.domainradar.standalone;
 
+import cz.vut.fit.domainradar.TriConsumer;
+import cz.vut.fit.domainradar.models.ResultCodes;
 import org.json.JSONObject;
 
 import java.io.IOException;
@@ -95,17 +97,24 @@ public class RepSystemAPIClient<TIn, TData> {
             String authHeaderName,
             org.slf4j.Logger logger,
             BiConsumer<TIn, TData> onSuccess,
-            BiConsumer<TIn, String> onError,
+            TriConsumer<TIn, Integer, String> onError,
             Function<JSONObject, TData> responseMapper,
             String collectorName,
             long processingTimeoutMs
     ) {
         if (_disabled) {
-            onError.accept(input, "Disabled");
+            onError.accept(input, ResultCodes.DISABLED, "Disabled");
             return CompletableFuture.completedFuture(null);
         }
 
         String url = requestUrlProvider.apply(input);
+
+        if (url == null) {
+            logger.debug("Discarding unsupported address");
+
+            onError.accept(input, ResultCodes.UNSUPPORTED_ADDRESS, null);
+            return CompletableFuture.completedFuture(null);
+        }
 
         var requestBuilder = HttpRequest.newBuilder()
                 .uri(URI.create(url))
@@ -141,22 +150,24 @@ public class RepSystemAPIClient<TIn, TData> {
                         onSuccess.accept(input, result);
                     }
                     else {
-                        onError.accept(input, collectorName + " response " + response.statusCode());
+                        onError.accept(input, ResultCodes.CANNOT_FETCH,
+                                collectorName + " response " + response.statusCode());
                     }
                 })
                 .exceptionally(e -> {
                     Throwable cause = e.getCause();
                     if (cause instanceof HttpConnectTimeoutException) {
                         logger.debug("Connection timeout");
-                        onError.accept(input, "Connection timed out (%d ms)".formatted(_httpTimeout.toMillis()));
+                        onError.accept(input, ResultCodes.TIMEOUT,
+                                "Connection timed out (%d ms)".formatted(_httpTimeout.toMillis()));
                     }
                     else if (cause instanceof IOException) {
                         logger.debug("I/O exception");
-                        onError.accept(input, cause.getMessage());
+                        onError.accept(input, ResultCodes.INTERNAL_ERROR, cause.getMessage());
                     }
                     else {
                         logger.warn("Unexpected error", e);
-                        onError.accept(input, cause.getMessage());
+                        onError.accept(input, ResultCodes.INTERNAL_ERROR, cause.getMessage());
                     }
                     return null;
                 });

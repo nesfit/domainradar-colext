@@ -67,8 +67,8 @@ public abstract class BaseDNRepSystemAPICollector<TData>
                     getAuthTokenHeaderName(),
                     getLogger(),
                     (input, result) -> _producer.send(resultRecord(Topics.OUT_DN, input, successResult(result))),
-                    (input, error) -> _producer.send(resultRecord(Topics.OUT_DN, input,
-                            errorResult(ResultCodes.CANNOT_FETCH, error))),
+                    (input, errorCode, errorMsg) -> _producer.send(resultRecord(Topics.OUT_DN, input,
+                            errorResult(errorCode, errorMsg))),
                     this::mapResponseToData,
                     getCollectorName(),
                     processingTimeout
