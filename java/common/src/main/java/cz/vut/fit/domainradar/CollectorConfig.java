@@ -91,6 +91,15 @@ public class CollectorConfig {
     public static final String OPENTIPKASPERSKY_TOKEN_DOC = "The Opentip Kaspersky access token.";
     public static final String OPENTIPKASPERSKY_TOKEN_DEFAULT = "";
 
+    /* --- Threatfox collector --- */
+    public static final String THREATFOX_HTTP_TIMEOUT_CONFIG = "collectors.threatfox.timeout";
+    public static final String THREATFOX_HTTP_TIMEOUT_DOC = "The request timeout to use in the Threatfox collector (seconds).";
+    public static final String THREATFOX_HTTP_TIMEOUT_DEFAULT = "5";
+
+    public static final String THREATFOX_TOKEN_CONFIG = "collectors.threatfox.token";
+    public static final String THREATFOX_TOKEN_DOC = "The Threatfox access token.";
+    public static final String THREATFOX_TOKEN_DEFAULT = "";
+
     /* --- Google Safe Browsing collector --- */
     public static final String GOOGLESAFEBROWSING_HTTP_TIMEOUT_CONFIG = "collectors.googlesafebrowsing.timeout";
     public static final String GOOGLESAFEBROWSING_HTTP_TIMEOUT_DOC = "The request timeout to use in the Google Safe Browsing collector (seconds).";

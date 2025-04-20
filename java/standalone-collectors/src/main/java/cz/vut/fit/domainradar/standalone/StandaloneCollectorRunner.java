@@ -137,6 +137,10 @@ public class StandaloneCollectorRunner {
                 components.add(new OpentipKasperskyCollector(mapper, appId, properties));
             }
 
+            if (useAll || cmd.hasOption("col-threatfox")) {
+                components.add(new ThreatfoxCollector(mapper, appId, properties));
+            }
+
             if (useAll || cmd.hasOption("col-googlesafebrowsing")) {
                 components.add(new GoogleSafeBrowsingCollector(mapper, appId, properties));
             }
@@ -208,6 +212,7 @@ public class StandaloneCollectorRunner {
         options.addOption(null, "col-greynoise", false, "Use the Greynoise collector");
         options.addOption(null, "col-cloudflareradar", false, "Use the Cloudflare Radar collector");
         options.addOption(null, "col-opentipkaspersky", false, "Use the Opentip Kaspersky collector");
+        options.addOption(null, "col-threatfox", false, "Use the Threatfox collector");
         options.addOption(null, "col-googlesafebrowsing", false, "Use the Google Safe browsing collector");
         options.addOption(null, "col-urlvoid", false, "Use the URLVoid collector");
         options.addOption(null, "col-projecthoneypot", false, "Use the ProjectHoneypot collector");
