@@ -7,6 +7,7 @@ import cz.vut.fit.domainradar.standalone.collectors.GeoAsnCollector;
 import cz.vut.fit.domainradar.standalone.collectors.NERDCollector;
 import cz.vut.fit.domainradar.standalone.collectors.TLSCollector;
 import cz.vut.fit.domainradar.standalone.collectors.VertxQRadarCollector;
+import cz.vut.fit.domainradar.standalone.collectors.VirusTotalCollector;
 import org.apache.commons.cli.*;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.jetbrains.annotations.NotNull;
@@ -120,6 +121,10 @@ public class StandaloneCollectorRunner {
             if (useAll || cmd.hasOption("col-abuseipdb")) {
                 components.add(new AbuseIpDbCollector(mapper, appId, properties));
             }
+
+            if (useAll || cmd.hasOption("col-virustotal")) {
+                components.add(new VirusTotalCollector(mapper, appId, properties));
+            }
         } catch (Exception e) {
             Logger.error("Failed to initialize a collector", e);
             System.exit(4);
@@ -175,6 +180,7 @@ public class StandaloneCollectorRunner {
         options.addOption(null, "col-geo", false, "Use the GEO-ASN collector");
         options.addOption(null, "col-qradar", false, "Use the QRadar Offense collector");
         options.addOption(null, "col-abuseipdb", false, "Use the AbuseIPDB collector");
+        options.addOption(null, "col-virustotal", false, "Use the VirusTotal collector");
 
         options.addOption(Option.builder("id")
                 .longOpt("app-id")

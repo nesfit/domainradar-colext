@@ -43,6 +43,15 @@ public class CollectorConfig {
     public static final String ABUSEIPDB_TOKEN_DOC = "The AbuseIPDB access token.";
     public static final String ABUSEIPDB_TOKEN_DEFAULT = "";
 
+    /* --- VirusTotal collector --- */
+    public static final String VIRUSTOTAL_HTTP_TIMEOUT_CONFIG = "collectors.virustotal.timeout";
+    public static final String VIRUSTOTAL_HTTP_TIMEOUT_DOC = "The request timeout to use in the VirusTotal collector (seconds).";
+    public static final String VIRUSTOTAL_HTTP_TIMEOUT_DEFAULT = "5";
+
+    public static final String VIRUSTOTAL_TOKEN_CONFIG = "collectors.virustotal.token";
+    public static final String VIRUSTOTAL_TOKEN_DOC = "The VirusTotal access token.";
+    public static final String VIRUSTOTAL_TOKEN_DEFAULT = "";
+
     /* --- TLS collector --- */
     public static final String TLS_TIMEOUT_MS_CONFIG = "collectors.tls.timeout";
     public static final String TLS_TIMEOUT_MS_DOC = "The TLS socket timeout (milliseconds).";
