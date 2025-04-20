@@ -61,6 +61,15 @@ public class CollectorConfig {
     public static final String HYBRIDANALYSIS_TOKEN_DOC = "The Hybrid-analysis access token.";
     public static final String HYBRIDANALYSIS_TOKEN_DEFAULT = "";
 
+    /* --- Greynoise collector --- */
+    public static final String GREYNOISE_HTTP_TIMEOUT_CONFIG = "collectors.greynoise.timeout";
+    public static final String GREYNOISE_HTTP_TIMEOUT_DOC = "The request timeout to use in the Greynoise collector (seconds).";
+    public static final String GREYNOISE_HTTP_TIMEOUT_DEFAULT = "5";
+
+    public static final String GREYNOISE_TOKEN_CONFIG = "collectors.greynoise.token";
+    public static final String GREYNOISE_TOKEN_DOC = "The Greynoise access token.";
+    public static final String GREYNOISE_TOKEN_DEFAULT = "";
+
     /* --- Cloudflare Radar collector --- */
     public static final String CLOUDFLARERADAR_HTTP_TIMEOUT_CONFIG = "collectors.cloudflareradar.timeout";
     public static final String CLOUDFLARERADAR_HTTP_TIMEOUT_DOC = "The request timeout to use in the Cloudflare Radar collector (seconds).";

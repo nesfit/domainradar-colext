@@ -125,6 +125,10 @@ public class StandaloneCollectorRunner {
                 components.add(new HybridAnalysisCollector(mapper, appId, properties));
             }
 
+            if (useAll || cmd.hasOption("col-greynoise")) {
+                components.add(new GreynoiseCollector(mapper, appId, properties));
+            }
+
             if (useAll || cmd.hasOption("col-cloudflareradar")) {
                 components.add(new CloudflareRadarCollector(mapper, appId, properties));
             }
@@ -201,6 +205,7 @@ public class StandaloneCollectorRunner {
         options.addOption(null, "col-abuseipdb", false, "Use the AbuseIPDB collector");
         options.addOption(null, "col-virustotal", false, "Use the VirusTotal collector");
         options.addOption(null, "col-hybridanalysis", false, "Use the HybridAnalysis collector");
+        options.addOption(null, "col-greynoise", false, "Use the Greynoise collector");
         options.addOption(null, "col-cloudflareradar", false, "Use the Cloudflare Radar collector");
         options.addOption(null, "col-opentipkaspersky", false, "Use the Opentip Kaspersky collector");
         options.addOption(null, "col-googlesafebrowsing", false, "Use the Google Safe browsing collector");
