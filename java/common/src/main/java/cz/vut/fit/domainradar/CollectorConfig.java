@@ -100,6 +100,15 @@ public class CollectorConfig {
     public static final String THREATFOX_TOKEN_DOC = "The Threatfox access token.";
     public static final String THREATFOX_TOKEN_DEFAULT = "";
 
+    /* --- CriminalIP collector --- */
+    public static final String CRIMINALIP_HTTP_TIMEOUT_CONFIG = "collectors.criminalip.timeout";
+    public static final String CRIMINALIP_HTTP_TIMEOUT_DOC = "The request timeout to use in the CriminalIP collector (seconds).";
+    public static final String CRIMINALIP_HTTP_TIMEOUT_DEFAULT = "5";
+
+    public static final String CRIMINALIP_TOKEN_CONFIG = "collectors.criminalip.token";
+    public static final String CRIMINALIP_TOKEN_DOC = "The CriminalIP access token.";
+    public static final String CRIMINALIP_TOKEN_DEFAULT = "";
+
     /* --- Google Safe Browsing collector --- */
     public static final String GOOGLESAFEBROWSING_HTTP_TIMEOUT_CONFIG = "collectors.googlesafebrowsing.timeout";
     public static final String GOOGLESAFEBROWSING_HTTP_TIMEOUT_DOC = "The request timeout to use in the Google Safe Browsing collector (seconds).";
