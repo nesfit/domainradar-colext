@@ -54,8 +54,8 @@ public class AbuseIpDbCollector extends BaseIPRepSystemAPICollector<AbuseIpDbDat
 
         return new AbuseIpDbData(
                 data.getInt("abuseConfidenceScore"),
-                data.getBoolean("isWhitelisted"),
-                data.getBoolean("isTor"),
+                data.isNull("isWhitelisted") ? null : data.getBoolean("isWhitelisted"),
+                data.isNull("isTor") ? null : data.getBoolean("isTor"),
                 data.getInt("totalReports")
         );
     }
