@@ -4,6 +4,7 @@ package cz.vut.fit.domainradar;
  * The configuration keys, descriptions and default values for the collectors.
  *
  * @author Ondřej Ondryáš
+ * @author Matěj Čech
  */
 @SuppressWarnings("ALL")
 public class CollectorConfig {
@@ -32,6 +33,15 @@ public class CollectorConfig {
     public static final String NERD_BATCH_SIZE_CONFIG = "collectors.nerd.batch.size";
     public static final String NERD_BATCH_SIZE_DOC = "The number of IPs to process in a single NERD query.";
     public static final String NERD_BATCH_SIZE_DEFAULT = "64";
+
+    /* --- AbuseIPDB collector --- */
+    public static final String ABUSEIPDB_HTTP_TIMEOUT_CONFIG = "collectors.abuseipdb.timeout";
+    public static final String ABUSEIPDB_HTTP_TIMEOUT_DOC = "The request timeout to use in the AbuseIPDB collector (seconds).";
+    public static final String ABUSEIPDB_HTTP_TIMEOUT_DEFAULT = "5";
+
+    public static final String ABUSEIPDB_TOKEN_CONFIG = "collectors.abuseipdb.token";
+    public static final String ABUSEIPDB_TOKEN_DOC = "The AbuseIPDB access token.";
+    public static final String ABUSEIPDB_TOKEN_DEFAULT = "";
 
     /* --- TLS collector --- */
     public static final String TLS_TIMEOUT_MS_CONFIG = "collectors.tls.timeout";

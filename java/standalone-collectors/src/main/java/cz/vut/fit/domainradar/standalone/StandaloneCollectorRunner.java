@@ -2,6 +2,7 @@ package cz.vut.fit.domainradar.standalone;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import cz.vut.fit.domainradar.Common;
+import cz.vut.fit.domainradar.standalone.collectors.AbuseIpDbCollector;
 import cz.vut.fit.domainradar.standalone.collectors.GeoAsnCollector;
 import cz.vut.fit.domainradar.standalone.collectors.NERDCollector;
 import cz.vut.fit.domainradar.standalone.collectors.TLSCollector;
@@ -115,6 +116,10 @@ public class StandaloneCollectorRunner {
             if (useAll || cmd.hasOption("col-qradar")) {
                 components.add(new VertxQRadarCollector(mapper, appId, properties));
             }
+
+            if (useAll || cmd.hasOption("col-abuseipdb")) {
+                components.add(new AbuseIpDbCollector(mapper, appId, properties));
+            }
         } catch (Exception e) {
             Logger.error("Failed to initialize a collector", e);
             System.exit(4);
@@ -169,6 +174,7 @@ public class StandaloneCollectorRunner {
         options.addOption(null, "col-nerd", false, "Use the NERD collector");
         options.addOption(null, "col-geo", false, "Use the GEO-ASN collector");
         options.addOption(null, "col-qradar", false, "Use the QRadar Offense collector");
+        options.addOption(null, "col-abuseipdb", false, "Use the AbuseIPDB collector");
 
         options.addOption(Option.builder("id")
                 .longOpt("app-id")
