@@ -61,6 +61,18 @@ public class CollectorConfig {
     public static final String HYBRIDANALYSIS_TOKEN_DOC = "The Hybrid-analysis access token.";
     public static final String HYBRIDANALYSIS_TOKEN_DEFAULT = "";
 
+    /* --- Cloudflare Radar collector --- */
+    public static final String CLOUDFLARERADAR_HTTP_TIMEOUT_CONFIG = "collectors.cloudflareradar.timeout";
+    public static final String CLOUDFLARERADAR_HTTP_TIMEOUT_DOC = "The request timeout to use in the Cloudflare Radar collector (seconds).";
+    public static final String CLOUDFLARERADAR_HTTP_TIMEOUT_DEFAULT = "5";
+
+    public static final String CLOUDFLARERADAR_TOKEN_CONFIG = "collectors.cloudflareradar.token";
+    public static final String CLOUDFLARERADAR_TOKEN_DOC = "The Cloudflare Radar URLScanner access token.";
+    public static final String CLOUDFLARERADAR_TOKEN_DEFAULT = "";
+
+    public static final String CLOUDFLARERADAR_ACCOUNTID_CONFIG = "collectors.cloudflareradar.accountid";
+    public static final String CLOUDFLARERADAR_ACCOUNTID_DOC = "The Cloudflare Radar account identifier.";
+
     /* --- TLS collector --- */
     public static final String TLS_TIMEOUT_MS_CONFIG = "collectors.tls.timeout";
     public static final String TLS_TIMEOUT_MS_DOC = "The TLS socket timeout (milliseconds).";

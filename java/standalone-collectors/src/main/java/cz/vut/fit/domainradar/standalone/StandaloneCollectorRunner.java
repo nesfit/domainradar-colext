@@ -3,6 +3,7 @@ package cz.vut.fit.domainradar.standalone;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import cz.vut.fit.domainradar.Common;
 import cz.vut.fit.domainradar.standalone.collectors.AbuseIpDbCollector;
+import cz.vut.fit.domainradar.standalone.collectors.CloudflareRadarCollector;
 import cz.vut.fit.domainradar.standalone.collectors.GeoAsnCollector;
 import cz.vut.fit.domainradar.standalone.collectors.HybridAnalysisCollector;
 import cz.vut.fit.domainradar.standalone.collectors.NERDCollector;
@@ -130,6 +131,10 @@ public class StandaloneCollectorRunner {
             if (useAll || cmd.hasOption("col-hybridanalysis")) {
                 components.add(new HybridAnalysisCollector(mapper, appId, properties));
             }
+
+            if (useAll || cmd.hasOption("col-cloudflareradar")) {
+                components.add(new CloudflareRadarCollector(mapper, appId, properties));
+            }
         } catch (Exception e) {
             Logger.error("Failed to initialize a collector", e);
             System.exit(4);
@@ -187,6 +192,7 @@ public class StandaloneCollectorRunner {
         options.addOption(null, "col-abuseipdb", false, "Use the AbuseIPDB collector");
         options.addOption(null, "col-virustotal", false, "Use the VirusTotal collector");
         options.addOption(null, "col-hybridanalysis", false, "Use the HybridAnalysis collector");
+        options.addOption(null, "col-cloudflareradar", false, "Use the Cloudflare Radar collector");
 
         options.addOption(Option.builder("id")
                 .longOpt("app-id")
