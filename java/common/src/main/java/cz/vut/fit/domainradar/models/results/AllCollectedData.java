@@ -16,13 +16,17 @@ import java.util.Map;
  * @param ipResults        A map of IP results, where the key is a string (denoting the IP address) and
  *                         the value is another map with a string key (denoting the source collector) and
  *                         a {@link CommonIPResult} with arbitrary data value, nullable.
+ * @param dnResults        A map of DN reputation systems results, where the key is a string (denoting
+ *                         the source collector) and a {@link CommonDNResult} with arbitrary data value, nullable.
  * @author Ondřej Ondryáš
+ * @author Matěj Čech
  */
 public record AllCollectedData(
         ZoneInfo zone,
         DNSResult dnsResult,
         @Nullable TLSResult tlsResult,
         @Nullable RDAPDomainResult rdapDomainResult,
-        @Nullable Map<String, Map<String, CommonIPResult<JsonNode>>> ipResults
+        @Nullable Map<String, Map<String, CommonIPResult<JsonNode>>> ipResults,
+        @Nullable Map<String, CommonDNResult<JsonNode>> dnResults
 ) {
 }

@@ -106,6 +106,7 @@ public class DataStreamJob {
         var rdapDnStream = makeKafkaDomainStream(env, Topics.OUT_RDAP_DN);
         var ipDataStream = makeKafkaIpStream(env, Topics.OUT_IP)
                 .keyBy(KafkaIPEntry::getDomainName);
+        var repSystemDnDataStream = makeKafkaRepSystemDNStream(env, Topics.OUT_DN);
 
         // ==== The pipeline ====
         var dnData = zoneStream.union(dnsStream, tlsStream, rdapDnStream)
@@ -114,11 +115,15 @@ public class DataStreamJob {
                 .uid("dn-merging-processor")
                 .keyBy(KafkaDomainAggregate::getDomainName);
 
+        var dnDataWithRepSystemDn = repSystemDnDataStream.connect(dnData)
+                .process(new RepSystemDNEntriesProcessFunction())
+                .uid("dn-rep-system-merging-processor");
+
         // Only use the IP merger for entries that actually carried IPs to process
-        var dnDataWithIps = dnData
-                .filter(dnAggregate -> !dnAggregate.getDNSIPs().isEmpty())
+        var dnDataWithIps = dnDataWithRepSystemDn
+                .filter(dnAggregate -> !dnAggregate.getDomainData().getDNSIPs().isEmpty())
                 .uid("dn-data-with-ips-filter")
-                .keyBy(KafkaDomainAggregate::getDomainName);
+                .keyBy(KafkaDomainWithRepSystemAggregate::getDomainName);
         var mergedData = ipDataStream.connect(dnDataWithIps)
                 .process(new IPEntriesProcessFunction())
                 .uid("dn-ip-final-merging-processor")
@@ -131,10 +136,10 @@ public class DataStreamJob {
                 .uid("entries-with-ips-sink");
 
         // Handle the IP-less merged results from DN-based collectors
-        var dnDataWithoutIps = dnData
-                .filter(dnAggregate -> dnAggregate.getDNSIPs().isEmpty())
+        var dnDataWithoutIps = dnDataWithRepSystemDn
+                .filter(dnAggregate -> dnAggregate.getDomainData().getDNSIPs().isEmpty())
                 .uid("dn-data-without-ips-filter")
-                .keyBy(KafkaDomainAggregate::getDomainName);
+                .keyBy(KafkaDomainWithRepSystemAggregate::getDomainName);
         var resultsWithoutIps = dnDataWithoutIps
                 .map(dnAggregate -> new KafkaMergedResult(dnAggregate.getDomainName(), dnAggregate, null))
                 .uid("map-to-merged-results")
@@ -175,6 +180,19 @@ public class DataStreamJob {
                 .keyBy(KafkaIPEntry::getDomainName);
     }
 
+    private static KeyedStream<KafkaRepSystemDNEntry, String>
+    makeKafkaRepSystemDNStream(final StreamExecutionEnvironment env, final String topic) {
+        final var outOfOrdernessMs =
+                Long.parseLong(appProperties.getProperty(MergerConfig.DN_MAX_OUT_OF_ORDERNESS_MS_CONFIG,
+                        MergerConfig.DN_MAX_OUT_OF_ORDERNESS_MS_DEFAULT));
+        final var idlenessSec =
+                Long.parseLong(appProperties.getProperty(MergerConfig.DN_IDLENESS_SEC_CONFIG,
+                        MergerConfig.DN_IDLENESS_SEC_DEFAULT));
+        return env.fromSource(makeKafkaRepSystemDNSource(topic), makeWatermarkStrategy(outOfOrdernessMs, idlenessSec), "Kafka: " + topic)
+                .uid("source-kafka-rep-system-dn-" + topic)
+                .keyBy(KafkaRepSystemDNEntry::getDomainName);
+    }
+
     private static KafkaSource<KafkaDomainEntry> makeKafkaDomainSource(final String topic) {
         return KafkaSource.<KafkaDomainEntry>builder()
                 .setProperties(kafkaProperties)
@@ -190,6 +208,15 @@ public class DataStreamJob {
                 .setTopics(topic)
                 .setStartingOffsets(OffsetsInitializer.committedOffsets(OffsetResetStrategy.EARLIEST))
                 .setDeserializer(new KafkaIPEntryDeserializer())
+                .build();
+    }
+
+    private static KafkaSource<KafkaRepSystemDNEntry> makeKafkaRepSystemDNSource(final String topic) {
+        return KafkaSource.<KafkaRepSystemDNEntry>builder()
+                .setProperties(kafkaProperties)
+                .setTopics(topic)
+                .setStartingOffsets(OffsetsInitializer.committedOffsets(OffsetResetStrategy.EARLIEST))
+                .setDeserializer(new KafkaRepSystemDNEntryDeserializer())
                 .build();
     }
 

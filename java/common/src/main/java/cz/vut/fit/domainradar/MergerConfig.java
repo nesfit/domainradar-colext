@@ -4,6 +4,7 @@ package cz.vut.fit.domainradar;
  * The configuration keys, descriptions and default values for the Flink-based merger.
  *
  * @author Ondřej Ondryáš
+ * @author Matěj Čech
  */
 @SuppressWarnings("ALL")
 public class MergerConfig {
@@ -67,9 +68,9 @@ public class MergerConfig {
 
     /**
      * The time (in ms) to wait after the last domain-data aggregate update before an unfinished final merged data entry
-     * is produced. This should be set to a value higher that the maximum expected time between the last DN-based
-     * collector result and the first IP-based collector result for the same domain; however, setting it too high will
-     * increase the per-domain latency and can cause large amount of retained state data.
+     * is produced. This should be set to a value higher that the maximum expected time between the last reputation system
+     * DN-based collector result and the first IP-based collector result for the same domain; however, setting it too high
+     * will increase the per-domain latency and can cause large amount of retained state data.
      */
     public static final String IP_MAX_ENTRY_LIFETIME_AFTER_DOMAIN_DATA_MS_CONFIG
             = "ip.max.entry.lifetime.after.domain.data.ms";
@@ -84,6 +85,26 @@ public class MergerConfig {
     public static final String IP_MAX_ENTRY_LIFETIME_AFTER_IP_DATA_MS_CONFIG
             = "ip.max.entry.lifetime.after.ip.data.ms";
     public static final String IP_MAX_ENTRY_LIFETIME_AFTER_IP_DATA_DEFAULT = "60000"; // 1 minute
+
+    /**
+     * The time (in ms) to wait after the last domain-data aggregate update before an unfinished final merged data entry
+     * is produced. This should be set to a value higher that the maximum expected time between the last DN-based non
+     * reputation system collector result and the reputation system DN-based collector result for the same domain;
+     * however, setting it too high will increase the per-domain latency and can cause large amount of retained state data.
+     */
+    public static final String DN_REP_MAX_ENTRY_LIFETIME_AFTER_DOMAIN_DATA_MS_CONFIG
+            = "dnrep.max.entry.lifetime.after.domain.data.ms";
+    public static final String DN_REP_MAX_ENTRY_LIFETIME_AFTER_DOMAIN_DATA_DEFAULT = "10000"; // 10 seconds
+
+    /**
+     * The time (in ms) to wait after the last DN-based reputation system collector result before an unfinished final
+     * merged data entry is produced. This should be set to a value higher that the maximum expected time between the
+     * first and the last DN-based reputation system collector result for a single DN; however, setting it too high
+     * will increase the per-domain latency and can cause large amount of retained state data.
+     */
+    public static final String DN_REP_MAX_ENTRY_LIFETIME_AFTER_DN_DATA_MS_CONFIG
+            = "dnrep.max.entry.lifetime.after.dnrep.data.ms";
+    public static final String DN_REP_MAX_ENTRY_LIFETIME_AFTER_DN_DATA_DEFAULT = "60000"; // 1 minute
 
     /**
      * The maximum time (in ms) to wait for the domain-based data blob to arrive to the final merger if an IP-based
