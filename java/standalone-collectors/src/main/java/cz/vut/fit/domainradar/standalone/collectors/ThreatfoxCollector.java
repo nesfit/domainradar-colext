@@ -81,7 +81,7 @@ public class ThreatfoxCollector extends BaseCombinedRepSystemAPICollector<Threat
         Integer confidenceLevel = null;
         List<String> tags = new ArrayList<>();
 
-        var queryStatus = jsonResponse.getString("queryStatus");
+        var queryStatus = jsonResponse.getString("query_status");
 
         if (queryStatus.equals("ok")) {
             var data = jsonResponse.getJSONArray("data").getJSONObject(0);
@@ -106,11 +106,11 @@ public class ThreatfoxCollector extends BaseCombinedRepSystemAPICollector<Threat
 
     @Override
     protected String getPOSTData(IPToProcess ip) {
-        return "{ \"query\": \"search_ioc\", \"search_term\": \"" + ip.ip() + "\", \"exact_match\": true }";
+        return "{ \"query\": \"search_ioc\", \"search_term\": \"" + ip.ip() + "\", \"exact_match\": false }";
     }
 
     @Override
     protected String getPOSTData(DNToProcess dn) {
-        return "{ \"query\": \"search_ioc\", \"search_term\": \"" + dn.dn() + "\", \"exact_match\": true }";
+        return "{ \"query\": \"search_ioc\", \"search_term\": \"" + dn.dn() + "\", \"exact_match\": false }";
     }
 }
