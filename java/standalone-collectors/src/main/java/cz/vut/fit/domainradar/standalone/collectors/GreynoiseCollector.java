@@ -44,7 +44,7 @@ public class GreynoiseCollector extends BaseIPRepSystemAPICollector<GreynoiseDat
             return null;
         }
 
-        return GREYNOISE_BASE;
+        return GREYNOISE_BASE + ip.ip();
     }
 
     @Override
