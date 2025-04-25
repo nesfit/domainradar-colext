@@ -2,7 +2,8 @@
 __authors__ = [
     "Ondřej Ondryáš <xondry02@vut.cz>",
     "Radek Hranický <hranicky@fit.vut.cz>",
-    "Adam Horák <ihorak@fit.vut.cz>"
+    "Adam Horák <ihorak@fit.vut.cz>",
+    "Matěj Čech <xcechm15@stud.fit.vut.cz>"
 ]
 
 import math
@@ -18,6 +19,12 @@ from pandas import Series
 # that you think could be useful for others, please extract it to here.
 
 DNS_TYPES = ["A", "AAAA", "CNAME", "MX", "NS", "TXT", "SOA"]
+
+OPENTIP_KASPERSKY_ZONES = ["Green", "Grey", "Yellow", "Orange", "Red"]
+
+PULSEDIVE_RISKS = ["none", "low", "medium", "high", "critical", "retired", "unknown"]
+
+CRIMINALIP_SCORE = ["Safe", "Low", "Moderate", "Dangerous", "Critical"]
 
 
 # Returns the timestamp representing day of feature extraction
@@ -186,3 +193,45 @@ def get_normalized_entropy(text: str) -> Optional[float]:
         p = float(f) / text_len
         entropy -= p * math.log(p, 2)
     return entropy / text_len
+
+
+def map_opentip_kaspersky_zone(zone: str) -> int:
+    """
+    Maps the Opentip Kaspersky zone from a string into an integer.
+
+    Args:
+        zone: the Opentip Kaspersky zone to be mapped into an integer
+
+    Returns:
+        int: mapped zone
+    """
+    zone_mapping = {
+        "Green": 0,
+        "Grey": 1,
+        "Yellow": 2,
+        "Orange": 3,
+        "Red": 4
+    }
+    return zone_mapping.get(zone, -1)
+
+
+def map_pulsedive_risk(risk: str) -> int:
+    """
+    Maps the Pulsedive risk or risk_recommended from a string into an integer.
+
+    Args:
+        risk: the Pulsedive risk or risk_recommended to be mapped into an integer
+
+    Returns:
+        int: mapped risk
+    """
+    risk_mapping = {
+        "none": 0,
+        "low": 1,
+        "medium": 2,
+        "high": 3,
+        "critical": 4,
+        "retired": 5,
+        "unknown": 6
+    }
+    return risk_mapping.get(risk, -1)

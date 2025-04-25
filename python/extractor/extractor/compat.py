@@ -1,6 +1,9 @@
 """compat.py: A compatibility transformation that converts the raw data collected by the DomainRadar Collector
 into a format that can be used by the "legacy" transformations."""
-__author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
+__authors__ = [
+    "Ondřej Ondryáš <xondry02@vut.cz>",
+    "Matěj Čech <xcechm15@stud.fit.vut.cz>"
+]
 
 import base64
 from datetime import datetime, UTC
@@ -53,6 +56,7 @@ class CompatibilityTransformation:
         "rdap_dnssec": "object",
         "rdap_entities": "object",
         "ip_data": "object",
+        "dn_data": "object",
         "countries": "object",
         "latitudes": "object",
         "longitudes": "object"
@@ -95,6 +99,7 @@ class CompatibilityTransformation:
         soa, zone_soa = self._make_soa(data)
         rdap_parsed = self._parse_rdap_dn(data["domain_name"], rdap_data, rdap_entities, whois_parsed, whois_raw)
         ip_data = self._make_ip_data(data)
+        dn_data = self._make_dn_data(data)
         country_codes, latitudes, longitudes = self._flatten_ip_data(ip_data)
 
         reg_date = self._ensure_utc_datetime(rdap_parsed.get("registration_date"))
@@ -125,6 +130,7 @@ class CompatibilityTransformation:
             "rdap_dnssec": self._make_rdap_dnssec(rdap_data),
             "rdap_entities": rdap_parsed.get("entities"),
             "ip_data": ip_data,
+            "dn_data": dn_data,
             "countries": country_codes,
             "latitudes": latitudes,
             "longitudes": longitudes
@@ -491,7 +497,7 @@ class CompatibilityTransformation:
 
         This method takes a dictionary of raw data as input and extracts the IP data. The IP data includes information
         about the IP address, the record from which it was obtained, ASN details, RDAP details, geolocation details,
-        average round-trip time (RTT), and NERD reputation.
+        average round-trip time (RTT), NERD reputation, and data from multiple other reputation systems.
 
         The method returns a list of dictionaries, each representing an IP address and its associated data. If the IP
         data is not present in the raw data, an empty list is returned.
@@ -501,7 +507,8 @@ class CompatibilityTransformation:
 
         Returns:
             list[dict]: A list of dictionaries representing the IP data. Each dictionary contains the IP address and its
-            associated data, including ASN details, RDAP details, geolocation details, average RTT, and NERD reputation.
+            associated data, including ASN details, RDAP details, geolocation details, average RTT, NERD reputation,
+            and data from multiple other reputation systems.
         """
         def t_ip_ver(ver: str | None):
             return "6" if ver == "v6" else ("4" if ver == "v4" else ver)
@@ -522,6 +529,20 @@ class CompatibilityTransformation:
                     rdap_parsed = rdap_parser.parse()
                 except ParseError:
                     pass
+
+            hybrid_analysis = get_safe(collectors_results, "hybrid-analysis.data") or {}
+            google_safe_browsing = get_safe(collectors_results, "google-safe-browsing.data") or {}
+            virustotal = get_safe(collectors_results, "virustotal.data") or {}
+            opentip_kaspersky = get_safe(collectors_results, "opentip-kaspersky.data") or {}
+            nerd = get_safe(collectors_results, "nerd.data.reputation")
+            project_honeypot = get_safe(collectors_results, "project-honeypot.data.malicious")
+            cloudflare_radar = get_safe(collectors_results, "cloudflare-radar.data.malicious")
+            abuseipdb = get_safe(collectors_results, "abuseipdb.data") or {}
+            fortiguard = get_safe(collectors_results, "fortiguard.data.spam")
+            greynoise = get_safe(collectors_results, "greynoise.data") or {}
+            criminalip = get_safe(collectors_results, "criminalip.data") or {}
+            threatfox = get_safe(collectors_results, "threatfox.data") or {}
+            pulsedive = get_safe(collectors_results, "pulsedive.data") or {}
 
             network_address: str | None = geo_asn.get("networkAddress", None)
             if network_address is not None and len(network_address) > 0 and network_address[0] == '/':
@@ -547,9 +568,132 @@ class CompatibilityTransformation:
                     "longitude": geo_asn.get("longitude", None)
                 } if "countryCode" in geo_asn else None,
                 "average_rtt": self._make_ip_average_rtt(collectors_results),
-                "nerd_rep": get_safe(collectors_results, "nerd.data.reputation") or -1
+                "hybrid_analysis": self._get_hybrid_analysis_data(hybrid_analysis),
+                "google_safe_browsing": self._get_google_safe_browsing_data(google_safe_browsing),
+                "virustotal": self._get_virustotal_data(virustotal),
+                "nerd_rep": nerd if nerd is not None else -1,
+                "opentip_kaspersky": self._get_opentip_kaspersky_data(opentip_kaspersky),
+                "project_honeypot_malicious": project_honeypot,
+                "cloudflare_radar_malicious": cloudflare_radar,
+                "abuseipdb": {
+                    "abuse_confidence_score": abuseipdb.get("abuseConfidenceScore", -1),
+                    "is_whitelisted": abuseipdb.get("isWhitelisted", None),
+                    "is_tor": abuseipdb.get("isTor", None),
+                    "total_reports": abuseipdb.get("totalReports", -1)
+                },
+                "fortiguard_spam": fortiguard,
+                "greynoise": {
+                    "noise": greynoise.get("noise", None),
+                    "riot": greynoise.get("riot", None),
+                    "classification": greynoise.get("classification", None),
+                },
+                "criminalip": {
+                    "inbound": criminalip.get("scoreInbound", None),
+                    "outbound": criminalip.get("scoreOutbound", None),
+                },
+                "threatfox": self._get_threatfox_data(threatfox),
+                "pulsedive": self._get_pulsedive_data(pulsedive)
             }
 
             ret.append(new_ip)
 
         return ret
+
+    def _make_dn_data(self, data: dict) -> dict:
+        """
+        Extracts and formats the DN data (currently only data gathered from reputation systems) from the raw data.
+
+        This method takes a dictionary of raw data as input and extracts the DN data. The DN data includes information
+        about the DN gathered from multiple reputation systems.
+
+        The method returns a dictionary representing the DN and its associated data. If the DN data is not present in
+        the raw data, an empty dictionary is returned.
+
+        Args:
+            data (dict): A dictionary containing the raw data collected by the DomainRadar collector.
+
+        Returns:
+            dict: A dictionary representing the DN data. The dictionary contains the DN data from multiple reputation
+            systems.
+        """
+        collectors_results = get_safe(data, "dnResults") or {}
+
+        hybrid_analysis = get_safe(collectors_results, "hybrid-analysis.data") or {}
+        google_safe_browsing = get_safe(collectors_results, "google-safe-browsing.data") or {}
+        opentip_kaspersky = get_safe(collectors_results, "opentip-kaspersky.data") or {}
+        virustotal = get_safe(collectors_results, "virustotal.data") or {}
+        urlvoid = get_safe(collectors_results, "urlvoid.data.detectionCounts")
+        cloudflare_radar = get_safe(collectors_results, "cloudflare-radar.data.malicious")
+        fortiguard = get_safe(collectors_results, "fortiguard.data.spam")
+        threatfox = get_safe(collectors_results, "threatfox.data") or {}
+        pulsedive = get_safe(collectors_results, "pulsedive.data") or {}
+
+        return {
+            "hybrid_analysis": self._get_hybrid_analysis_data(hybrid_analysis),
+            "google_safe_browsing": self._get_google_safe_browsing_data(google_safe_browsing),
+            "opentip_kaspersky": self._get_opentip_kaspersky_data(opentip_kaspersky),
+            "virustotal": self._get_virustotal_data(virustotal),
+            "urlvoid_detection_counts": urlvoid if urlvoid is not None else -1,
+            "cloudflare_radar_malicious": cloudflare_radar,
+            "fortiguard_spam": fortiguard,
+            "threatfox": self._get_threatfox_data(threatfox),
+            "pulsedive": self._get_pulsedive_data(pulsedive)
+        }
+
+    @staticmethod
+    def _get_hybrid_analysis_data(data: dict) -> dict:
+        return {
+            "malicious_cnt": data.get("maliciousCnt", -1),
+            "suspicious_cnt": data.get("suspiciousCnt", -1),
+            "no_threat_cnt": data.get("noThreatCnt", -1),
+            "whitelisted_cnt": data.get("whitelistedCnt", -1),
+            "worst_score": data.get("worstScore", -1),
+            "best_score": data.get("bestScore", -1),
+            "avg_score": data.get("avgScore", -1),
+            "null_score_cnt": data.get("nullScoreCnt", -1)
+        }
+
+    @staticmethod
+    def _get_google_safe_browsing_data(data: dict) -> dict:
+        return {
+            "unspecified_cnt": data.get("threatTypeUnspecifiedCnt", -1),
+            "malware_cnt": data.get("malwareCnt", -1),
+            "social_engineering_cnt": data.get("socialEngineeringCnt", -1),
+            "unwanted_software_cnt": data.get("unwantedSoftwareCnt", -1),
+            "potentially_harmful_cnt": data.get("potentiallyHarmfulApplicationCnt", -1)
+        }
+
+    @staticmethod
+    def _get_opentip_kaspersky_data(data: dict) -> dict:
+        return {
+            "zone": data.get("zone", None),
+            "categories": data.get("categories", []),
+            "category_zones": data.get("categoryZones", []),
+        }
+
+    @staticmethod
+    def _get_virustotal_data(data: dict) -> dict:
+        return {
+            "reputation": data.get("reputation", -1),
+            "malicious": data.get("malicious", -1),
+            "suspicious": data.get("suspicious", -1),
+            "undetected": data.get("undetected", -1),
+            "harmless": data.get("harmless", -1)
+        }
+
+    @staticmethod
+    def _get_threatfox_data(data: dict) -> dict:
+        return {
+            "threat_type": data.get("threatType", None),
+            "malware": data.get("malware", None),
+            "confidence_level": data.get("confidenceLevel", -1),
+            "tags": data.get("tags", []),
+        }
+
+    @staticmethod
+    def _get_pulsedive_data(data: dict) -> dict:
+        return {
+            "risk": data.get("risk", None),
+            "risk_recommended": data.get("riskRecommended", None),
+            "manual_risk": data.get("manualRisk", -1),
+        }
