@@ -149,6 +149,10 @@ public class RepSystemAPIClient<TIn, TData> {
                         TData result = responseMapper.apply(new JSONObject(response.body()));
                         onSuccess.accept(input, result);
                     }
+                    else if (response.statusCode() == 429) {
+                        onError.accept(input, ResultCodes.RATE_LIMITED,
+                                collectorName + " is rate limited");
+                    }
                     else {
                         onError.accept(input, ResultCodes.CANNOT_FETCH,
                                 collectorName + " response " + response.statusCode());
