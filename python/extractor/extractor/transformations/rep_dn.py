@@ -6,7 +6,7 @@ import numpy as np
 from pandas import DataFrame, concat
 
 from extractor.transformations.base_transformation import Transformation
-from ._helpers import map_opentip_kaspersky_zone, map_pulsedive_risk, OPENTIP_KASPERSKY_ZONES
+from ._helpers import map_opentip_kaspersky_zone, map_pulsedive_risk, map_cloudflare_malicious, OPENTIP_KASPERSKY_ZONES
 
 
 def _extract_virustotal_features(dn_data):
@@ -76,11 +76,11 @@ def _extract_urlvoid_features(dn_data) -> int:
 
 
 def _extract_cloudflare_radar_features(dn_data) -> bool:
-    return dn_data.get("cloudflare_radar_malicious")
+    return map_cloudflare_malicious(dn_data.get("cloudflare_radar_malicious"))
 
 
 def _extract_fortiguard_features(dn_data) -> bool:
-    return dn_data.get("fortiguard_spam")
+    return dn_data.get("fortiguard_spam", False)
 
 
 def _extract_threatfox_features(dn_data):
@@ -165,11 +165,11 @@ class RepDomainTransformation(Transformation):
             "rep_dn_opentip_kaspersky_category_yellow_zone_cnt": "Int64",
             "rep_dn_opentip_kaspersky_category_orange_zone_cnt": "Int64",
             "rep_dn_opentip_kaspersky_category_red_zone_cnt": "Int64",
-            "rep_dn_opentip_kaspersky_is_category_adware": "boolean",
-            "rep_dn_opentip_kaspersky_is_category_phishing": "boolean",
-            "rep_dn_opentip_kaspersky_is_category_malware": "boolean",
-            "rep_dn_opentip_kaspersky_is_category_compromised": "boolean",
-            "rep_dn_opentip_kaspersky_is_category_botnet_cnc": "boolean",
+            "rep_dn_opentip_kaspersky_is_category_adware": "bool",
+            "rep_dn_opentip_kaspersky_is_category_phishing": "bool",
+            "rep_dn_opentip_kaspersky_is_category_malware": "bool",
+            "rep_dn_opentip_kaspersky_is_category_compromised": "bool",
+            "rep_dn_opentip_kaspersky_is_category_botnet_cnc": "bool",
             "rep_dn_hybrid_analysis_malicious_cnt": "Int64",
             "rep_dn_hybrid_analysis_suspicious_cnt": "Int64",
             "rep_dn_hybrid_analysis_no_threat_cnt": "Int64",
@@ -184,8 +184,8 @@ class RepDomainTransformation(Transformation):
             "rep_dn_google_safe_browsing_unwanted_software_cnt": "Int64",
             "rep_dn_google_safe_browsing_potentially_harmful_cnt": "Int64",
             "rep_dn_urlvoid_detection_cnt": "Int64",
-            "rep_dn_cloudflare_malicious": "boolean",
-            "rep_dn_fortiguard_spam": "boolean",
+            "rep_dn_cloudflare_malicious": "Int64",
+            "rep_dn_fortiguard_spam": "bool",
             "rep_dn_threatfox_malware_confidence_level": "Int64",
             "rep_dn_pulsedive_risk": "Int64",
             "rep_dn_pulsedive_risk_recommended": "Int64",

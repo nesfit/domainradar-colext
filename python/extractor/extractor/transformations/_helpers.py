@@ -235,3 +235,21 @@ def map_pulsedive_risk(risk: str) -> int:
         "unknown": 6
     }
     return risk_mapping.get(risk, -1)
+
+
+def map_cloudflare_malicious(malicious) -> int:
+    """
+    Maps the Cloudflare Radar malicious type into an integer.
+
+    Args:
+        malicious: the Cloudflare Radar malicious to be mapped into an integer
+
+    Returns:
+        int: mapped malicious
+    """
+    malicious_map = {
+        True: 1,
+        False: 0,
+        None: -1
+    }
+    return malicious_map.get(malicious, -1)
