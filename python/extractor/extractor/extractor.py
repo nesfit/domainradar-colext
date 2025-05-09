@@ -20,6 +20,7 @@ from .transformations.lexical import LexicalTransformation
 from .transformations.rdap_dn import RDAPDomainTransformation
 from .transformations.rdap_ip import RDAPAddressTransformation
 from .transformations.tls import TLSTransformation
+from .transformations.tfidf import TFIDFTransformation
 
 _all_transformations = OrderedDict([
     ("html", HTMLTransformation),
@@ -30,6 +31,7 @@ _all_transformations = OrderedDict([
     ("lexical", LexicalTransformation),
     ("rdap_dn", RDAPDomainTransformation),
     ("rdap_ip", RDAPAddressTransformation),
+    ("tfidf", TFIDFTransformation),
     ("drop", DropColumnsTransformation)
 ])
 """An ordered dictionary of all data transformer classes.
