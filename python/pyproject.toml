@@ -12,6 +12,8 @@ python = ">=3.11,<3.12"
 domrad-python-collectors = { path = "./collector/", develop = true }
 domrad-python-extractor = { path = "./extractor/", develop = true, extras = ["parquet"] }
 domrad-python-classifier-unit = { path = "./classifier_unit/", develop = true }
+langid = "^1.1.6"
+scikit-learn = "^1.6.1"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0.0"
