@@ -49,7 +49,7 @@ public class GreynoiseCollector extends BaseIPRepSystemAPICollector<GreynoiseDat
 
     @Override
     protected String getAuthTokenHeaderName() {
-        return "gn_api_key";
+        return "key";
     }
 
     @Override
