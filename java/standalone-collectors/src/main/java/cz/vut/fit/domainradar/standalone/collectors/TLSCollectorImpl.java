@@ -163,8 +163,12 @@ public class TLSCollectorImpl {
             }
 
             if (line.startsWith("Location:")) {
-                location = line.split(":")[1].trim();
+                // Extract the location header
+                var colonIndex = line.indexOf(':');
+                location = line.substring(colonIndex + 1).trim();
                 isRedirect = true;
+                // Stop reading headers if we find a location header
+                break;
             }
 
             if (line.isEmpty()) break; // End of headers
