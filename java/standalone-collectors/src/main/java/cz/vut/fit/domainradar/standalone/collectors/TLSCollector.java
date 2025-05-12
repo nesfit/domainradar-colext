@@ -70,8 +70,8 @@ public class TLSCollector
         var maxRedirects = Integer.parseInt(properties.getProperty(CollectorConfig.TLS_TIMEOUT_MS_CONFIG,
                 CollectorConfig.TLS_TIMEOUT_MS_DEFAULT));
 
-        _collector = new TLSCollectorImpl(maxRedirects, _timeout);
         _executor = Executors.newVirtualThreadPerTaskExecutor();
+        _collector = new TLSCollectorImpl(maxRedirects, _timeout, _executor);
         _producer = super.createProducer(new StringSerializer(),
                 JsonSerde.of(jsonMapper, TLSResult.class).serializer());
 
@@ -106,6 +106,18 @@ public class TLSCollector
 
             try {
                 var result = resultFuture.join();
+                if (result.html() == null) {
+                    // Try HTTP to fetch the HTML
+                    var httpFuture = _collector.collectHTTPOnly(dn, ip);
+                    try {
+                        var html = httpFuture.orTimeout(futureTimeout, TimeUnit.MILLISECONDS).join();
+                        result = new TLSResult(result.statusCode(), result.error(),
+                                result.lastAttempt(), result.tlsData(), html);
+                    } catch (CompletionException e) { 
+                        // intentionally ignore
+                    }
+                }
+                
                 _producer.send(resultRecord(Topics.OUT_TLS, dn, result));
             } catch (CompletionException e) {
                 if (e.getCause() instanceof TimeoutException) {

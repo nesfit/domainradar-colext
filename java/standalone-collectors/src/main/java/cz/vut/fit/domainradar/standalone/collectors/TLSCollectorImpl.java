@@ -14,14 +14,20 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.net.*;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateEncodingException;
 import java.security.cert.X509Certificate;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
 
 /**
  * This class encapsulates the processing logic for the {@link TLSCollector}.
@@ -41,10 +47,18 @@ public class TLSCollectorImpl {
 
     private final int _maxRedirects;
     private final int _timeout;
+    private final HttpClient _httpClient;
 
-    public TLSCollectorImpl(int maxRedirects, int timeoutMs) {
+    public TLSCollectorImpl(int maxRedirects, int timeoutMs, ExecutorService executor) {
         _maxRedirects = maxRedirects;
         _timeout = timeoutMs;
+
+        _httpClient = HttpClient.newBuilder()
+            .followRedirects(HttpClient.Redirect.NEVER)
+            .connectTimeout(Duration.ofMillis(timeoutMs))
+            .version(HttpClient.Version.HTTP_1_1)
+            .executor(executor)
+            .build();
     }
 
     /**
@@ -115,7 +129,7 @@ public class TLSCollectorImpl {
                     }
                 }
 
-                @Nullable final var finalHtmlResponse = this.fetchHTTPContent(hostName, socket, context,
+                @Nullable final var finalHtmlResponse = this.fetchHTTPSContent(hostName, socket, context,
                         null, 0);
                 final var tlsData = new TLSData(targetIp, protocol, cipher, certificates);
                 return new TLSResult(ResultCodes.OK, null, Instant.now(), tlsData, finalHtmlResponse);
@@ -135,7 +149,7 @@ public class TLSCollectorImpl {
         }
     }
 
-    private String fetchHTTPContent(String hostName, SSLSocket socket, SSLContext sslContext,
+    private String fetchHTTPSContent(String hostName, Socket socket, SSLContext sslContext,
                                     String referrer, int counter) throws IOException {
         var osw = new OutputStreamWriter(socket.getOutputStream());
         osw.write("GET / HTTP/1.1\r\nHost: ");
@@ -227,7 +241,10 @@ public class TLSCollectorImpl {
             if (!uri.isAbsolute()) {
                 uri = new URI("https://", currentLocation, newLocation, "");
             }
-
+            // Check if URI is HTTP (not HTTPS)
+            if (!uri.getScheme().equalsIgnoreCase("https")) {
+                return null;
+            }
             final var url = uri.toURL();
             newHost = url.getHost();
             port = url.getPort();
@@ -241,7 +258,7 @@ public class TLSCollectorImpl {
             socket.connect(new InetSocketAddress(newHost, port), _timeout);
             socket.setSoTimeout(_timeout);
             socket.startHandshake();
-            return this.fetchHTTPContent(newHost, socket, sslContext, currentLocation, counter + 1);
+            return this.fetchHTTPSContent(newHost, socket, sslContext, currentLocation, counter + 1);
         } catch (IOException e) {
             Logger.debug("Cannot connect to {}: {}", newLocation, e.getMessage());
             return null;
@@ -257,6 +274,72 @@ public class TLSCollectorImpl {
         } catch (CertificateEncodingException e) {
             return new TLSData.Certificate(subjectDN, new byte[0]);
         }
+    }
+
+    public CompletableFuture<String> collectHTTPOnly(@NotNull String hostName, @NotNull String targetIp) {
+        try {
+            var uri = new URI("http://" + hostName);
+            return this.fetchHTTPContent(uri, targetIp, 0);
+        } catch (URISyntaxException e) {
+            Logger.debug("Cannot create URI: {}", e.getMessage());
+            return CompletableFuture.completedFuture(null);
+        }
+    }
+
+    private CompletableFuture<String> fetchHTTPContent(@NotNull URI location, 
+        @Nullable String targetIp, int counter) {
+
+        HttpRequest.Builder reqBuilder = HttpRequest.newBuilder()
+            .timeout(Duration.ofMillis(_timeout))
+            .header("Accept", "*/*")
+            .GET();
+
+        var host = location.getHost();
+        if (targetIp != null) {
+            try {
+                location = new URI(location.getScheme(), targetIp, location.getPath(), null);
+            } catch (URISyntaxException e) {
+                return null;
+            }
+            reqBuilder = reqBuilder
+                .uri(location)
+                .header("Host", host);
+        } else {
+            reqBuilder = reqBuilder
+                .uri(location);
+        }
+
+        final var finalLocation = location;
+
+        // Send the request asynchronously
+        var responseFuture = _httpClient.sendAsync(reqBuilder.build(), HttpResponse.BodyHandlers.ofString());
+        return responseFuture.thenCompose(response -> {
+            // Check if the response is a redirect
+            if (response.statusCode() >= 300 && response.statusCode() < 400) {
+                // If the maximum number of redirects has been reached, return null
+                if (counter == _maxRedirects)
+                    return CompletableFuture.completedFuture(null);
+
+                // Handle the redirect
+                var newLocation = response.headers().firstValue("Location").orElse(null);
+                if (newLocation == null)
+                    return CompletableFuture.completedFuture(null);
+                
+                try {
+                    var uri = new URI(newLocation);
+                    // Handle relative redirects
+                    if (!uri.isAbsolute()) {
+                        uri = new URI(finalLocation.getScheme(), host, newLocation, "");
+                    }
+
+                    return this.fetchHTTPContent(new URI(newLocation), null, counter + 1);
+                } catch (URISyntaxException | IllegalArgumentException e) {
+                    return CompletableFuture.completedFuture(null);
+                }
+            }
+
+            return CompletableFuture.completedFuture(response.body());
+        });   
     }
 
     public static TLSResult errorResult(int code, String message) {
