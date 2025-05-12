@@ -1,2 +1,3 @@
 cz.vut.fit.domainradar.connect.BytesConverter
+cz.vut.fit.domainradar.connect.DNToProcessConverter
 cz.vut.fit.domainradar.connect.IPToProcessConverter
