@@ -51,7 +51,8 @@ public final class TagRegistry {
             Map.entry("google-safe-browsing", 14),
             Map.entry("fortiguard", 15),
             Map.entry("urlvoid", 16),
-            Map.entry("pulsedive", 17)
+            Map.entry("pulsedive", 17),
+            Map.entry("hybrid-analysis", 18)
     ));
 
     public static final Map<Integer, String> REP_SYSTEM_DN_COLLECTOR_NAMES = Map.ofEntries(
@@ -62,6 +63,7 @@ public final class TagRegistry {
             Map.entry(14, "google-safe-browsing"),
             Map.entry(15, "fortiguard"),
             Map.entry(16, "urlvoid"),
-            Map.entry(17, "pulsedive")
+            Map.entry(17, "pulsedive"),
+            Map.entry(18, "hybrid-analysis")
     );
 }

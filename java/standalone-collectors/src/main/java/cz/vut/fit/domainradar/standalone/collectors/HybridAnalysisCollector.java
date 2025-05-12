@@ -3,9 +3,10 @@ package cz.vut.fit.domainradar.standalone.collectors;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import cz.vut.fit.domainradar.CollectorConfig;
 import cz.vut.fit.domainradar.Common;
+import cz.vut.fit.domainradar.models.DNToProcess;
 import cz.vut.fit.domainradar.models.IPToProcess;
 import cz.vut.fit.domainradar.models.repsystems.HybridAnalysisData;
-import cz.vut.fit.domainradar.standalone.BaseIPRepSystemAPICollector;
+import cz.vut.fit.domainradar.standalone.BaseCombinedRepSystemAPICollector;
 import org.json.JSONObject;
 
 import java.net.URLEncoder;
@@ -13,11 +14,11 @@ import java.nio.charset.StandardCharsets;
 import java.util.Properties;
 
 /**
- * A collector that processes IP data using the HybridAnalysis API.
+ * A collector that processes IP and DN data using the HybridAnalysis API.
  *
  * @author Matěj Čech
  */
-public class HybridAnalysisCollector extends BaseIPRepSystemAPICollector<HybridAnalysisData> {
+public class HybridAnalysisCollector extends BaseCombinedRepSystemAPICollector<HybridAnalysisData> {
     public static final String NAME = "hybrid-analysis";
     public static final String COMPONENT_NAME = "collector-" + NAME;
     private static final org.slf4j.Logger Logger = Common.getComponentLogger(HybridAnalysisCollector.class);
@@ -41,6 +42,11 @@ public class HybridAnalysisCollector extends BaseIPRepSystemAPICollector<HybridA
     }
 
     @Override
+    protected String getRequestUrl(DNToProcess dn) {
+        return HYBRIDANALYSIS_BASE;
+    }
+
+    @Override
     protected String getAuthTokenHeaderName() {
         return "api-key";
     }
@@ -51,7 +57,16 @@ public class HybridAnalysisCollector extends BaseIPRepSystemAPICollector<HybridA
     }
 
     @Override
-    protected HybridAnalysisData mapResponseToData(JSONObject jsonResponse) {
+    protected HybridAnalysisData mapIPResponseToData(JSONObject jsonResponse) {
+        return mapResponseToData(jsonResponse);
+    }
+
+    @Override
+    protected HybridAnalysisData mapDNResponseToData(JSONObject jsonResponse) {
+        return mapResponseToData(jsonResponse);
+    }
+
+    private HybridAnalysisData mapResponseToData(JSONObject jsonResponse) {
         var data = jsonResponse.getJSONArray("result");
         var dataLen = data.length();
 
@@ -116,5 +131,10 @@ public class HybridAnalysisCollector extends BaseIPRepSystemAPICollector<HybridA
     @Override
     protected String getUrlEncodedData(IPToProcess ip) {
         return "host=" + URLEncoder.encode(ip.ip(), StandardCharsets.UTF_8);
+    }
+
+    @Override
+    protected String getUrlEncodedData(DNToProcess dn) {
+        return "domain=" + URLEncoder.encode(dn.dn(), StandardCharsets.UTF_8);
     }
 }

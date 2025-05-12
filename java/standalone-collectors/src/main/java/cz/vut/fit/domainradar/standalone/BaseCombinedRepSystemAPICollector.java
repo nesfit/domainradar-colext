@@ -55,6 +55,11 @@ public abstract class BaseCombinedRepSystemAPICollector<TData> implements Collec
             protected String getPOSTData(IPToProcess ip) {
                 return BaseCombinedRepSystemAPICollector.this.getPOSTData(ip);
             }
+
+            @Override
+            protected String getUrlEncodedData(IPToProcess ip) {
+                return BaseCombinedRepSystemAPICollector.this.getUrlEncodedData(ip);
+            }
         };
 
         this.dnCollector = new BaseDNRepSystemAPICollector<TData>(jsonMapper, appName, properties, authToken,
@@ -87,6 +92,11 @@ public abstract class BaseCombinedRepSystemAPICollector<TData> implements Collec
             @Override
             protected String getPOSTData(DNToProcess dn) {
                 return BaseCombinedRepSystemAPICollector.this.getPOSTData(dn);
+            }
+
+            @Override
+            protected String getUrlEncodedData(DNToProcess dn) {
+                return BaseCombinedRepSystemAPICollector.this.getUrlEncodedData(dn);
             }
         };
     }
@@ -164,6 +174,30 @@ public abstract class BaseCombinedRepSystemAPICollector<TData> implements Collec
      * @return The POST data as a string, or null if no POST data is required.
      */
     protected String getPOSTData(DNToProcess dn) {
+        return null;
+    }
+
+    /**
+     * Optionally provides URL-encoded data for the IP request.
+     * By default, this method returns null, but it can be overridden by a subclass to provide URL-encoded data
+     * for POST requests if needed.
+     *
+     * @param ip The IP address to be processed.
+     * @return The URL-encoded data as a string, or null if no URL-encoded data is required.
+     */
+    protected String getUrlEncodedData(IPToProcess ip) {
+        return null;
+    }
+
+    /**
+     * Optionally provides URL-encoded data for the DN request.
+     * By default, this method returns null, but it can be overridden by a subclass to provide URL-encoded data
+     * for POST requests if needed.
+     *
+     * @param dn The domain name to be processed.
+     * @return The URL-encoded data as a string, or null if no URL-encoded data is required.
+     */
+    protected String getUrlEncodedData(DNToProcess dn) {
         return null;
     }
 
