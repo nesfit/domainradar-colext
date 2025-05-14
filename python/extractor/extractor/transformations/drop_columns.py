@@ -1,6 +1,9 @@
 """drop_columns.py: A transformation that drops columns from the DataFrame that should not be
 a part of the feature vector."""
-__author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
+__authors__ = [
+    "Ondřej Ondryáš <xondry02@vut.cz>",
+    "Matěj Čech <xcechm15@stud.fit.vut.cz>"
+]
 
 from pandas import DataFrame
 
@@ -28,6 +31,7 @@ _to_drop = [
     "rdap_evaluated_on",
     "rdap_dnssec",
     "ip_data",
+    "dn_data",
     "countries",
     "latitudes",
     "longitudes"

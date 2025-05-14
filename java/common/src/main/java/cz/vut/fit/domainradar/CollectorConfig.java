@@ -4,6 +4,7 @@ package cz.vut.fit.domainradar;
  * The configuration keys, descriptions and default values for the collectors.
  *
  * @author Ondřej Ondryáš
+ * @author Matěj Čech
  */
 @SuppressWarnings("ALL")
 public class CollectorConfig {
@@ -32,6 +33,114 @@ public class CollectorConfig {
     public static final String NERD_BATCH_SIZE_CONFIG = "collectors.nerd.batch.size";
     public static final String NERD_BATCH_SIZE_DOC = "The number of IPs to process in a single NERD query.";
     public static final String NERD_BATCH_SIZE_DEFAULT = "64";
+
+    /* --- AbuseIPDB collector --- */
+    public static final String ABUSEIPDB_HTTP_TIMEOUT_CONFIG = "collectors.abuseipdb.timeout";
+    public static final String ABUSEIPDB_HTTP_TIMEOUT_DOC = "The request timeout to use in the AbuseIPDB collector (seconds).";
+    public static final String ABUSEIPDB_HTTP_TIMEOUT_DEFAULT = "5";
+
+    public static final String ABUSEIPDB_TOKEN_CONFIG = "collectors.abuseipdb.token";
+    public static final String ABUSEIPDB_TOKEN_DOC = "The AbuseIPDB access token.";
+    public static final String ABUSEIPDB_TOKEN_DEFAULT = "";
+
+    /* --- VirusTotal collector --- */
+    public static final String VIRUSTOTAL_HTTP_TIMEOUT_CONFIG = "collectors.virustotal.timeout";
+    public static final String VIRUSTOTAL_HTTP_TIMEOUT_DOC = "The request timeout to use in the VirusTotal collector (seconds).";
+    public static final String VIRUSTOTAL_HTTP_TIMEOUT_DEFAULT = "5";
+
+    public static final String VIRUSTOTAL_TOKEN_CONFIG = "collectors.virustotal.token";
+    public static final String VIRUSTOTAL_TOKEN_DOC = "The VirusTotal access token.";
+    public static final String VIRUSTOTAL_TOKEN_DEFAULT = "";
+
+    /* --- Pulsedive collector --- */
+    public static final String PULSEDIVE_HTTP_TIMEOUT_CONFIG = "collectors.pulsedive.timeout";
+    public static final String PULSEDIVE_HTTP_TIMEOUT_DOC = "The request timeout to use in the Pulsedive collector (seconds).";
+    public static final String PULSEDIVE_HTTP_TIMEOUT_DEFAULT = "5";
+
+    public static final String PULSEDIVE_TOKEN_CONFIG = "collectors.pulsedive.token";
+    public static final String PULSEDIVE_TOKEN_DOC = "The Pulsedive access token.";
+    public static final String PULSEDIVE_TOKEN_DEFAULT = "";
+
+    /* --- Hybrid-analysis collector --- */
+    public static final String HYBRIDANALYSIS_HTTP_TIMEOUT_CONFIG = "collectors.hybridanalysis.timeout";
+    public static final String HYBRIDANALYSIS_HTTP_TIMEOUT_DOC = "The request timeout to use in the Hybrid-analysis collector (seconds).";
+    public static final String HYBRIDANALYSIS_HTTP_TIMEOUT_DEFAULT = "5";
+
+    public static final String HYBRIDANALYSIS_TOKEN_CONFIG = "collectors.hybridanalysis.token";
+    public static final String HYBRIDANALYSIS_TOKEN_DOC = "The Hybrid-analysis access token.";
+    public static final String HYBRIDANALYSIS_TOKEN_DEFAULT = "";
+
+    /* --- Greynoise collector --- */
+    public static final String GREYNOISE_HTTP_TIMEOUT_CONFIG = "collectors.greynoise.timeout";
+    public static final String GREYNOISE_HTTP_TIMEOUT_DOC = "The request timeout to use in the Greynoise collector (seconds).";
+    public static final String GREYNOISE_HTTP_TIMEOUT_DEFAULT = "5";
+
+    public static final String GREYNOISE_TOKEN_CONFIG = "collectors.greynoise.token";
+    public static final String GREYNOISE_TOKEN_DOC = "The Greynoise access token.";
+    public static final String GREYNOISE_TOKEN_DEFAULT = "";
+
+    /* --- Cloudflare Radar collector --- */
+    public static final String CLOUDFLARERADAR_HTTP_TIMEOUT_CONFIG = "collectors.cloudflareradar.timeout";
+    public static final String CLOUDFLARERADAR_HTTP_TIMEOUT_DOC = "The request timeout to use in the Cloudflare Radar collector (seconds).";
+    public static final String CLOUDFLARERADAR_HTTP_TIMEOUT_DEFAULT = "5";
+
+    public static final String CLOUDFLARERADAR_TOKEN_CONFIG = "collectors.cloudflareradar.token";
+    public static final String CLOUDFLARERADAR_TOKEN_DOC = "The Cloudflare Radar URLScanner access token.";
+    public static final String CLOUDFLARERADAR_TOKEN_DEFAULT = "";
+
+    public static final String CLOUDFLARERADAR_ACCOUNTID_CONFIG = "collectors.cloudflareradar.accountid";
+    public static final String CLOUDFLARERADAR_ACCOUNTID_DOC = "The Cloudflare Radar account identifier.";
+
+    /* --- Opentip Kaspersky collector --- */
+    public static final String OPENTIPKASPERSKY_HTTP_TIMEOUT_CONFIG = "collectors.opentipkaspersky.timeout";
+    public static final String OPENTIPKASPERSKY_HTTP_TIMEOUT_DOC = "The request timeout to use in the Opentip Kaspersky collector (seconds).";
+    public static final String OPENTIPKASPERSKY_HTTP_TIMEOUT_DEFAULT = "5";
+
+    public static final String OPENTIPKASPERSKY_TOKEN_CONFIG = "collectors.opentipkaspersky.token";
+    public static final String OPENTIPKASPERSKY_TOKEN_DOC = "The Opentip Kaspersky access token.";
+    public static final String OPENTIPKASPERSKY_TOKEN_DEFAULT = "";
+
+    /* --- Threatfox collector --- */
+    public static final String THREATFOX_HTTP_TIMEOUT_CONFIG = "collectors.threatfox.timeout";
+    public static final String THREATFOX_HTTP_TIMEOUT_DOC = "The request timeout to use in the Threatfox collector (seconds).";
+    public static final String THREATFOX_HTTP_TIMEOUT_DEFAULT = "5";
+
+    public static final String THREATFOX_TOKEN_CONFIG = "collectors.threatfox.token";
+    public static final String THREATFOX_TOKEN_DOC = "The Threatfox access token.";
+    public static final String THREATFOX_TOKEN_DEFAULT = "";
+
+    /* --- CriminalIP collector --- */
+    public static final String CRIMINALIP_HTTP_TIMEOUT_CONFIG = "collectors.criminalip.timeout";
+    public static final String CRIMINALIP_HTTP_TIMEOUT_DOC = "The request timeout to use in the CriminalIP collector (seconds).";
+    public static final String CRIMINALIP_HTTP_TIMEOUT_DEFAULT = "5";
+
+    public static final String CRIMINALIP_TOKEN_CONFIG = "collectors.criminalip.token";
+    public static final String CRIMINALIP_TOKEN_DOC = "The CriminalIP access token.";
+    public static final String CRIMINALIP_TOKEN_DEFAULT = "";
+
+    /* --- Google Safe Browsing collector --- */
+    public static final String GOOGLESAFEBROWSING_HTTP_TIMEOUT_CONFIG = "collectors.googlesafebrowsing.timeout";
+    public static final String GOOGLESAFEBROWSING_HTTP_TIMEOUT_DOC = "The request timeout to use in the Google Safe Browsing collector (seconds).";
+    public static final String GOOGLESAFEBROWSING_HTTP_TIMEOUT_DEFAULT = "5";
+
+    public static final String GOOGLESAFEBROWSING_TOKEN_CONFIG = "collectors.googlesafebrowsing.token";
+    public static final String GOOGLESAFEBROWSING_TOKEN_DOC = "The Google Safe Browsing access token.";
+    public static final String GOOGLESAFEBROWSING_TOKEN_DEFAULT = "";
+
+    /* --- URLVoid collector --- */
+    public static final String URLVOID_HTTP_TIMEOUT_CONFIG = "collectors.urlvoid.timeout";
+    public static final String URLVOID_HTTP_TIMEOUT_DOC = "The request timeout to use in the URLVoid collector (seconds).";
+    public static final String URLVOID_HTTP_TIMEOUT_DEFAULT = "5";
+
+    /* --- ProjectHoneypot collector --- */
+    public static final String PROJECTHONEYPOT_HTTP_TIMEOUT_CONFIG = "collectors.projecthoneypot.timeout";
+    public static final String PROJECTHONEYPOT_HTTP_TIMEOUT_DOC = "The request timeout to use in the ProjectHoneypot collector (seconds).";
+    public static final String PROJECTHONEYPOT_HTTP_TIMEOUT_DEFAULT = "5";
+
+    /* --- Fortiguard collector --- */
+    public static final String FORTIGUARD_HTTP_TIMEOUT_CONFIG = "collectors.fortiguard.timeout";
+    public static final String FORTIGUARD_HTTP_TIMEOUT_DOC = "The request timeout to use in the Fortiguard collector (seconds).";
+    public static final String FORTIGUARD_HTTP_TIMEOUT_DEFAULT = "5";
 
     /* --- TLS collector --- */
     public static final String TLS_TIMEOUT_MS_CONFIG = "collectors.tls.timeout";

@@ -1,7 +1,10 @@
 """extractor.py: The feature extraction process implementation.
 Provides the extract_features function that takes raw data, passes it through the configured transformations and returns
  a DataFrame of feature vectors. The list of transformations is initialized from the configuration."""
-__author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
+__authors__ = [
+    "Ondřej Ondryáš <xondry02@vut.cz>",
+    "Matěj Čech <xcechm15@stud.fit.vut.cz>"
+]
 
 from collections import OrderedDict
 from typing import Iterable
@@ -19,6 +22,8 @@ from .transformations.ip import IPTransformation
 from .transformations.lexical import LexicalTransformation
 from .transformations.rdap_dn import RDAPDomainTransformation
 from .transformations.rdap_ip import RDAPAddressTransformation
+from .transformations.rep_dn import RepDomainTransformation
+from .transformations.rep_ip import RepAddressTransformation
 from .transformations.tls import TLSTransformation
 
 _all_transformations = OrderedDict([
@@ -30,6 +35,8 @@ _all_transformations = OrderedDict([
     ("lexical", LexicalTransformation),
     ("rdap_dn", RDAPDomainTransformation),
     ("rdap_ip", RDAPAddressTransformation),
+    ("rep_dn", RepDomainTransformation),
+    ("rep_ip", RepAddressTransformation),
     ("drop", DropColumnsTransformation)
 ])
 """An ordered dictionary of all data transformer classes.

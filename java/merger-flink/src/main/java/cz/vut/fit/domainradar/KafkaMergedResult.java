@@ -10,18 +10,18 @@ public class KafkaMergedResult {
     @NotNull
     private String domainName;
     @NotNull
-    private KafkaDomainAggregate domainData;
+    private KafkaDomainWithRepSystemAggregate domainData;
     @Nullable
     private Map<String, Map<Byte, KafkaIPEntry>> ipData;
 
     public KafkaMergedResult() {
         this.domainName = "";
-        this.domainData = new KafkaDomainAggregate();
+        this.domainData = new KafkaDomainWithRepSystemAggregate();
         this.ipData = null;
     }
 
     public KafkaMergedResult(@NotNull String domainName,
-                             @NotNull KafkaDomainAggregate domainData,
+                             @NotNull KafkaDomainWithRepSystemAggregate domainData,
                              @Nullable Map<String, Map<Byte, KafkaIPEntry>> ipData) {
         this.domainName = domainName;
         this.domainData = domainData;
@@ -36,11 +36,11 @@ public class KafkaMergedResult {
         this.domainName = domainName;
     }
 
-    public @NotNull KafkaDomainAggregate getDomainData() {
+    public @NotNull KafkaDomainWithRepSystemAggregate getDomainData() {
         return domainData;
     }
 
-    public void setDomainData(@NotNull KafkaDomainAggregate domainData) {
+    public void setDomainData(@NotNull KafkaDomainWithRepSystemAggregate domainData) {
         this.domainData = domainData;
     }
 

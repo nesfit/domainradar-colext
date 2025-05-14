@@ -3,6 +3,7 @@ package cz.vut.fit.domainradar.connect;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import cz.vut.fit.domainradar.Common;
 import cz.vut.fit.domainradar.Topics;
+import cz.vut.fit.domainradar.models.DNToProcess;
 import cz.vut.fit.domainradar.models.IPToProcess;
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.connect.connector.ConnectRecord;
@@ -32,6 +33,7 @@ import java.util.Map;
  * The value follows {@link #VALUE_SCHEMA} that contains the status code, the error message and the raw result data,
  * i.e. the entire JSON string with the result.
  * @author Ondřej Ondryáš
+ * @author Matěj Čech
  */
 public class PostgresCollectorResultSinkTransformation<R extends ConnectRecord<R>> implements Transformation<R> {
     public record CommonResult(
@@ -68,6 +70,7 @@ public class PostgresCollectorResultSinkTransformation<R extends ConnectRecord<R
 
         final var topic = record.topic();
         final var isIpResult = topic.equals(Topics.OUT_IP) || topic.equals(Topics.OUT_QRADAR);
+        final var isRepSystemDnResult = topic.equals(Topics.OUT_DN);
         final var key = (byte[]) record.key();
         final var value = (byte[]) record.value();
 
@@ -80,6 +83,21 @@ public class PostgresCollectorResultSinkTransformation<R extends ConnectRecord<R
                 domainName = ipData.dn();
                 ip = ipData.ip();
                 collector = result.collector;
+
+                // Append "-ip" suffix to the collector name if the collector collects data for both IPs and DNs
+                if (CombinedRepSystemCollectors.COMBINED_REP_SYSTEM_COLLECTORS.contains(collector)) {
+                    collector += "-ip";
+                }
+            } else if (isRepSystemDnResult) {
+                var dnData = _mapper.readValue(key, DNToProcess.class);
+                domainName = dnData.dn();
+                ip = null;
+                collector = result.collector;
+
+                // Append "-dn" suffix to the collector name if the collector collects data for both IPs and DNs
+                if (CombinedRepSystemCollectors.COMBINED_REP_SYSTEM_COLLECTORS.contains(collector)) {
+                    collector += "-dn";
+                }
             } else {
                 domainName = new String(key, StandardCharsets.UTF_8);
                 ip = null;

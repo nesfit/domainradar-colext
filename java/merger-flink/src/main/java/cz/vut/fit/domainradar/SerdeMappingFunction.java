@@ -27,6 +27,7 @@ public class SerdeMappingFunction extends RichMapFunction<KafkaMergedResult, Tup
     private transient Deserializer<ZoneResult> _zoneResultDeserializer;
     private transient Serializer<AllCollectedData> _finalResultSerializer;
     private transient Deserializer<CommonIPResult<JsonNode>> _ipResultDeserializer;
+    private transient Deserializer<CommonDNResult<JsonNode>> _dnResultDeserializer;
 
     @Override
     public void open(OpenContext openContext) throws Exception {
@@ -37,12 +38,13 @@ public class SerdeMappingFunction extends RichMapFunction<KafkaMergedResult, Tup
         _zoneResultDeserializer = new JsonDeserializer<>(mapper, ZoneResult.class);
         _ipResultDeserializer = new JsonDeserializer<>(mapper, new TypeReference<>() {
         });
+        _dnResultDeserializer = new JsonDeserializer<>(mapper, new TypeReference<>() {});
         _finalResultSerializer = new JsonSerializer<>(mapper);
     }
 
     @Override
     public Tuple2<String, byte[]> map(KafkaMergedResult kafkaMergedResult) throws Exception {
-        final var domainData = kafkaMergedResult.getDomainData();
+        final var domainData = kafkaMergedResult.getDomainData().getDomainData();
 
         final var zoneData = domainData.getZoneData();
         final var dnsData = domainData.getDNSData();
@@ -65,6 +67,19 @@ public class SerdeMappingFunction extends RichMapFunction<KafkaMergedResult, Tup
         final var rdapDnResult = rdapDnData == null
                 ? null
                 : _rdapDnResultDeserializer.deserialize(Topics.OUT_RDAP_DN, rdapDnData.getValue());
+
+        // Add the reputation systems data for the domain name
+        final var dnRepSystemResult = kafkaMergedResult.getDomainData().getRepSystemDNEntries();
+        final var dnRepSystemData = dnRepSystemResult == null ? null : new HashMap<String, CommonDNResult<JsonNode>>();
+
+        if (dnRepSystemResult != null) {
+            for (var entry : dnRepSystemResult) {
+                var collectorName = TagRegistry.REP_SYSTEM_DN_COLLECTOR_NAMES.get(entry.getCollectorTag().intValue());
+                var deserializedEntryData = _dnResultDeserializer.deserialize(Topics.OUT_DN,
+                        entry.getValue());
+                dnRepSystemData.put(String.valueOf(collectorName), deserializedEntryData);
+            }
+        }
 
         // We don't need to go through the IPs if the original DNS result did not require any
         final var ipData = (dnsResult.ips() == null || dnsResult.ips().isEmpty())
@@ -91,7 +106,8 @@ public class SerdeMappingFunction extends RichMapFunction<KafkaMergedResult, Tup
                 dnsResult,
                 tlsResult,
                 rdapDnResult,
-                ipData
+                ipData,
+                dnRepSystemData
         );
 
         return Tuple2.of(domainData.getDomainName(),

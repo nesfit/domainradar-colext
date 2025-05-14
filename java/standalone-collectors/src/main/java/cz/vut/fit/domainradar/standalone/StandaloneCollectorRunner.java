@@ -2,10 +2,7 @@ package cz.vut.fit.domainradar.standalone;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import cz.vut.fit.domainradar.Common;
-import cz.vut.fit.domainradar.standalone.collectors.GeoAsnCollector;
-import cz.vut.fit.domainradar.standalone.collectors.NERDCollector;
-import cz.vut.fit.domainradar.standalone.collectors.TLSCollector;
-import cz.vut.fit.domainradar.standalone.collectors.VertxQRadarCollector;
+import cz.vut.fit.domainradar.standalone.collectors.*;
 import org.apache.commons.cli.*;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.jetbrains.annotations.NotNull;
@@ -91,13 +88,13 @@ public class StandaloneCollectorRunner {
      * @param cmd        The parsed command line arguments.
      * @param mapper     The ObjectMapper instance to use for serialization and deserialization.
      * @param properties The Properties instance containing configuration settings.
-     * @return A list of initialized BaseStandaloneCollector instances.
+     * @return A list of initialized collector instances that implement the CollectorInterface.
      */
     @NotNull
-    private static List<BaseStandaloneCollector<?, ?, ?>> initCollectors(CommandLine cmd, ObjectMapper mapper, Properties properties) {
+    private static List<CollectorInterface> initCollectors(CommandLine cmd, ObjectMapper mapper, Properties properties) {
         var appId = cmd.getOptionValue("id");
         var useAll = cmd.hasOption("a");
-        var components = new ArrayList<BaseStandaloneCollector<?, ?, ?>>();
+        var components = new ArrayList<CollectorInterface>();
 
         try {
             if (useAll || cmd.hasOption("col-tls")) {
@@ -114,6 +111,58 @@ public class StandaloneCollectorRunner {
 
             if (useAll || cmd.hasOption("col-qradar")) {
                 components.add(new VertxQRadarCollector(mapper, appId, properties));
+            }
+
+            if (useAll || cmd.hasOption("col-abuseipdb")) {
+                components.add(new AbuseIpDbCollector(mapper, appId, properties));
+            }
+
+            if (useAll || cmd.hasOption("col-virustotal")) {
+                components.add(new VirusTotalCollector(mapper, appId, properties));
+            }
+
+            if (useAll || cmd.hasOption("col-pulsedive")) {
+                components.add(new PulsediveCollector(mapper, appId, properties));
+            }
+
+            if (useAll || cmd.hasOption("col-hybridanalysis")) {
+                components.add(new HybridAnalysisCollector(mapper, appId, properties));
+            }
+
+            if (useAll || cmd.hasOption("col-greynoise")) {
+                components.add(new GreynoiseCollector(mapper, appId, properties));
+            }
+
+            if (useAll || cmd.hasOption("col-cloudflareradar")) {
+                components.add(new CloudflareRadarCollector(mapper, appId, properties));
+            }
+
+            if (useAll || cmd.hasOption("col-opentipkaspersky")) {
+                components.add(new OpentipKasperskyCollector(mapper, appId, properties));
+            }
+
+            if (useAll || cmd.hasOption("col-threatfox")) {
+                components.add(new ThreatfoxCollector(mapper, appId, properties));
+            }
+
+            if (useAll || cmd.hasOption("col-criminalip")) {
+                components.add(new CriminalIPCollector(mapper, appId, properties));
+            }
+
+            if (useAll || cmd.hasOption("col-googlesafebrowsing")) {
+                components.add(new GoogleSafeBrowsingCollector(mapper, appId, properties));
+            }
+
+            if (useAll || cmd.hasOption("col-fortiguard")) {
+                components.add(new FortiguardCollector(mapper, appId, properties));
+            }
+
+            if (useAll || cmd.hasOption("col-urlvoid")) {
+                components.add(new UrlvoidCollector(mapper, appId, properties));
+            }
+
+            if (useAll || cmd.hasOption("col-projecthoneypot")) {
+                components.add(new ProjectHoneypotCollector(mapper, appId, properties));
             }
         } catch (Exception e) {
             Logger.error("Failed to initialize a collector", e);
@@ -169,6 +218,19 @@ public class StandaloneCollectorRunner {
         options.addOption(null, "col-nerd", false, "Use the NERD collector");
         options.addOption(null, "col-geo", false, "Use the GEO-ASN collector");
         options.addOption(null, "col-qradar", false, "Use the QRadar Offense collector");
+        options.addOption(null, "col-abuseipdb", false, "Use the AbuseIPDB collector");
+        options.addOption(null, "col-virustotal", false, "Use the VirusTotal collector");
+        options.addOption(null, "col-pulsedive", false, "Use the Pulsedive collector");
+        options.addOption(null, "col-hybridanalysis", false, "Use the HybridAnalysis collector");
+        options.addOption(null, "col-greynoise", false, "Use the Greynoise collector");
+        options.addOption(null, "col-cloudflareradar", false, "Use the Cloudflare Radar collector");
+        options.addOption(null, "col-opentipkaspersky", false, "Use the Opentip Kaspersky collector");
+        options.addOption(null, "col-threatfox", false, "Use the Threatfox collector");
+        options.addOption(null, "col-criminalip", false, "Use the CriminalIP collector");
+        options.addOption(null, "col-googlesafebrowsing", false, "Use the Google Safe browsing collector");
+        options.addOption(null, "col-fortiguard", false, "Use the Fortiguard collector");
+        options.addOption(null, "col-urlvoid", false, "Use the URLVoid collector");
+        options.addOption(null, "col-projecthoneypot", false, "Use the ProjectHoneypot collector");
 
         options.addOption(Option.builder("id")
                 .longOpt("app-id")

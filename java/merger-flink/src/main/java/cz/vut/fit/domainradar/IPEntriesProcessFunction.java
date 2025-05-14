@@ -20,12 +20,12 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 
-public class IPEntriesProcessFunction extends KeyedCoProcessFunction<String, KafkaIPEntry, KafkaDomainAggregate, KafkaMergedResult> {
+public class IPEntriesProcessFunction extends KeyedCoProcessFunction<String, KafkaIPEntry, KafkaDomainWithRepSystemAggregate, KafkaMergedResult> {
 
     // Key: Tuple of (IP, collector tag) -> Value: IP data
     private transient MapState<Tuple2<String, Byte>, KafkaIPEntry> _ipAndCollectorToIpData;
     private transient MapState<String, Integer> _expectedIpsToNumberOfEntries;
-    private transient ValueState<KafkaDomainAggregate> _domainData;
+    private transient ValueState<KafkaDomainWithRepSystemAggregate> _domainData;
     private transient ValueState<Long> _entryExpirationTimestamp;
     private transient ValueState<Boolean> _completeStateProduced;
 
@@ -49,7 +49,7 @@ public class IPEntriesProcessFunction extends KeyedCoProcessFunction<String, Kaf
                 = new MapStateDescriptor<>("Number of entries accepted for each expected IP",
                 TypeInformation.of(String.class),
                 TypeInformation.of(Integer.class));
-        var domainDataDescriptor = new ValueStateDescriptor<>("Domain data", KafkaDomainAggregate.class);
+        var domainDataDescriptor = new ValueStateDescriptor<>("Domain data", KafkaDomainWithRepSystemAggregate.class);
         var entryExpirationTimestampDescriptor = new ValueStateDescriptor<>("Current entry expiration timestamp", Long.class);
         var completeStateDescriptor = new ValueStateDescriptor<>("Complete result dispatched flag", Boolean.class);
 
@@ -112,7 +112,7 @@ public class IPEntriesProcessFunction extends KeyedCoProcessFunction<String, Kaf
 
     @Override
     public void processElement1(KafkaIPEntry value,
-                                KeyedCoProcessFunction<String, KafkaIPEntry, KafkaDomainAggregate, KafkaMergedResult>.Context ctx,
+                                KeyedCoProcessFunction<String, KafkaIPEntry, KafkaDomainWithRepSystemAggregate, KafkaMergedResult>.Context ctx,
                                 Collector<KafkaMergedResult> out) throws Exception {
         final var dn = ctx.getCurrentKey();
         final var ip = value.ip;
@@ -157,8 +157,8 @@ public class IPEntriesProcessFunction extends KeyedCoProcessFunction<String, Kaf
     }
 
     @Override
-    public void processElement2(KafkaDomainAggregate value,
-                                KeyedCoProcessFunction<String, KafkaIPEntry, KafkaDomainAggregate, KafkaMergedResult>.Context ctx,
+    public void processElement2(KafkaDomainWithRepSystemAggregate value,
+                                KeyedCoProcessFunction<String, KafkaIPEntry, KafkaDomainWithRepSystemAggregate, KafkaMergedResult>.Context ctx,
                                 Collector<KafkaMergedResult> out) throws Exception {
         final var key = ctx.getCurrentKey();
         LOG.trace("[{}] Accepted domain data", key);
@@ -167,7 +167,7 @@ public class IPEntriesProcessFunction extends KeyedCoProcessFunction<String, Kaf
         // In case it comes multiple times, overwrite the previous value just in case it contains DNS data
         // and the previous did not
         final var currentValue = _domainData.value();
-        if (currentValue != null && (currentValue.getDNSData() != null || value.getDNSData() == null))
+        if (currentValue != null && (currentValue.getDomainData().getDNSData() != null || value.getDomainData().getDNSData() == null))
             return;
 
         // Update the data object
@@ -175,7 +175,7 @@ public class IPEntriesProcessFunction extends KeyedCoProcessFunction<String, Kaf
         _domainData.update(value);
 
         // Load the expected IP addresses
-        for (var ip : value.getDNSIPs()) {
+        for (var ip : value.getDomainData().getDNSIPs()) {
             if (!_expectedIpsToNumberOfEntries.contains(ip))
                 _expectedIpsToNumberOfEntries.put(ip, 0);
         }
@@ -239,7 +239,7 @@ public class IPEntriesProcessFunction extends KeyedCoProcessFunction<String, Kaf
     }
 
     @Override
-    public void onTimer(long timestamp, KeyedCoProcessFunction<String, KafkaIPEntry, KafkaDomainAggregate,
+    public void onTimer(long timestamp, KeyedCoProcessFunction<String, KafkaIPEntry, KafkaDomainWithRepSystemAggregate,
             KafkaMergedResult>.OnTimerContext ctx, Collector<KafkaMergedResult> out) throws Exception {
         final var key = ctx.getCurrentKey();
 
