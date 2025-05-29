@@ -1,7 +1,7 @@
 [tool.poetry]
 package-mode = true
 name = "domrad-python-collectors"
-version = "0.1.0"
+version = "0.2.0"
 description = "DomainRadar Python pipeline – collectors"
 authors = ["Ondřej Ondryáš <xondry02@stud.fit.vut.cz>"]
 license = "MIT"
@@ -14,13 +14,11 @@ packages = [
 
 [tool.poetry.dependencies]
 python = "^3.11"
-aiokafka = { extras = ["zstd"], version = "^0.10.0" }
-faust-streaming = { extras = ["rocksdict"], version = "^0.11.0" }
+domrad-kafka-client = { path = "../domrad_kafka_client", develop = true }
 asyncwhois = "^1.1.3"
 whodap = "^0.1.12"
 icmplib = "^3.0.4"
 tldextract = "^5.1.2"
-asynciolimiter = "^1.0.0"
 dnspython = "^2.6.1"
 pydantic = "^2.8.2"
 

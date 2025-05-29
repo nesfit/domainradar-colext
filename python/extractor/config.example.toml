@@ -1,24 +1,62 @@
+# ==== Broker Connection ==== #
 [connection]
-brokers = ["aiokafka://localhost:9092"]
+brokers = ["localhost:9092"]
 use_ssl = false
 
 [connection.ssl]
 ca_file = "/path/to/ca.pem"
-server_verification_required = true
 client_cert_file = "/path/to/client_certificate.pem"
 client_key_file = "/path/to/client_key.pem"
 client_key_password = "password for the private key"
 check_hostname = true
 
-[extractor.faust]
-# All keys from this section will be passed directly to the faust.App constructor
-# See common/util.py:make_app for keys that cannot be set from this configuration
-# See https://faust-streaming.github.io/faust/userguide/settings.html#guide-settings
-producer_compression_type = "zstd"
+# ==== Low-Level Client Options ==== #
+[consumer]
+# Options passed directly to confluent-kafka and its underlying librdkafka library.
+# The dotted keys must be enclosed in "".
+# See: https://github.com/confluentinc/librdkafka/blob/master/CONFIGURATION.md
+"session.timeout.ms" = 10000
+"auto.commit.interval.ms" = 3000
+"broker.address.family" = "v4"
 
-[extractor]
+[producer]
+# Same as above.
+"compression.codec" = "zstd"
+"linger.ms" = 1000
+"batch.num.messages" = 10000
+"request.required.acks" = "all"
+"message.send.max.retries" = 100
+"broker.address.family" = "v4"
+
+# ==== Client Options ==== #
+[client]
 app_id = "domrad-extractor"
-data_dir = "/path/to/data"
+mp_start_method = "forkserver"
+# Number of worker processes
+workers = 4
+# How long to wait in a single Kafka consume request
+poll_timeout = 2.0
+# How long to wait for a worker to finish (seconds)
+worker_kill_timeout = 5.0
+# How often check if all worker processes live (seconds)
+liveliness_check_interval = 10.0
+# How long to wait for the worker processes to initialize before starting to consume input requests (seconds)
+init_wait = 1.0
+# How long an entry can wait in the to-process queue before a warning is logged (seconds)
+entry_late_warning_threshold = 15
+# How long an entry can wait in the to-process queue before the whole system gives up (seconds)
+max_entry_time_in_queue = 100
+# The maximum input queue size
+max_queued_items = 10
+# After reaching the maximum input queue size specified above, this number of input entries must be processed
+# and produced before new items are added to the queue
+resume_after_freed_items = 2
+# The maximum number of items to retrieve from the processed queue in a single cycle (livelock prevention threshold)
+max_entries_to_confirm = 10
+
+# ==== Extractor-Specific Options ==== #
+[extractor]
+data_dir = "./extractor/data/"
 # Number of records to collect in a buffer and process at once.
 # This should be fairly high, according to the input rate.
 # The downside of batching is that in case of an unhandled exception,
@@ -34,17 +72,45 @@ enabled_transformations = ["html", "dns", "ip", "geo", "tls", "lexical", "rdap_d
 # When set to true, the feature extractor will produce the JSON-serialized feature vectors one-by-one to the
 # feature_vectors_json topic. This is useful for debugging and testing the feature extractor, as well as for
 # the "standalone" mode, where the extractor is not connected to the rest of the pipeline.
-produce_jsons = false
+produce_jsons = true
 # When set to true, the feature extractor won't produce the binary-serialised dataframes to the feature_vectors topic.
 only_produce_jsons = false
-# == Experimental == #
-# When set to > 1, the extraction process will be executing in a real thread from a thread pool with the specified
-# number of threads, or in another process from a process pool. In normal world, threading would help in parallelizing
-# the extraction, but here, Python's GIL prevents this from happening, so this setting could only benefit from pandas
-# running its computations in native code. However, the current transformations are dumb and mostly performed using
-# .apply() which is executed under the GIL. Using multiprocessing instead may help in large throughputs, though it has
-# not been tested whether the overhead is worth it.
-computation_workers = 1
-# One of 'spawn' / 'fork' / 'forkserver' (uses ProcessPoolExecutor) or 'thread' (uses ThreadPoolExecutor).
-# Refer to https://docs.python.org/3/library/multiprocessing.html#multiprocessing-start-methods
-worker_spawn_method = "forkserver"
+
+# ==== Logging ==== #
+[logging]
+version = 1
+disable_existing_loggers = true
+worker_level = "TRACE"
+
+[logging.formatters.simple]
+class = "logging.Formatter"
+format = "[%(name)s][%(process)s|%(processName)s][%(levelname)s]\t%(asctime)s: %(message)s"
+
+[logging.formatters.extra]
+class = "common.log.ExtraFormatter"
+
+[logging.handlers.console]
+class = "logging.StreamHandler"
+formatter = "simple"
+level = "TRACE"
+stream = "ext://sys.stdout"
+
+[logging.handlers.err]
+class = "logging.StreamHandler"
+formatter = "simple"
+level = "WARNING"
+stream = "ext://sys.stderr"
+
+[logging.root]
+handlers = ["console", "err"]
+level = "INFO"
+
+# ==== Metrics ==== #
+[metrics]
+enabled = true
+
+[metrics.server]
+# Options passed as kwargs for prometheus_client.start_http_server
+port = 8080
+addr = "127.0.0.1"
+

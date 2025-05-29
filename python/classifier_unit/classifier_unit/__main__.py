@@ -1,8 +1,8 @@
-if __name__ == '__main__':
-    from . import util
-    from . import client
+"""__main__.py: The entry point file for running as a module using python -m."""
+__author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
 
-    config = util.read_config()
-    util.setup_logging(config, "client")
-    client = client.ClassifierPipelineClient(config)
-    client.run()
+from domrad_kafka_client import run_client
+from .classifier_impl import ClassifierProcessor
+
+if __name__ == '__main__':
+    run_client('feature_vectors', ClassifierProcessor)

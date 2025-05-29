@@ -1,21 +1,22 @@
 import logging
 import typing
 from time import sleep
-from .request_handler import RequestHandler
+from .worker_manager import WorkerManager
+from .message_processor import KafkaMessageProcessor
 from . import util
 import confluent_kafka as ck
 
-TOPIC_INPUT = "feature_vectors"
-TOPIC_OUTPUT = "classification_results"
 
+class KafkaClient:
+    def __init__(self, config: dict, input_topic: str, processor_type: typing.Type[KafkaMessageProcessor]):
+        self._config = config
+        self._input_topic = input_topic
+        self._processor_type = processor_type
 
-class ClassifierPipelineClient:
-    def __init__(self, config: dict):
         self._consumer: ck.Consumer = typing.cast(ck.Consumer, None)
         self._producer: ck.Producer = typing.cast(ck.Producer, None)
-        self._request_handler: RequestHandler = typing.cast(RequestHandler, None)
+        self._request_handler: WorkerManager = typing.cast(WorkerManager, None)
         self._running = False
-        self._config = config
         self._client_config = config.get("client", {})
         self._logger = logging.getLogger("main")
 
@@ -35,7 +36,8 @@ class ClassifierPipelineClient:
         self._producer.init_transactions()
         self._logger.info("Producer initialized")
 
-        self._request_handler = RequestHandler(self._config, TOPIC_INPUT, TOPIC_OUTPUT, self._consumer, self._producer)
+        self._request_handler = WorkerManager(self._config, self._input_topic, self._processor_type,
+                                              self._consumer, self._producer)
         sleep(self._client_config.get("init_wait", 0))
         self._run_consume_loop()
 
@@ -44,8 +46,8 @@ class ClassifierPipelineClient:
         timeout = self._client_config.get("poll_timeout", 1.0)
 
         try:
-            self._logger.info("Subscribing to %s", TOPIC_INPUT)
-            self._consumer.subscribe([TOPIC_INPUT])
+            self._logger.info("Subscribing to %s", self._input_topic)
+            self._consumer.subscribe([self._input_topic])
 
             while self._running:
                 try:

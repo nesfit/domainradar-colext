@@ -1,7 +1,8 @@
 """__main__.py: The entry point file for running as a module using python -m."""
 __author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
 
-from common import main
+from domrad_kafka_client import run_client
+from .rtt import RTTProcessor
 
 if __name__ == '__main__':
-    main("collectors.rtt.rtt")
+    run_client('to_process_IP', RTTProcessor)

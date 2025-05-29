@@ -4,26 +4,30 @@ import os
 import queue
 import signal
 import time
+from typing import Type
 
 from confluent_kafka import KafkaException, KafkaError
 
 from .worker_process import init_process
+from .message_processor import KafkaMessageProcessor
 from .types import *
+from .util import get_worker_logger_config
 
 import confluent_kafka as ck
 
 
-class RequestHandler:
+class WorkerManager:
 
-    def __init__(self, config: dict, topic_in: str, topic_out: str, consumer: ck.Consumer, producer: ck.Producer):
+    def __init__(self, config: dict, topic_in: str, processor_type: Type[KafkaMessageProcessor],
+                 consumer: ck.Consumer, producer: ck.Producer):
         self._config = config
-        self._client_config = config.get("client", {})
-        self._logger = logging.getLogger("req-handler")
         self._topic_in = topic_in
-        self._topic_out = topic_out
+        self._processor_type = processor_type
         self._consumer = consumer
         self._producer = producer
-        mp.set_start_method(self._client_config.get("mp_start_method", "forkserver"))
+
+        self._client_config = config.get("client", {})
+        self._logger = logging.getLogger("req-handler")
 
         self._robs_for_partitions: ROBContainer = {}
         self._in_flight = 0
@@ -50,17 +54,23 @@ class RequestHandler:
 
         partition: int = msg.partition()
         offset: int = msg.offset()
+        key: bytes = msg.key()
         # noinspection PyArgumentList
         value: bytes = msg.value()
 
+        self._logger.trace("Handling incoming message p=%s, o=%s", partition, offset)
         partition_rob = self._robs_for_partitions.get(partition)
         if partition_rob is None:
+            self._logger.trace("Creating new ROB for p=%s", partition)
             partition_rob = SortedDict()
             self._robs_for_partitions[partition] = partition_rob
 
-        partition_rob[offset] = time.time() + self._entry_late_warning_threshold
+        late_warning = time.time() + self._entry_late_warning_threshold
+        partition_rob[offset] = late_warning
         self._in_flight += 1
-        self._to_process.put((partition, offset, value))
+        self._logger.trace("Late warning for p=%s, o=%s at %s; in_flight=%s; adding to_process entry",
+                           partition, offset, late_warning, self._in_flight)
+        self._to_process.put((partition, offset, key, value))
 
     def handle_results(self):
         self._update_rob()
@@ -70,36 +80,38 @@ class RequestHandler:
         if self._locked:
             if self._in_flight < (self._max_queued_items - self._resume_after_freed_items):
                 self._locked = False
-                self._logger.debug("Resumed from in-flight limit wait")
+                self._logger.trace("Resumed from in-flight limit wait")
                 return True
+            self._logger.trace("Still locked, in_flight=%s", self._in_flight)
             return False
         else:
             if self._in_flight < self._max_queued_items:
                 return True
             else:
                 self._locked = True
-                self._logger.debug("Reached in-flight limit")
+                self._logger.trace("Reached in-flight limit, in_flight=%s", self._in_flight)
                 return False
 
     def _update_rob(self) -> None:
-        try:
-            processed: ProcessedEntry = self._processed.get_nowait()
-        except queue.Empty:
-            return None
-
+        self._logger.trace("Updating ROB: accepting from processed queue")
         livelock_prevention_counter = 0
-        while processed is not None and livelock_prevention_counter < self._max_entries_to_confirm:
-            livelock_prevention_counter += 1
+        while livelock_prevention_counter < self._max_entries_to_confirm:
+            try:
+                processed: ProcessedEntry = self._processed.get_nowait()
+            except queue.Empty:
+                self._logger.trace("Processed queue empty at ctr=%s", livelock_prevention_counter)
+                break
+
+            self._logger.trace("Accepted item with %s messages at ctr=%s, p=%s, o=%s", len(processed[2]),
+                               livelock_prevention_counter, processed[0], processed[1])
             partition_rob = self._robs_for_partitions.get(processed[0])
             if partition_rob is None:
+                self._logger.trace("Partition ROB for %s does not exist, weird!", processed[0])
                 partition_rob = SortedDict()
                 self._robs_for_partitions[processed[0]] = partition_rob
 
             partition_rob[processed[1]] = processed[2]
-            try:
-                processed = self._processed.get_nowait()
-            except queue.Empty:
-                break
+            livelock_prevention_counter += 1
 
     def _produce_results(self) -> None:
         partition: int
@@ -107,6 +119,8 @@ class RequestHandler:
 
         for partition, offsets in self._robs_for_partitions.items():
             current_time = time.time()
+            self._logger.trace("Evaluating ROB for p=%s at t=%s; offsets in ROB: %s", partition, current_time,
+                               len(offsets))
             while len(offsets) > 0:
                 # Extract the top of the ROB
                 offset: Offset
@@ -114,18 +128,25 @@ class RequestHandler:
                 offset, expire_time_or_result = offsets.peekitem(index=0)
                 # 'None' means item done
                 item_done = not isinstance(expire_time_or_result, float)
+
                 if item_done:
+                    self._logger.trace("Top of ROB p=%s is o=%s, done with %s msgs", partition, offset,
+                                       len(expire_time_or_result))
+
                     self._producer.begin_transaction()
                     for result_msg in expire_time_or_result:
-                        self._producer.produce(self._topic_out, key=result_msg[0], value=result_msg[1])
+                        self._producer.produce(result_msg[0], key=result_msg[1], value=result_msg[2])
 
                     positions = [ck.TopicPartition(self._topic_in, partition, offset=(offset + 1))]
                     self._producer.send_offsets_to_transaction(positions, self._consumer.consumer_group_metadata())
 
                     try:
+                        self._logger.trace("Commiting transaction")
                         self._producer.commit_transaction()
                         offsets.popitem(index=0)
                         self._in_flight -= 1
+                        self._logger.trace("Popped offset, %s offsets remaining; in_flight=%s", len(offsets),
+                                           self._in_flight)
                     except KafkaException as e:
                         self._logger.error("Error commiting transaction for p=%s, o=%s",
                                            partition, offset, exc_info=e)
@@ -133,11 +154,16 @@ class RequestHandler:
                         kafka_error_code: int = e.args[0].code()
                         if kafka_error_code == KafkaError.PRODUCER_FENCED \
                                 or kafka_error_code == KafkaError.OUT_OF_ORDER_SEQUENCE_NUMBER:
+                            self._logger.trace("Producer fenced or out of order, crashing")
                             raise e
                         else:
+                            self._logger.trace("Aborting transaction, will retry")
                             self._producer.abort_transaction()
                             # Next iteration will try again
                 else:
+                    self._logger.trace("Top of ROB p=%s is o=%s, waiting with exp_t=%s", partition, offset,
+                                       expire_time_or_result)
+
                     if not item_done and expire_time_or_result < current_time and not self._closing:
                         self._logger.info("Entry taking too long at p=%s, o=%s", partition, offset)
 
@@ -146,26 +172,36 @@ class RequestHandler:
                                                self._max_entry_time_in_queue)
                             os.kill(os.getpid(), signal.SIGINT)
                             return
+
+                    self._logger.trace("Breaking loop for ROB p=%s; %s offset remaining", partition, len(offsets))
                     break
 
     def close(self) -> None:
+        self._logger.trace("Closing the WorkerManager")
         process: mp.Process
         for process in self._workers:
             self._logger.debug("Terminating %s", process.pid)
-            os.kill(process.pid, signal.SIGINT)
+            try:
+                os.kill(process.pid, signal.SIGINT)
+            except ProcessLookupError:
+                self._logger.debug("ProcessLookupError for %s - process already dead?", process.pid)
+                pass
 
         for process in self._workers:
-            # self._logger.debug("Waiting for %s", process.pid)
+            self._logger.trace("Waiting for %s", process.pid)
             process.join(self._client_config.get("worker_kill_timeout", 1.0))
             self._logger.debug("%s ended", process.pid)
 
+        self._logger.trace("Activating closing mode, calling handle_results")
         self._closing = True
         self.handle_results()
 
     def _make_worker(self, worker_id: int):
+        self._logger.trace("Making worker worker_id=%s", worker_id)
         worker_process = mp.Process(target=init_process,
-                                    name="classifier-worker-{}".format(worker_id),
-                                    args=(self._config, self._to_process, self._processed, self._topic_out, worker_id))
+                                    name="worker-{}".format(worker_id),
+                                    args=(worker_id, self._config, self._processor_type,
+                                          self._to_process, self._processed, get_worker_logger_config()))
         self._workers.append(worker_process)
         worker_process.daemon = True
         worker_process.start()
@@ -176,6 +212,7 @@ class RequestHandler:
         if time.time() < self._next_liveliness_check:
             return
 
+        self._logger.trace("Checking if workers live")
         new_names = []
         to_rm = []
         for process in self._workers:

@@ -1,11 +1,17 @@
 import logging
+import logging.config
+import logging.handlers
 import os
-import sys
 import tomllib
 import platform
+import multiprocessing as mp
+from logging import Handler
+from typing import Optional
 
 _config_file = None
-_config = None
+_config: dict | None = None
+_log_queue: Optional[mp.Queue] = None
+_log_queue_listener: logging.handlers.QueueListener | None = None
 
 
 def get_config_file() -> str:
@@ -34,7 +40,6 @@ def get_config_file() -> str:
         raise FileNotFoundError("Configuration file not found: " + config_file)
 
     _config_file = os.path.abspath(config_file)
-    _last_config_modify_time = os.stat(_config_file).st_mtime
     return _config_file
 
 
@@ -49,26 +54,85 @@ def read_config() -> dict:
         return _config
 
 
-def setup_logging(config: dict, section: str, worker: bool = False) -> None:
-    config = config.get("logging", {}).get(section, {})
+def add_logging_trace_level() -> None:
+    # Define the new "trace" method
+    def trace(self, message, *args, **kwargs):
+        if self.isEnabledFor(trace_const):
+            self._log(trace_const, message, args, **kwargs)
 
-    logger = logging.getLogger()
-    logger.setLevel(config.get("min_level", "INFO"))
+    trace_const = logging.DEBUG - 5
+    logger_class = logging.getLoggerClass()
 
-    pid = os.getpid() if worker else "client"
-    formatter = logging.Formatter(f'[%(name)s][{pid}][%(levelname)s]\t%(asctime)s: %(message)s')
+    if not hasattr(logging, "TRACE"):
+        logging.addLevelName(trace_const, 'TRACE')
+        setattr(logging, "TRACE", trace_const)
+        setattr(logger_class, "trace", trace)
 
-    if "stdout_level" in config and config["stdout_level"] != "disabled":
-        out_h = logging.StreamHandler(stream=sys.stdout)
-        out_h.setLevel(config.get("stdout_level", "INFO"))
-        out_h.setFormatter(formatter)
-        logger.addHandler(out_h)
 
-    if "stderr_level" in config and config["stderr_level"] != "disabled":
-        err_h = logging.StreamHandler(stream=sys.stderr)
-        err_h.setLevel(config.get("stderr_level", "WARN"))
-        err_h.setFormatter(formatter)
-        logger.addHandler(err_h)
+def init_logging() -> None:
+    global _log_queue, _log_queue_listener, _config
+    assert _config is not None
+
+    add_logging_trace_level()
+
+    class PassthroughHandler(Handler):
+        def handle(self, record):
+            if record.name == "root":
+                logger = logging.getLogger()
+            else:
+                logger = logging.getLogger(record.name)
+
+            if logger.isEnabledFor(record.levelno):
+                logger.handle(record)
+
+    config = _config.get("logging", {
+        'version': 1,
+        'handlers': {
+            'console': {
+                'class': 'logging.StreamHandler',
+                'level': 'INFO'
+            }
+        },
+        'root': {
+            'handlers': ['console'],
+            'level': 'INFO'
+        }
+    })
+
+    _log_queue = mp.Queue()
+    logging.config.dictConfig(config)
+    _log_queue_listener = logging.handlers.QueueListener(_log_queue, PassthroughHandler())
+    _log_queue_listener.start()
+
+
+def get_worker_logger_config() -> dict:
+    global _log_queue, _config
+    assert _config is not None
+    assert _log_queue is not None
+
+    level = _config.get("logging", {}).get("worker_level", "INFO")
+
+    return {
+        'version': 1,
+        'disable_existing_loggers': True,
+        'handlers': {
+            'queue': {
+                'class': 'logging.handlers.QueueHandler',
+                'queue': _log_queue
+            }
+        },
+        'root': {
+            'handlers': ['queue'],
+            'level': level
+        }
+    }
+
+
+def finalize_logging():
+    global _log_queue_listener
+    if _log_queue_listener:
+        _log_queue_listener.stop()
+        _log_queue_listener = None
 
 
 def make_client_settings(config: dict) -> dict:

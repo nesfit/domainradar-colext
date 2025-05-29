@@ -1,7 +1,7 @@
 [tool.poetry]
 package-mode = true
 name = "domrad-python-extractor"
-version = "0.1.0"
+version = "0.2.0"
 description = "DomainRadar Python pipeline – the feature extractor"
 authors = ["Ondřej Ondryáš <xondry02@stud.fit.vut.cz>"]
 license = "MIT"
@@ -14,8 +14,7 @@ packages = [
 
 [tool.poetry.dependencies]
 python = "^3.11"
-aiokafka = { extras = ["zstd"], version = "^0.10.0" }
-faust-streaming = { extras = ["rocksdict"], version = "^0.11.0" }
+domrad-kafka-client = { path = "../domrad_kafka_client", develop = true }
 tldextract = "^5.1.2"
 pandas = "^2.2.2"
 whoisit = "^2.7.6"
@@ -26,6 +25,7 @@ pydantic = "^2.8.2"
 python-whois = "^0.9.4"
 pyarrow = "^16.1.0"
 beautifulsoup4 = "^4.12.3"
+lxml = "^5.3.1"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0.0"

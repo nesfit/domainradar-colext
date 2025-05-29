@@ -1,11 +1,14 @@
 import re
+import warnings
 from collections import Counter, OrderedDict
 from typing import Iterable
 
-from bs4 import BeautifulSoup
-from pandas import DataFrame, notnull
+from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
+from pandas import DataFrame, isnull
 
 from extractor.transformations.base_transformation import Transformation
+
+warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
 
 
 # TODO fix 'None' problems
@@ -106,7 +109,8 @@ class HTMLTransformation(Transformation):
                 len(get_elements('link', 'type')), len(get_elements('link', 'type="application/rss+xml"')),
                 len(get_elements('link', 'rel="shortlink"')), len(soup.find_all(href=True)),
                 len(form_actions), len([form for form in form_actions if "http" in form.get('action', '')]),
-                len(tags.get('strong', [])), int(no_hrefs_flag), int(internal_hrefs_flag), len(hrefs_internal), int(external_hrefs_flag),
+                len(tags.get('strong', [])), int(no_hrefs_flag), int(internal_hrefs_flag), len(hrefs_internal),
+                int(external_hrefs_flag),
                 len(hrefs_http), len(get_elements('link', 'rel="shortcut icon"')), int(bool(
                 [icon for icon in get_elements('link', 'rel="shortcut icon"') if "http" in icon.get('href', '')])),
                 len([form for form in form_actions if ".php" in form.get('action', '')]),
@@ -120,8 +124,17 @@ class HTMLTransformation(Transformation):
                 len(get_elements('a', 'href="#content"')), len(get_elements('a', 'href="javascript:void(0)"'))
                 ]
 
+    @staticmethod
+    def make_soup(html):
+        if isnull(html):
+            return None
+        soup = BeautifulSoup(html, 'lxml')
+        if soup.is_xml:
+            soup = BeautifulSoup(html, 'xml')
+        return soup
+
     def transform(self, df: DataFrame) -> DataFrame:
-        df['soup'] = df['html'].apply(lambda html: BeautifulSoup(html, 'html.parser') if notnull(html) else None)
+        df['soup'] = df['html'].apply(self.make_soup)
         df['js_inline'] = df['soup'].apply(
             lambda soup: [script for script in soup.find_all('script') if not script.has_attr('src')] if soup else [])
 
@@ -196,7 +209,6 @@ class HTMLTransformation(Transformation):
 
         return (html_num_of_words, html_num_of_lines, html_unique_words, html_average_word_len,
                 html_blocked_keywords_label, html_num_of_blank_spaces)
-
 
     def get_js_f(self, js: list) -> Iterable[int | float]:
         if not js:
