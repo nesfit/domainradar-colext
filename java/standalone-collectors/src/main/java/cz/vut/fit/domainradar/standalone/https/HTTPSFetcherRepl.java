@@ -8,6 +8,9 @@ import java.util.Scanner;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executors;
 
+/**
+ * A simple REPL for manual invocation of the HTTP(S) Fetcher.
+ */
 public class HTTPSFetcherRepl {
     public static void main(String[] args) {
         var maxRedirects = 2;
@@ -30,9 +33,13 @@ public class HTTPSFetcherRepl {
 
             if (inputLine.startsWith(":mr")) {
                 maxRedirects = Integer.parseInt(inputLine.substring(3).trim());
+                logger.info("Max redirects set to {}", maxRedirects);
+                fetcher.close();
                 fetcher = new HTTPSFetcherImpl(maxRedirects, timeoutMs, executor, logger);
             } else if (inputLine.startsWith(":t")) {
                 timeoutMs = Integer.parseInt(inputLine.substring(2).trim());
+                logger.info("Timeout set to {}", timeoutMs);
+                fetcher.close();
                 fetcher = new HTTPSFetcherImpl(maxRedirects, timeoutMs, executor, logger);
             } else {
                 // Resolve hostname stored in inputLine to IP address

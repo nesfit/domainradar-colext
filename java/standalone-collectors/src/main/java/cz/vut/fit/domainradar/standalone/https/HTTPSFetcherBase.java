@@ -9,10 +9,7 @@ import org.slf4j.Logger;
 
 import javax.net.ssl.*;
 import javax.security.auth.x500.X500Principal;
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
+import java.io.*;
 import java.net.*;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -28,7 +25,17 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
-public abstract class HTTPSFetcherBase {
+/**
+ * An abstract base class for fetching HTTPS (and optionally HTTP) content and TLS information
+ * from a given host and IP address.
+ *
+ * <p>To use this class, the JVM must be started with the following parameter:</p>
+ * <pre>-Djdk.httpclient.allowRestrictedHeaders=host</pre>
+ *
+ * <p>Implementations must define how to construct the HTTP client, SSL context, and socket by
+ * implementing the respective abstract methods.</p>
+ */
+public abstract class HTTPSFetcherBase implements Closeable, AutoCloseable {
 
     /**
      * A set of HTTP headers to send in the request.
@@ -55,6 +62,13 @@ public abstract class HTTPSFetcherBase {
     protected abstract SSLContext buildSSLContext() throws NoSuchAlgorithmException, KeyManagementException;
 
     protected abstract Socket buildSocket() throws IOException;
+
+    @Override
+    public void close() {
+        if (_httpClient != null) {
+            _httpClient.close();
+        }
+    }
 
     /**
      * Connects to a TLS host on a given IP, using a given hostname for a SNI header.
@@ -84,14 +98,15 @@ public abstract class HTTPSFetcherBase {
                 _logger.trace("[{}] Connecting to {}:443", hostName, targetIp);
                 rawSocket.connect(new InetSocketAddress(targetIp, 443), _timeout);
             } catch (SocketTimeoutException e) {
-                _logger.debug("Connection timed out: {}", hostName);
+                _logger.debug("[{}] Connection timed out", hostName);
                 return errorResult(ResultCodes.TIMEOUT, "Connection timed out (%d ms)".formatted(_timeout));
             } catch (IllegalArgumentException e) {
-                _logger.debug("Cannot use IPv6: {} at {}", hostName, targetIp);
+                _logger.debug("[{}] Cannot use IPv6 ({})", hostName, targetIp);
                 return errorResult(ResultCodes.UNSUPPORTED_ADDRESS, "Cannot use this IP version");
             }
 
             // Make the TLS layer
+            _logger.trace("[{}] Building TLS socket", hostName);
             SSLSocketFactory factory = context.getSocketFactory();
             try (var socket = (SSLSocket) factory.createSocket(rawSocket, targetIp, 443, false)) {
                 // Enable timeouts
@@ -103,11 +118,11 @@ public abstract class HTTPSFetcherBase {
                 socket.setSSLParameters(sslParams);
 
                 // Start handshake to retrieve session details
-                _logger.trace("Starting TLS handshake: {}", hostName);
+                _logger.trace("[{}] Starting TLS handshake", hostName);
                 socket.startHandshake();
 
+                _logger.trace("[{}] Evaluating session details", hostName);
                 SSLSession session = socket.getSession();
-
                 // Extract negotiated protocol and cipher
                 var protocol = session.getProtocol();
                 var cipher = session.getCipherSuite();
@@ -127,6 +142,7 @@ public abstract class HTTPSFetcherBase {
                     }
                 }
 
+                _logger.trace("[{}] Starting HTTP fetch", hostName);
                 @Nullable final var finalHtmlResponse = this.fetchHTTPSContent(hostName, socket, context,
                         null, 0);
                 final var tlsData = new TLSData(targetIp, protocol, cipher, certificates);
@@ -149,16 +165,18 @@ public abstract class HTTPSFetcherBase {
 
     public CompletableFuture<String> collectHTTPOnly(@NotNull String hostName, @NotNull String targetIp) {
         try {
+            _logger.trace("[{}] Fetching content through HTTP", hostName);
             var uri = new URI("http://" + hostName);
             return this.fetchHTTPContent(uri, targetIp, 0);
         } catch (URISyntaxException e) {
-            _logger.debug("Cannot create URI: {}", e.getMessage());
+            _logger.debug("[{}] Cannot create URI", hostName, e);
             return CompletableFuture.completedFuture(null);
         }
     }
 
     protected String fetchHTTPSContent(String hostName, Socket socket, SSLContext sslContext,
                                        String referrer, int counter) throws IOException {
+        _logger.trace("[{}|R:{}] Writing HTTP GET", hostName, referrer);
         var osw = new OutputStreamWriter(socket.getOutputStream());
         osw.write("GET / HTTP/1.1\r\nHost: ");
         osw.write(hostName);
@@ -179,6 +197,7 @@ public abstract class HTTPSFetcherBase {
         var statusCode = 0;
 
         // Read HTTP headers
+        _logger.trace("[{}|R:{}] Reading HTTP response", hostName, referrer);
         while ((line = reader.readLine()) != null) {
             if (line.startsWith("HTTP/")) {
                 statusCode = Integer.parseInt(line.split(" ")[1]);
@@ -199,12 +218,14 @@ public abstract class HTTPSFetcherBase {
         // Check if it's a redirect
         if (isRedirect && statusCode >= 300 && statusCode < 400) {
             // If the maximum number of redirects has been reached, return null
-            if (counter == _maxRedirects)
+            if (counter == _maxRedirects) {
                 // The socket is not closed here as it will be closed by the caller.
+                _logger.trace("[{}|R:{}] Maximum redirects limit reached", hostName, referrer);
                 return null;
+            }
 
             // Handle the redirect. Close the current socket first so that resources are not wasted.
-            _logger.debug("Redirecting from '{}' to: '{}'", hostName, location);
+            _logger.debug("[{}|R:{}] Redirecting to: '{}'", hostName, referrer, location);
             reader.close();
             socket.close();
             return this.handleRedirect(sslContext, hostName, location, counter + 1);
@@ -234,7 +255,7 @@ public abstract class HTTPSFetcherBase {
         }
 
         final var resultBody = body.toString();
-        _logger.trace("Body read");
+        _logger.trace("[{}|R:{}] Body read", hostName, referrer);
         return resultBody;
     }
 
@@ -249,8 +270,9 @@ public abstract class HTTPSFetcherBase {
             if (!uri.isAbsolute()) {
                 uri = new URI("https://", currentLocation, newLocation, "");
             }
-            // Check if URI is HTTP (not HTTPS)
+            // Check if URI is HTTPS
             if (!uri.getScheme().equalsIgnoreCase("https")) {
+                _logger.debug("[{}] Target is not HTTPS: {}", currentLocation, uri);
                 return null;
             }
             final var url = uri.toURL();
@@ -259,16 +281,19 @@ public abstract class HTTPSFetcherBase {
             if (port == -1)
                 port = 443;
         } catch (MalformedURLException | URISyntaxException | IllegalArgumentException e) {
+            _logger.debug("[{}->{}] Bad redirect URL", currentLocation, newLocation, e);
             return null;
         }
 
+        _logger.trace("[{}->{}] Building TLS socket", currentLocation, newLocation);
         try (var socket = (SSLSocket) sslContext.getSocketFactory().createSocket()) {
+            _logger.trace("[{}->{}] Connecting", currentLocation, newLocation);
             socket.connect(new InetSocketAddress(newHost, port), _timeout);
             socket.setSoTimeout(_timeout);
             socket.startHandshake();
-            return this.fetchHTTPSContent(newHost, socket, sslContext, currentLocation, counter + 1);
+            return this.fetchHTTPSContent(newHost, socket, sslContext, currentLocation, counter);
         } catch (IOException e) {
-            _logger.debug("Cannot connect to {}: {}", newLocation, e.getMessage());
+            _logger.debug("[{}->{}] Cannot connect", currentLocation, newLocation, e);
             return null;
         }
     }
@@ -298,15 +323,18 @@ public abstract class HTTPSFetcherBase {
                 // Create a new URI with the target IP as the host
                 location = new URI(location.getScheme(), targetIp, location.getPath(), null);
             } catch (URISyntaxException e) {
+                _logger.debug("[{}] Cannot construct new target URI", host, e);
                 return null;
             }
             // Set the Host header to the original host name
             // This requires the -Djdk.httpclient.allowRestrictedHeaders=host JVM property to be set
+            _logger.trace("[{}] Changing target URI to '{}', using Host header", host, location);
             reqBuilder = reqBuilder
                     .uri(location)
                     .header("Host", host);
         } else {
             // If no target IP is provided, use the original URI
+            _logger.trace("[{}] No target IP provided, using the hostname", host);
             reqBuilder = reqBuilder
                     .uri(location);
         }
@@ -315,6 +343,7 @@ public abstract class HTTPSFetcherBase {
 
         // Build HTTP client if not already built
         if (_httpClient == null) {
+            _logger.trace("[{}] Building HTTPClient", host);
             _httpClient = this.buildHttpClient();
             if (_httpClient == null) {
                 _logger.error("HTTP client is not initialized");
@@ -323,18 +352,24 @@ public abstract class HTTPSFetcherBase {
         }
 
         // Send the request asynchronously
+        _logger.trace("[{}] Fetching HTTP content through HTTPClient", host);
         var responseFuture = _httpClient.sendAsync(reqBuilder.build(), HttpResponse.BodyHandlers.ofString());
         return responseFuture.thenCompose(response -> {
             // Check if the response is a redirect
             if (response.statusCode() >= 300 && response.statusCode() < 400) {
                 // If the maximum number of redirects has been reached, return null
-                if (counter == _maxRedirects)
+                if (counter == _maxRedirects) {
+                    _logger.trace("[{}] Maximum redirects limit reached", host);
                     return CompletableFuture.completedFuture(null);
+                }
 
                 // Handle the redirect
                 var newLocation = response.headers().firstValue("Location").orElse(null);
-                if (newLocation == null)
+                if (newLocation == null) {
+                    _logger.trace("[{}] Redirect status code {} but no Location header found", host,
+                            response.statusCode());
                     return CompletableFuture.completedFuture(null);
+                }
 
                 try {
                     var uri = new URI(newLocation);
@@ -348,6 +383,7 @@ public abstract class HTTPSFetcherBase {
                         return this.fetchHTTPContent(uri, null, counter + 1);
                     }
                 } catch (URISyntaxException | IllegalArgumentException e) {
+                    _logger.debug("[{}] Cannot create URI", host, e);
                     return CompletableFuture.completedFuture(null);
                 }
             }
