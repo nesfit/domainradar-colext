@@ -8,6 +8,8 @@ import cz.vut.fit.domainradar.models.ResultCodes;
 import cz.vut.fit.domainradar.models.results.TLSResult;
 import cz.vut.fit.domainradar.serialization.JsonSerde;
 import cz.vut.fit.domainradar.standalone.BaseStandaloneCollector;
+import cz.vut.fit.domainradar.standalone.https.HTTPSFetcherBase;
+import cz.vut.fit.domainradar.standalone.https.HTTPSFetcherImpl;
 import io.confluent.parallelconsumer.ParallelStreamProcessor;
 import org.apache.commons.cli.CommandLine;
 import org.apache.kafka.clients.producer.KafkaProducer;
@@ -28,7 +30,7 @@ import java.util.concurrent.*;
  * A collector that processes TLS data for domain names.
  *
  * @author Ondřej Ondryáš
- * @see TLSCollectorImpl
+ * @see cz.vut.fit.domainradar.standalone.https.HTTPSFetcherBase
  */
 public class TLSCollector
         extends BaseStandaloneCollector<String, String, ParallelStreamProcessor<String, String>> {
@@ -37,30 +39,10 @@ public class TLSCollector
     private static final org.slf4j.Logger Logger = Common.getComponentLogger(TLSCollector.class);
 
 
-    /**
-     * A naive trust manager that accepts all certificates.
-     */
-    static class NaiveTrustManager implements X509TrustManager {
-        @Override
-        public X509Certificate[] getAcceptedIssuers() {
-            return new X509Certificate[0];
-        }
-
-        @Override
-        public void checkServerTrusted(X509Certificate[] chain, String authType) {
-            // Never throw -> accept all certificates
-        }
-
-        @Override
-        public void checkClientTrusted(X509Certificate[] chain, String authType) {
-            // Not used
-        }
-    }
-
     private final KafkaProducer<String, TLSResult> _producer;
     private final ExecutorService _executor;
     private final int _timeout;
-    private final TLSCollectorImpl _collector;
+    private final HTTPSFetcherBase _collector;
 
     public TLSCollector(@NotNull ObjectMapper jsonMapper, @NotNull String appName, @NotNull Properties properties) {
         super(jsonMapper, appName, properties,
@@ -71,7 +53,7 @@ public class TLSCollector
                 CollectorConfig.TLS_TIMEOUT_MS_DEFAULT));
 
         _executor = Executors.newVirtualThreadPerTaskExecutor();
-        _collector = new TLSCollectorImpl(maxRedirects, _timeout, _executor);
+        _collector = new HTTPSFetcherImpl(maxRedirects, _timeout, _executor, Logger);
         _producer = super.createProducer(new StringSerializer(),
                 JsonSerde.of(jsonMapper, TLSResult.class).serializer());
 
@@ -106,28 +88,28 @@ public class TLSCollector
 
             try {
                 var result = resultFuture.join();
-                if (result.html() == null) {
+                if (result.statusCode() != 0 && result.html() == null) {
                     // Try HTTP to fetch the HTML
                     var httpFuture = _collector.collectHTTPOnly(dn, ip);
                     try {
                         var html = httpFuture.orTimeout(futureTimeout, TimeUnit.MILLISECONDS).join();
                         result = new TLSResult(result.statusCode(), result.error(),
                                 result.lastAttempt(), result.tlsData(), html);
-                    } catch (CompletionException e) { 
+                    } catch (CompletionException e) {
                         // intentionally ignore
                     }
                 }
-                
+
                 _producer.send(resultRecord(Topics.OUT_TLS, dn, result));
             } catch (CompletionException e) {
                 if (e.getCause() instanceof TimeoutException) {
                     Logger.debug("Operation timed out: {}", dn);
                     _producer.send(resultRecord(Topics.OUT_TLS, dn,
-                            TLSCollectorImpl.errorResult(ResultCodes.TIMEOUT, "Operation timed out (%d ms)".formatted(_timeout))));
+                            HTTPSFetcherBase.errorResult(ResultCodes.TIMEOUT, "Operation timed out (%d ms)".formatted(_timeout))));
                 } else {
                     Logger.warn("Unexpected error: {}", dn, e.getCause());
                     _producer.send(resultRecord(Topics.OUT_TLS, dn,
-                            TLSCollectorImpl.errorResult(ResultCodes.INTERNAL_ERROR, e.getMessage())));
+                            HTTPSFetcherBase.errorResult(ResultCodes.INTERNAL_ERROR, e.getMessage())));
                 }
             }
         });

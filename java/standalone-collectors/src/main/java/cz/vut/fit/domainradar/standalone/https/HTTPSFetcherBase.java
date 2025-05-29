@@ -1,11 +1,11 @@
-package cz.vut.fit.domainradar.standalone.collectors;
+package cz.vut.fit.domainradar.standalone.https;
 
-import cz.vut.fit.domainradar.Common;
 import cz.vut.fit.domainradar.models.ResultCodes;
 import cz.vut.fit.domainradar.models.results.TLSResult;
 import cz.vut.fit.domainradar.models.tls.TLSData;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
 
 import javax.net.ssl.*;
 import javax.security.auth.x500.X500Principal;
@@ -27,39 +27,34 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
 
-/**
- * This class encapsulates the processing logic for the {@link TLSCollector}.
- */
-public class TLSCollectorImpl {
+public abstract class HTTPSFetcherBase {
 
     /**
      * A set of HTTP headers to send in the request.
      */
-    private static final String HTTP_HEADERS =
+    protected static final String HTTP_HEADERS =
             "Accept: text/html, application/xhtml+xml, application/xml\r\n" +
                     "Accept-Encoding: identity\r\n" +
                     "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:131.0) Gecko/20100101 Firefox/131.0\r\n" +
                     "Connection: close\r\n\r\n";
 
-    private static final org.slf4j.Logger Logger = Common.getComponentLogger(TLSCollector.class);
+    protected final Logger _logger;
+    protected final int _maxRedirects;
+    protected final int _timeout;
+    protected HttpClient _httpClient;
 
-    private final int _maxRedirects;
-    private final int _timeout;
-    private final HttpClient _httpClient;
-
-    public TLSCollectorImpl(int maxRedirects, int timeoutMs, ExecutorService executor) {
+    public HTTPSFetcherBase(int maxRedirects, int timeoutMs, @NotNull Logger logger) {
         _maxRedirects = maxRedirects;
         _timeout = timeoutMs;
-
-        _httpClient = HttpClient.newBuilder()
-            .followRedirects(HttpClient.Redirect.NEVER)
-            .connectTimeout(Duration.ofMillis(timeoutMs))
-            .version(HttpClient.Version.HTTP_1_1)
-            .executor(executor)
-            .build();
+        _logger = logger;
     }
+
+    protected abstract HttpClient buildHttpClient();
+
+    protected abstract SSLContext buildSSLContext() throws NoSuchAlgorithmException, KeyManagementException;
+
+    protected abstract Socket buildSocket() throws IOException;
 
     /**
      * Connects to a TLS host on a given IP, using a given hostname for a SNI header.
@@ -74,22 +69,25 @@ public class TLSCollectorImpl {
         // Create a new SSL context with a naive trust manager that accepts all certificates
         SSLContext context;
         try {
-            context = SSLContext.getInstance("TLS");
-            context.init(null, new TrustManager[]{new TLSCollector.NaiveTrustManager()}, null);
+            _logger.trace("[{}] Building TLS context", hostName);
+            context = this.buildSSLContext();
         } catch (NoSuchAlgorithmException | KeyManagementException e) {
-            Logger.error("TLS context error", e);
+            _logger.error("[{}] TLS context error", hostName, e);
             // Should not happen
             return errorResult(ResultCodes.INTERNAL_ERROR, e.getMessage());
         }
 
-        try (var rawSocket = new Socket()) {
+
+        _logger.trace("[{}] Building raw socket", hostName);
+        try (var rawSocket = this.buildSocket()) {
             try {
+                _logger.trace("[{}] Connecting to {}:443", hostName, targetIp);
                 rawSocket.connect(new InetSocketAddress(targetIp, 443), _timeout);
             } catch (SocketTimeoutException e) {
-                Logger.debug("Connection timed out: {}", hostName);
+                _logger.debug("Connection timed out: {}", hostName);
                 return errorResult(ResultCodes.TIMEOUT, "Connection timed out (%d ms)".formatted(_timeout));
             } catch (IllegalArgumentException e) {
-                Logger.debug("Cannot use IPv6: {} at {}", hostName, targetIp);
+                _logger.debug("Cannot use IPv6: {} at {}", hostName, targetIp);
                 return errorResult(ResultCodes.UNSUPPORTED_ADDRESS, "Cannot use this IP version");
             }
 
@@ -105,7 +103,7 @@ public class TLSCollectorImpl {
                 socket.setSSLParameters(sslParams);
 
                 // Start handshake to retrieve session details
-                Logger.trace("Starting TLS handshake: {}", hostName);
+                _logger.trace("Starting TLS handshake: {}", hostName);
                 socket.startHandshake();
 
                 SSLSession session = socket.getSession();
@@ -134,23 +132,33 @@ public class TLSCollectorImpl {
                 final var tlsData = new TLSData(targetIp, protocol, cipher, certificates);
                 return new TLSResult(ResultCodes.OK, null, Instant.now(), tlsData, finalHtmlResponse);
             } catch (SocketTimeoutException e) {
-                Logger.debug("Socket read timed out: {}", hostName);
+                _logger.debug("Socket read timed out: {}", hostName);
                 return errorResult(ResultCodes.TIMEOUT, "Socket read timed out (%d ms)".formatted(_timeout));
             } catch (SSLHandshakeException e) {
-                Logger.debug("TLS handshake error: {}: {}", hostName, e.getMessage());
+                _logger.debug("TLS handshake error: {}: {}", hostName, e.getMessage());
                 return errorResult(ResultCodes.CANNOT_FETCH, "Socket handshake error: " + e.getMessage());
             } catch (IOException e) {
-                Logger.debug("TLS error: {}: {}", hostName, e.getMessage());
+                _logger.debug("TLS error: {}: {}", hostName, e.getMessage());
                 return errorResult(ResultCodes.CANNOT_FETCH, e.getMessage());
             }
         } catch (IOException e) {
-            Logger.debug("Cannot connect to {}: {}", hostName, e.getMessage());
+            _logger.debug("Cannot connect to {}: {}", hostName, e.getMessage());
             return errorResult(ResultCodes.CANNOT_FETCH, e.getMessage());
         }
     }
 
-    private String fetchHTTPSContent(String hostName, Socket socket, SSLContext sslContext,
-                                    String referrer, int counter) throws IOException {
+    public CompletableFuture<String> collectHTTPOnly(@NotNull String hostName, @NotNull String targetIp) {
+        try {
+            var uri = new URI("http://" + hostName);
+            return this.fetchHTTPContent(uri, targetIp, 0);
+        } catch (URISyntaxException e) {
+            _logger.debug("Cannot create URI: {}", e.getMessage());
+            return CompletableFuture.completedFuture(null);
+        }
+    }
+
+    protected String fetchHTTPSContent(String hostName, Socket socket, SSLContext sslContext,
+                                       String referrer, int counter) throws IOException {
         var osw = new OutputStreamWriter(socket.getOutputStream());
         osw.write("GET / HTTP/1.1\r\nHost: ");
         osw.write(hostName);
@@ -196,7 +204,7 @@ public class TLSCollectorImpl {
                 return null;
 
             // Handle the redirect. Close the current socket first so that resources are not wasted.
-            Logger.debug("Redirecting from '{}' to: '{}'", hostName, location);
+            _logger.debug("Redirecting from '{}' to: '{}'", hostName, location);
             reader.close();
             socket.close();
             return this.handleRedirect(sslContext, hostName, location, counter + 1);
@@ -226,11 +234,11 @@ public class TLSCollectorImpl {
         }
 
         final var resultBody = body.toString();
-        Logger.trace("Body read");
+        _logger.trace("Body read");
         return resultBody;
     }
 
-    private String handleRedirect(SSLContext sslContext, String currentLocation, String newLocation, int counter) {
+    protected String handleRedirect(SSLContext sslContext, String currentLocation, String newLocation, int counter) {
         // Parse the redirected URL
         String newHost;
         int port;
@@ -260,7 +268,7 @@ public class TLSCollectorImpl {
             socket.startHandshake();
             return this.fetchHTTPSContent(newHost, socket, sslContext, currentLocation, counter + 1);
         } catch (IOException e) {
-            Logger.debug("Cannot connect to {}: {}", newLocation, e.getMessage());
+            _logger.debug("Cannot connect to {}: {}", newLocation, e.getMessage());
             return null;
         }
     }
@@ -276,40 +284,43 @@ public class TLSCollectorImpl {
         }
     }
 
-    public CompletableFuture<String> collectHTTPOnly(@NotNull String hostName, @NotNull String targetIp) {
-        try {
-            var uri = new URI("http://" + hostName);
-            return this.fetchHTTPContent(uri, targetIp, 0);
-        } catch (URISyntaxException e) {
-            Logger.debug("Cannot create URI: {}", e.getMessage());
-            return CompletableFuture.completedFuture(null);
-        }
-    }
-
-    private CompletableFuture<String> fetchHTTPContent(@NotNull URI location, 
-        @Nullable String targetIp, int counter) {
-
+    protected CompletableFuture<String> fetchHTTPContent(@NotNull URI location,
+                                                         @Nullable String targetIp, int counter) {
         HttpRequest.Builder reqBuilder = HttpRequest.newBuilder()
-            .timeout(Duration.ofMillis(_timeout))
-            .header("Accept", "*/*")
-            .GET();
+                .timeout(Duration.ofMillis(_timeout))
+                .header("Accept", "*/*")
+                .GET();
 
+        // If the target IP is provided, we need to modify the URI to use it
         var host = location.getHost();
         if (targetIp != null) {
             try {
+                // Create a new URI with the target IP as the host
                 location = new URI(location.getScheme(), targetIp, location.getPath(), null);
             } catch (URISyntaxException e) {
                 return null;
             }
+            // Set the Host header to the original host name
+            // This requires the -Djdk.httpclient.allowRestrictedHeaders=host JVM property to be set
             reqBuilder = reqBuilder
-                .uri(location)
-                .header("Host", host);
+                    .uri(location)
+                    .header("Host", host);
         } else {
+            // If no target IP is provided, use the original URI
             reqBuilder = reqBuilder
-                .uri(location);
+                    .uri(location);
         }
 
         final var finalLocation = location;
+
+        // Build HTTP client if not already built
+        if (_httpClient == null) {
+            _httpClient = this.buildHttpClient();
+            if (_httpClient == null) {
+                _logger.error("HTTP client is not initialized");
+                return CompletableFuture.completedFuture(null);
+            }
+        }
 
         // Send the request asynchronously
         var responseFuture = _httpClient.sendAsync(reqBuilder.build(), HttpResponse.BodyHandlers.ofString());
@@ -324,22 +335,25 @@ public class TLSCollectorImpl {
                 var newLocation = response.headers().firstValue("Location").orElse(null);
                 if (newLocation == null)
                     return CompletableFuture.completedFuture(null);
-                
+
                 try {
                     var uri = new URI(newLocation);
                     // Handle relative redirects
                     if (!uri.isAbsolute()) {
                         uri = new URI(finalLocation.getScheme(), host, newLocation, "");
+                        // Use the original target IP for relative redirects
+                        return this.fetchHTTPContent(uri, targetIp, counter + 1);
+                    } else {
+                        // If the URI is absolute, just use it; the target IP does not matter anymore
+                        return this.fetchHTTPContent(uri, null, counter + 1);
                     }
-
-                    return this.fetchHTTPContent(new URI(newLocation), null, counter + 1);
                 } catch (URISyntaxException | IllegalArgumentException e) {
                     return CompletableFuture.completedFuture(null);
                 }
             }
 
             return CompletableFuture.completedFuture(response.body());
-        });   
+        });
     }
 
     public static TLSResult errorResult(int code, String message) {
