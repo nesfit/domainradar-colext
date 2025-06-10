@@ -513,8 +513,8 @@ class CompatibilityTransformation:
             ip = ip_obj["ip"]
             collectors_results = ip_results.get(ip, {})
             # the 'data' properties may be null if the collectors failed
-            geo_asn = get_safe(collectors_results, "geo_asn.data") or {}
-            rdap = get_safe(collectors_results, "rdap_ip.data") or {}
+            geo_asn = get_safe(collectors_results, "geo-asn.data") or {}
+            rdap = get_safe(collectors_results, "rdap-ip.data") or {}
             rdap_parsed = {}
             if len(rdap) != 0:
                 rdap_parser = ParseIPNetwork(self.whoisit_bootstrap, rdap, ip, True)
