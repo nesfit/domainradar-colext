@@ -42,6 +42,7 @@ public class TLSCollector
     private final KafkaProducer<String, TLSResult> _producer;
     private final ExecutorService _executor;
     private final int _timeout;
+    private final boolean _tryHTTPOnly;
     private final HTTPSFetcherBase _collector;
 
     public TLSCollector(@NotNull ObjectMapper jsonMapper, @NotNull String appName, @NotNull Properties properties) {
@@ -49,8 +50,10 @@ public class TLSCollector
                 Serdes.String(), Serdes.String());
         _timeout = Integer.parseInt(properties.getProperty(CollectorConfig.TLS_TIMEOUT_MS_CONFIG,
                 CollectorConfig.TLS_TIMEOUT_MS_DEFAULT));
-        var maxRedirects = Integer.parseInt(properties.getProperty(CollectorConfig.TLS_TIMEOUT_MS_CONFIG,
-                CollectorConfig.TLS_TIMEOUT_MS_DEFAULT));
+        _tryHTTPOnly = Boolean.parseBoolean(properties.getProperty(CollectorConfig.TLS_TRY_HTTP_ONLY_CONFIG,
+                CollectorConfig.TLS_TRY_HTTP_ONLY_DEFAULT));
+        var maxRedirects = Integer.parseInt(properties.getProperty(CollectorConfig.TLS_MAX_REDIRECTS_CONFIG,
+                CollectorConfig.TLS_MAX_REDIRECTS_DEFAULT));
 
         _executor = Executors.newVirtualThreadPerTaskExecutor();
         _collector = new HTTPSFetcherImpl(maxRedirects, _timeout, _executor, Logger);
@@ -88,7 +91,7 @@ public class TLSCollector
 
             try {
                 var result = resultFuture.join();
-                if (result.statusCode() != 0 && result.html() == null) {
+                if (_tryHTTPOnly && result.statusCode() != 0 && result.html() == null) {
                     // Try HTTP to fetch the HTML
                     var httpFuture = _collector.collectHTTPOnly(dn, ip);
                     try {

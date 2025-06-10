@@ -42,6 +42,10 @@ public class CollectorConfig {
     public static final String TLS_MAX_REDIRECTS_DOC = "The maximum number of HTTP redirects to follow.";
     public static final String TLS_MAX_REDIRECTS_DEFAULT = "2";
 
+    public static final String TLS_TRY_HTTP_ONLY_CONFIG = "collectors.tls.try.http.only";
+    public static final String TLS_TRY_HTTP_ONLY_DOC = "Whether to try fetching HTML through a HTTP client if TLS fails.";
+    public static final String TLS_TRY_HTTP_ONLY_DEFAULT = "true";
+
     /* --- QRadar collector --- */
     public static final String QRADAR_URL_CONFIG = "collectors.qradar.url";
     public static final String QRADAR_URL_DOC = "The QRadar RESTful API base URL.";
