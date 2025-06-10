@@ -143,7 +143,7 @@ public abstract class HTTPSFetcherBase implements Closeable, AutoCloseable {
                 }
 
                 _logger.trace("[{}] Starting HTTP fetch", hostName);
-                @Nullable final var finalHtmlResponse = this.fetchHTTPSContent(hostName, socket, context,
+                @Nullable final var finalHtmlResponse = this.fetchHTTPSContent(hostName, "/", socket, context,
                         null, 0);
                 final var tlsData = new TLSData(targetIp, protocol, cipher, certificates);
                 return new TLSResult(ResultCodes.OK, null, Instant.now(), tlsData, finalHtmlResponse);
@@ -174,15 +174,15 @@ public abstract class HTTPSFetcherBase implements Closeable, AutoCloseable {
         }
     }
 
-    protected String fetchHTTPSContent(String hostName, Socket socket, SSLContext sslContext,
+    protected String fetchHTTPSContent(String hostName, String path, Socket socket, SSLContext sslContext,
                                        String referrer, int counter) throws IOException {
         _logger.trace("[{}|R:{}] Writing HTTP GET", hostName, referrer);
         var osw = new OutputStreamWriter(socket.getOutputStream());
-        osw.write("GET / HTTP/1.1\r\nHost: ");
+        osw.write("GET %s HTTP/1.1\r\nHost: ".formatted(path));
         osw.write(hostName);
 
         if (referrer != null) {
-            osw.write("\r\nReferer: https://" + referrer + "/\r\n");
+            osw.write("\r\nReferer: https://%s/\r\n".formatted(referrer));
         } else {
             osw.write("\r\n");
         }
@@ -261,26 +261,27 @@ public abstract class HTTPSFetcherBase implements Closeable, AutoCloseable {
 
     protected String handleRedirect(SSLContext sslContext, String currentLocation, String newLocation, int counter) {
         // Parse the redirected URL
-        String newHost;
+        String newHost, newPath;
         int port;
 
         try {
             var uri = new URI(newLocation);
             // Handle relative redirects
             if (!uri.isAbsolute()) {
-                uri = new URI("https://", currentLocation, newLocation, "");
+                uri = new URI("https", currentLocation, newLocation, "");
             }
             // Check if URI is HTTPS
             if (!uri.getScheme().equalsIgnoreCase("https")) {
                 _logger.debug("[{}] Target is not HTTPS: {}", currentLocation, uri);
                 return null;
             }
-            final var url = uri.toURL();
-            newHost = url.getHost();
-            port = url.getPort();
+            newHost = uri.getHost();
+            var query = uri.getRawQuery();
+            newPath = uri.getPath() + (query != null ? "?" + query : "");
+            port = uri.getPort();
             if (port == -1)
                 port = 443;
-        } catch (MalformedURLException | URISyntaxException | IllegalArgumentException e) {
+        } catch (URISyntaxException | IllegalArgumentException e) {
             _logger.debug("[{}->{}] Bad redirect URL", currentLocation, newLocation, e);
             return null;
         }
@@ -291,7 +292,7 @@ public abstract class HTTPSFetcherBase implements Closeable, AutoCloseable {
             socket.connect(new InetSocketAddress(newHost, port), _timeout);
             socket.setSoTimeout(_timeout);
             socket.startHandshake();
-            return this.fetchHTTPSContent(newHost, socket, sslContext, currentLocation, counter);
+            return this.fetchHTTPSContent(newHost, newPath, socket, sslContext, currentLocation, counter);
         } catch (IOException e) {
             _logger.debug("[{}->{}] Cannot connect", currentLocation, newLocation, e);
             return null;
