@@ -7,8 +7,6 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.serialization.Deserializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
 
-import java.io.IOException;
-
 public class KafkaDomainEntryDeserializer
         extends CommonDeserializer
         implements KafkaRecordDeserializationSchema<KafkaDomainEntry> {
@@ -21,10 +19,10 @@ public class KafkaDomainEntryDeserializer
         }
 
         String key = _keyDeserializer.deserialize(consumerRecord.topic(), consumerRecord.key());
-        int statusCode = parseStatusCode(consumerRecord.value());
+        var statusMeta = this.parseStatusMeta(consumerRecord.value());
 
-        collector.collect(new KafkaDomainEntry(key, consumerRecord.value(), statusCode, consumerRecord.topic(),
-                consumerRecord.partition(), consumerRecord.offset(), consumerRecord.timestamp()));
+        collector.collect(new KafkaDomainEntry(key, consumerRecord.value(), statusMeta.statusCode(), statusMeta.error(),
+                consumerRecord.topic(), consumerRecord.partition(), consumerRecord.offset(), consumerRecord.timestamp()));
     }
 
     @Override

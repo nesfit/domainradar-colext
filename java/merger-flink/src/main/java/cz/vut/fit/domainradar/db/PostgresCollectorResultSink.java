@@ -1,21 +1,18 @@
 package cz.vut.fit.domainradar.db;
 
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import cz.vut.fit.domainradar.Common;
-import cz.vut.fit.domainradar.KafkaDomainAggregate;
-import cz.vut.fit.domainradar.KafkaDomainEntry;
-import cz.vut.fit.domainradar.KafkaIPEntry;
-import cz.vut.fit.domainradar.KafkaMergedResult;
-import cz.vut.fit.domainradar.Topics;
+import cz.vut.fit.domainradar.*;
 import cz.vut.fit.domainradar.models.ip.GeoIPData;
 import cz.vut.fit.domainradar.models.ip.NERDData;
 import cz.vut.fit.domainradar.models.results.CommonIPResult;
 import cz.vut.fit.domainradar.serialization.TagRegistry;
 import org.apache.flink.api.connector.sink2.Sink;
 import org.apache.flink.api.connector.sink2.SinkWriter;
+import org.apache.flink.api.connector.sink2.WriterInitContext;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.sql.*;
@@ -28,7 +25,6 @@ import java.util.Objects;
  * It performs the same operations as the former {@code process_collection_results()} procedure.
  */
 public class PostgresCollectorResultSink implements Sink<KafkaMergedResult> {
-    public static final String COMPONENT_NAME = "postgres-sink";
 
     private final String dbUrl;
     private final String dbUser;
@@ -40,8 +36,13 @@ public class PostgresCollectorResultSink implements Sink<KafkaMergedResult> {
         this.dbPassword = dbPassword;
     }
 
-    @Override
+    @Deprecated
     public SinkWriter<KafkaMergedResult> createWriter(InitContext context) throws IOException {
+        return null;
+    }
+
+    @Override
+    public SinkWriter<KafkaMergedResult> createWriter(WriterInitContext context) throws IOException {
         try {
             return new PgWriter();
         } catch (SQLException e) {
@@ -50,7 +51,7 @@ public class PostgresCollectorResultSink implements Sink<KafkaMergedResult> {
     }
 
     private class PgWriter implements SinkWriter<KafkaMergedResult> {
-        private final Logger LOG = Common.getComponentLogger(PostgresCollectorResultSink.class);
+        private final Logger LOG = LoggerFactory.getLogger(PostgresCollectorResultSink.class);
 
         private final Connection connection;
         private final PreparedStatement selectDomain;
@@ -59,19 +60,26 @@ public class PostgresCollectorResultSink implements Sink<KafkaMergedResult> {
         private final PreparedStatement insertIp;
         private final PreparedStatement insertResult;
         private final PreparedStatement insertDomainError;
+        private final PreparedStatement updateIpGeoData;
+        private final PreparedStatement updateIpNerdData;
+
         private final ObjectMapper mapper;
         private final Map<String, CollectorInfo> collectorCache = new HashMap<>();
-        private final TypeReference<CommonIPResult<GeoIPData>> geoRef = new TypeReference<>() {};
-        private final TypeReference<CommonIPResult<NERDData>> nerdRef = new TypeReference<>() {};
-        private final TypeReference<CommonIPResult<Object>> genericRef = new TypeReference<>() {};
+        private final TypeReference<CommonIPResult<GeoIPData>> geoRef = new TypeReference<>() {
+        };
+        private final TypeReference<CommonIPResult<NERDData>> nerdRef = new TypeReference<>() {
+        };
 
         PgWriter() throws SQLException {
+            LOG.debug("Opening connection");
             connection = DriverManager.getConnection(dbUrl, dbUser, dbPassword);
             connection.setAutoCommit(false);
 
             selectDomain = connection.prepareStatement("SELECT id FROM Domain WHERE domain_name = ?");
             insertDomain = connection.prepareStatement(
-                    "INSERT INTO Domain(domain_name, last_update) VALUES (?, ?) RETURNING id");
+                    "INSERT INTO Domain(domain_name, last_update) VALUES (?, ?)" +
+                            " ON CONFLICT (domain_name) DO UPDATE SET last_update=EXCLUDED.last_update" +
+                            " RETURNING id");
             selectIp = connection.prepareStatement(
                     "SELECT id FROM IP WHERE domain_id = ? AND ip = ?::inet");
             insertIp = connection.prepareStatement(
@@ -84,6 +92,16 @@ public class PostgresCollectorResultSink implements Sink<KafkaMergedResult> {
             insertDomainError = connection.prepareStatement(
                     "INSERT INTO Domain_Errors(domain_id, timestamp, source, error, sql_error_code, sql_error_message)" +
                             " VALUES (?, ?, ?, ?, ?, ?)");
+            updateIpGeoData = connection.prepareStatement(
+                    "UPDATE IP SET geo_country_code=?, geo_region=?, geo_region_code=?, geo_city=?," +
+                            " geo_postal_code=?, geo_latitude=?, geo_longitude=?, geo_timezone=?," +
+                            " asn=?, as_org=?, network_address=?, network_prefix_length=?," +
+                            " geo_asn_update_timestamp=? WHERE id=?" +
+                            " AND (geo_asn_update_timestamp IS NULL OR geo_asn_update_timestamp <= ?)");
+            updateIpNerdData = connection.prepareStatement(
+                    "UPDATE IP SET nerd_reputation=?, nerd_update_timestamp=? WHERE id=?" +
+                            " AND (nerd_update_timestamp IS NULL OR nerd_update_timestamp <= ?)");
+
             mapper = Common.makeMapper().build();
         }
 
@@ -91,9 +109,11 @@ public class PostgresCollectorResultSink implements Sink<KafkaMergedResult> {
         public void write(KafkaMergedResult value, Context context) throws IOException {
             try {
                 processResult(value);
+                LOG.debug("Issued all commands, commiting");
                 connection.commit();
             } catch (Exception e) {
                 try {
+                    LOG.warn("Rolling back due to an error");
                     connection.rollback();
                 } catch (SQLException ex) {
                     LOG.error("Rollback failed", ex);
@@ -105,6 +125,7 @@ public class PostgresCollectorResultSink implements Sink<KafkaMergedResult> {
         @Override
         public void flush(boolean endOfInput) throws IOException {
             try {
+                LOG.trace("Flush – commiting");
                 connection.commit();
             } catch (SQLException e) {
                 throw new IOException(e);
@@ -113,47 +134,54 @@ public class PostgresCollectorResultSink implements Sink<KafkaMergedResult> {
 
         @Override
         public void close() throws Exception {
+            LOG.debug("Closing connection");
             connection.close();
         }
 
         private void processResult(KafkaMergedResult merged) throws Exception {
             var domainName = merged.getDomainName();
+            LOG.trace("[{}] Processing entry", domainName);
+
             long ts = earliestTimestamp(merged);
             long domainId = getOrCreateDomain(domainName, ts);
 
             Map<String, Long> ipIds = new HashMap<>();
             if (merged.getIPData() != null) {
                 for (var ipEntry : merged.getIPData().entrySet()) {
-                    var ipId = getOrCreateIp(domainId, ipEntry.getKey());
+                    var ipId = getOrCreateIp(domainId, ipEntry.getKey(), domainName);
                     ipIds.put(ipEntry.getKey(), ipId);
                 }
             }
 
             // Domain based results
             var domainData = merged.getDomainData();
-            handleDomainEntry(domainId, domainData.getZoneData());
-            handleDomainEntry(domainId, domainData.getDNSData());
-            handleDomainEntry(domainId, domainData.getRDAPData());
-            handleDomainEntry(domainId, domainData.getTLSData());
+            handleDomainEntry(domainId, domainData.getZoneData(), domainName);
+            handleDomainEntry(domainId, domainData.getDNSData(), domainName);
+            handleDomainEntry(domainId, domainData.getRDAPData(), domainName);
+            handleDomainEntry(domainId, domainData.getTLSData(), domainName);
 
             // IP based results
             if (merged.getIPData() != null) {
                 for (var ipEntry : merged.getIPData().entrySet()) {
-                    var ipId = ipIds.get(ipEntry.getKey());
+                    String ip = ipEntry.getKey();
+                    var ipId = ipIds.get(ip);
                     for (var collectorEntry : ipEntry.getValue().entrySet()) {
-                        handleIpEntry(domainId, ipId, collectorEntry.getKey(), collectorEntry.getValue());
+                        handleIpEntry(domainId, ipId, collectorEntry.getKey(), collectorEntry.getValue(),
+                                domainName, ip);
                     }
                 }
             }
         }
 
         private long getOrCreateDomain(String domainName, long timestamp) throws SQLException {
+            LOG.trace("[{}] Getting domain ID", domainName);
             selectDomain.setString(1, domainName);
             try (var rs = selectDomain.executeQuery()) {
                 if (rs.next()) {
                     return rs.getLong(1);
                 }
             }
+            LOG.trace("[{}] Domain not found, doing upsert", domainName);
             insertDomain.setString(1, domainName);
             insertDomain.setTimestamp(2, new Timestamp(timestamp));
             try (var rs = insertDomain.executeQuery()) {
@@ -161,6 +189,7 @@ public class PostgresCollectorResultSink implements Sink<KafkaMergedResult> {
                     return rs.getLong(1);
                 }
             }
+            LOG.trace("[{}] Didn't get ID from upsert, trying get again", domainName);
             selectDomain.setString(1, domainName);
             try (var rs = selectDomain.executeQuery()) {
                 rs.next();
@@ -168,7 +197,8 @@ public class PostgresCollectorResultSink implements Sink<KafkaMergedResult> {
             }
         }
 
-        private long getOrCreateIp(long domainId, String ip) throws SQLException {
+        private long getOrCreateIp(long domainId, String ip, String domainName) throws SQLException {
+            LOG.trace("[{}][{}] Getting IP", domainName, ip);
             selectIp.setLong(1, domainId);
             selectIp.setString(2, ip);
             try (var rs = selectIp.executeQuery()) {
@@ -176,6 +206,7 @@ public class PostgresCollectorResultSink implements Sink<KafkaMergedResult> {
                     return rs.getLong(1);
                 }
             }
+            LOG.trace("[{}][{}] IP not found, doing upsert", domainName, ip);
             insertIp.setLong(1, domainId);
             insertIp.setString(2, ip);
             try (var rs = insertIp.executeQuery()) {
@@ -183,14 +214,20 @@ public class PostgresCollectorResultSink implements Sink<KafkaMergedResult> {
                     return rs.getLong(1);
                 }
             } catch (SQLException e) {
-                insertIp.setLong(1, domainId);
-                insertIp.setString(2, "0.0.0.0");
-                try (var rs2 = insertIp.executeQuery()) {
-                    if (rs2.next()) {
-                        return rs2.getLong(1);
+                if (e.getSQLState().equals("22P02")) {
+                    // Invalid IP (cast error) - insert with a placeholder IP (unless we're already doing that)
+                    if (!ip.equals("0.0.0.0")) {
+                        return this.getOrCreateIp(domainId, "0.0.0.0", domainName);
+                    } else {
+                        // Shouldn't happen
+                        throw e;
                     }
+                } else {
+                    // The error is not cast-related, propagate
+                    throw e;
                 }
             }
+            LOG.trace("[{}][{}] Didn't get IP from upsert, trying get again", domainName, ip);
             selectIp.setLong(1, domainId);
             selectIp.setString(2, ip);
             try (var rs = selectIp.executeQuery()) {
@@ -199,78 +236,84 @@ public class PostgresCollectorResultSink implements Sink<KafkaMergedResult> {
             }
         }
 
-        private void handleDomainEntry(long domainId, KafkaDomainEntry entry) throws Exception {
+        private void handleDomainEntry(long domainId, KafkaDomainEntry entry, String domainName) throws Exception {
             if (entry == null) {
                 return;
             }
+            LOG.trace("[{}] Processing entry (target: {})", domainName, entry.getTopic());
             String collector = Topics.TOPICS_TO_COLLECTOR_ID.get(entry.getTopic());
             if (collector == null) {
-                insertDomainError(domainId, entry.getTimestamp(), COMPONENT_NAME,
+                LOG.warn("[{}] Unknown collector for topic {}", domainName, entry.getTopic());
+                insertDomainError(domainId, entry.getTimestamp(),
                         "Unknown collector: " + entry.getTopic(), null);
                 return;
             }
             CollectorInfo ci = getCollectorInfo(domainId, entry.getTimestamp(), collector);
             if (ci == null) {
+                LOG.warn("[{}] No collector ID found in the database for collector {}", domainName, collector);
                 return;
             }
-            JsonNode node = parseJson(domainId, entry.getTimestamp(), entry.getValue());
-            String error = node != null && node.hasNonNull("error") ? node.get("error").asText() : null;
-            insertCollectionResult(domainId, null, ci.id, entry.getStatusCode(), error,
+            LOG.trace("[{}] Performing collection result insert for collector {} ({})", domainName, collector, ci.id);
+            insertCollectionResult(domainId, null, ci.id, entry.getStatusCode(), entry.getError(),
                     entry.getTimestamp(), entry.getValue());
         }
 
-        private void handleIpEntry(long domainId, long ipId, byte collectorTag, KafkaIPEntry entry) throws Exception {
+        private void handleIpEntry(long domainId, long ipId, byte collectorTag, KafkaIPEntry entry,
+                                   String domainName, String ip) throws Exception {
+            LOG.trace("[{}][{}] Processing IP entry (collector tag: {})", domainName, ipId, collectorTag);
             String collector = TagRegistry.COLLECTOR_NAMES.get((int) collectorTag);
             if (collector == null) {
-                insertDomainError(domainId, entry.getTimestamp(), COMPONENT_NAME,
+                LOG.warn("[{}][{}] Unknown IP collector tag {}", domainName, ip, collectorTag);
+                insertDomainError(domainId, entry.getTimestamp(),
                         "Unknown collector tag: " + collectorTag, null);
                 return;
             }
             CollectorInfo ci = getCollectorInfo(domainId, entry.getTimestamp(), collector);
             if (ci == null) {
+                LOG.warn("[{}][{}] No collector ID found in the database for collector {}", domainName, ip, collector);
                 return;
             }
-            var result = parseIpResult(domainId, entry.getTimestamp(), collector, entry.getValue());
-            String error = result == null ? null : result.error();
-            insertCollectionResult(domainId, ipId, ci.id, entry.getStatusCode(), error,
+
+            LOG.trace("[{}][{}] Performing collection result insert for collector {} ({})", domainName, ip, collector,
+                    ci.id);
+            insertCollectionResult(domainId, ipId, ci.id, entry.getStatusCode(), entry.getError(),
                     entry.getTimestamp(), entry.getValue());
-            if (result != null && entry.getStatusCode() == 0) {
+
+            if (entry.getStatusCode() == 0) {
+                var result = parseIpResult(domainId, entry.getTimestamp(), collector, entry.getValue());
+                if (result == null) return;
+                var data = result.data();
+                if (data == null) return;
+                LOG.trace("[{}][{}] Updating IP metadata based on {}", domainName, ip, collector);
+
                 if ("geo-asn".equals(collector)) {
-                    updateGeoIpData(ipId, ((CommonIPResult<GeoIPData>) result).data(), entry.getTimestamp());
+                    updateGeoIpData(ipId, (GeoIPData) data, entry.getTimestamp());
                 } else if ("nerd".equals(collector)) {
-                    updateNerdData(ipId, ((CommonIPResult<NERDData>) result).data(), entry.getTimestamp());
+                    updateNerdData(ipId, (NERDData) data, entry.getTimestamp());
                 }
             }
         }
 
-        private JsonNode parseJson(long domainId, long ts, byte[] data) throws SQLException {
-            try {
-                return mapper.readTree(data);
-            } catch (Exception e) {
-                insertDomainError(domainId, ts, COMPONENT_NAME, "Cannot parse JSON.", e);
-                return null;
-            }
-        }
-
-        private CommonIPResult<?> parseIpResult(long domainId, long ts, String collector, byte[] data) throws SQLException {
+        private @Nullable CommonIPResult<?> parseIpResult(long domainId, long ts, String collector, byte[] data)
+                throws SQLException {
             try {
                 if ("geo-asn".equals(collector)) {
                     return mapper.readValue(data, geoRef);
                 } else if ("nerd".equals(collector)) {
                     return mapper.readValue(data, nerdRef);
                 } else {
-                    return mapper.readValue(data, genericRef);
+                    return null;
                 }
             } catch (Exception e) {
-                insertDomainError(domainId, ts, COMPONENT_NAME, "Cannot parse JSON.", e);
+                insertDomainError(domainId, ts, "Cannot parse JSON.", e);
                 return null;
             }
         }
 
-        private void insertDomainError(long domainId, long ts, String source, String message, Exception e) throws SQLException {
+        private void insertDomainError(long domainId, long ts, String message, Exception e) throws SQLException {
             insertDomainError.setLong(1, domainId);
             insertDomainError.setTimestamp(2, new Timestamp(ts));
-            insertDomainError.setString(3, source);
+            insertDomainError.setString(3, "flink-collection-results-db-sink");
             insertDomainError.setString(4, message);
             if (e instanceof SQLException se) {
                 insertDomainError.setString(5, se.getSQLState());
@@ -295,7 +338,7 @@ public class PostgresCollectorResultSink implements Sink<KafkaMergedResult> {
                     }
                 }
             }
-            insertDomainError(domainId, ts, COMPONENT_NAME, "Unknown collector: " + name, null);
+            insertDomainError(domainId, ts, "Unknown collector: " + name, null);
             return null;
         }
 
@@ -320,45 +363,34 @@ public class PostgresCollectorResultSink implements Sink<KafkaMergedResult> {
         }
 
         private void updateGeoIpData(long ipId, GeoIPData data, long ts) throws SQLException {
-            if (ipId == 0 || data == null) return;
-            try (PreparedStatement ps = connection.prepareStatement(
-                    "UPDATE IP SET geo_country_code=?, geo_region=?, geo_region_code=?, geo_city=?," +
-                            " geo_postal_code=?, geo_latitude=?, geo_longitude=?, geo_timezone=?," +
-                            " asn=?, as_org=?, network_address=?, network_prefix_length=?," +
-                            " geo_asn_update_timestamp=? WHERE id=?" +
-                            " AND (geo_asn_update_timestamp IS NULL OR geo_asn_update_timestamp <= ?)")) {
-                ps.setString(1, data.countryCode());
-                ps.setString(2, data.region());
-                ps.setString(3, data.regionCode());
-                ps.setString(4, data.city());
-                ps.setString(5, data.postalCode());
-                setDoubleOrNull(ps, 6, data.latitude());
-                setDoubleOrNull(ps, 7, data.longitude());
-                ps.setString(8, data.timezone());
-                setLongOrNull(ps, 9, data.asn());
-                ps.setString(10, data.asnOrg());
-                ps.setString(11, data.networkAddress());
-                setIntOrNull(ps, 12, data.prefixLength() == null ? null : data.prefixLength().intValue());
-                Timestamp tsObj = new Timestamp(ts);
-                ps.setTimestamp(13, tsObj);
-                ps.setLong(14, ipId);
-                ps.setTimestamp(15, tsObj);
-                ps.executeUpdate();
-            }
+            var ps = updateIpGeoData;
+            ps.setString(1, data.countryCode());
+            ps.setString(2, data.region());
+            ps.setString(3, data.regionCode());
+            ps.setString(4, data.city());
+            ps.setString(5, data.postalCode());
+            setDoubleOrNull(ps, 6, data.latitude());
+            setDoubleOrNull(ps, 7, data.longitude());
+            ps.setString(8, data.timezone());
+            setLongOrNull(ps, 9, data.asn());
+            ps.setString(10, data.asnOrg());
+            ps.setString(11, data.networkAddress());
+            setIntOrNull(ps, 12, data.prefixLength() == null ? null : data.prefixLength().intValue());
+            Timestamp tsObj = new Timestamp(ts);
+            ps.setTimestamp(13, tsObj);
+            ps.setLong(14, ipId);
+            ps.setTimestamp(15, tsObj);
+            ps.executeUpdate();
         }
 
         private void updateNerdData(long ipId, NERDData data, long ts) throws SQLException {
-            if (ipId == 0 || data == null) return;
-            try (PreparedStatement ps = connection.prepareStatement(
-                    "UPDATE IP SET nerd_reputation=?, nerd_update_timestamp=? WHERE id=?" +
-                            " AND (nerd_update_timestamp IS NULL OR nerd_update_timestamp <= ?)")) {
-                setDoubleOrNull(ps, 1, data.reputation());
-                Timestamp tsObj = new Timestamp(ts);
-                ps.setTimestamp(2, tsObj);
-                ps.setLong(3, ipId);
-                ps.setTimestamp(4, tsObj);
-                ps.executeUpdate();
-            }
+            var ps = updateIpNerdData;
+            setDoubleOrNull(ps, 1, data.reputation());
+            Timestamp tsObj = new Timestamp(ts);
+            ps.setTimestamp(2, tsObj);
+            ps.setLong(3, ipId);
+            ps.setTimestamp(4, tsObj);
+            ps.executeUpdate();
         }
 
         private void setDoubleOrNull(PreparedStatement ps, int idx, Double n) throws SQLException {
@@ -388,7 +420,7 @@ public class PostgresCollectorResultSink implements Sink<KafkaMergedResult> {
         private long earliestTimestamp(KafkaMergedResult merged) {
             long ts = Long.MAX_VALUE;
             KafkaDomainAggregate d = merged.getDomainData();
-            if (d.getZoneData() != null) ts = Math.min(ts, d.getZoneData().getTimestamp());
+            if (d.getZoneData() != null) ts = d.getZoneData().getTimestamp();
             if (d.getDNSData() != null) ts = Math.min(ts, d.getDNSData().getTimestamp());
             if (d.getRDAPData() != null) ts = Math.min(ts, d.getRDAPData().getTimestamp());
             if (d.getTLSData() != null) ts = Math.min(ts, d.getTLSData().getTimestamp());
@@ -404,5 +436,6 @@ public class PostgresCollectorResultSink implements Sink<KafkaMergedResult> {
         }
     }
 
-    private record CollectorInfo(short id, boolean isIpCollector) { }
+    private record CollectorInfo(short id, boolean isIpCollector) {
+    }
 }

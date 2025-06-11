@@ -35,7 +35,7 @@ public class KafkaIPEntryDeserializer
         IPToProcess key = _keyDeserializer.deserialize(consumerRecord.topic(), consumerRecord.key());
 
         var value = consumerRecord.value();
-        int statusCode = parseStatusCode(value);
+        var statusMeta = this.parseStatusMeta(value);
 
         // TODO: Use tags
         // byte collectorTag = value[value.length - 1];
@@ -48,8 +48,8 @@ public class KafkaIPEntryDeserializer
         }
         var collectorTag = collectorTagOrNull.byteValue();
         collector.collect(new KafkaIPEntry(key.dn(), key.ip(), consumerRecord.value(),
-                statusCode, collectorTag, consumerRecord.topic(), consumerRecord.partition(),
-                consumerRecord.offset(), consumerRecord.timestamp()));
+                statusMeta.statusCode(), statusMeta.error(), collectorTag, consumerRecord.topic(),
+                consumerRecord.partition(), consumerRecord.offset(), consumerRecord.timestamp()));
     }
 
     @Override

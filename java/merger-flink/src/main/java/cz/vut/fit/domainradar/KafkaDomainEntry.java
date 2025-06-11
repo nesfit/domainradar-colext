@@ -1,6 +1,7 @@
 package cz.vut.fit.domainradar;
 
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * A POJO representing a Kafka record with a string key.
@@ -12,23 +13,27 @@ public class KafkaDomainEntry implements KafkaEntry {
     String domainName;
     byte @NotNull [] value;
     int statusCode;
+
+    @Nullable
+    String error;
+
     @NotNull
     String topic;
     int partition;
     long offset;
     long timestamp;
-
     public KafkaDomainEntry() {
         this.domainName = "";
         this.topic = "";
         this.value = new byte[0];
     }
 
-    public KafkaDomainEntry(@NotNull String domainName, byte @NotNull [] value, int statusCode, @NotNull String topic,
-                            int partition, long offset, long timestamp) {
+    public KafkaDomainEntry(@NotNull String domainName, byte @NotNull [] value, int statusCode, @Nullable String error,
+                            @NotNull String topic, int partition, long offset, long timestamp) {
         this.domainName = domainName;
         this.value = value;
         this.statusCode = statusCode;
+        this.error = error;
         this.topic = topic;
         this.partition = partition;
         this.offset = offset;
@@ -58,6 +63,14 @@ public class KafkaDomainEntry implements KafkaEntry {
 
     public void setStatusCode(int statusCode) {
         this.statusCode = statusCode;
+    }
+
+    public @Nullable String getError() {
+        return error;
+    }
+
+    public void setError(@Nullable String error) {
+        this.error = error;
     }
 
     @NotNull

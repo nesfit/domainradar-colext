@@ -18,6 +18,7 @@
         <flink.version>1.20.0</flink.version>
         <flink.kafka.version>3.3.0-1.20</flink.kafka.version>
         <scala.binary.version>2.12</scala.binary.version>
+        <postgres.version>42.7.4</postgres.version>
     </properties>
 
     <repositories>
@@ -79,7 +80,7 @@
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
-            <version>42.7.2</version>
+            <version>${postgres.version}</version>
         </dependency>
     </dependencies>
 

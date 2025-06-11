@@ -1,6 +1,7 @@
 package cz.vut.fit.domainradar;
 
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * A tuple representing a Kafka record with a (domain name, IP) pair key.
@@ -14,6 +15,8 @@ public class KafkaIPEntry implements KafkaEntry {
     String ip;
     byte @NotNull [] value;
     int statusCode;
+    @Nullable
+    String error;
     byte collectorTag;
     @NotNull
     String topic;
@@ -29,11 +32,13 @@ public class KafkaIPEntry implements KafkaEntry {
     }
 
     public KafkaIPEntry(@NotNull String domainName, @NotNull String ip, byte @NotNull [] value, int statusCode,
-                        byte collectorTag, @NotNull String topic, int partition, long offset, long timestamp) {
+                        @Nullable String error, byte collectorTag,
+                        @NotNull String topic, int partition, long offset, long timestamp) {
         this.domainName = domainName;
         this.ip = ip;
         this.value = value;
         this.statusCode = statusCode;
+        this.error = error;
         this.collectorTag = collectorTag;
         this.topic = topic;
         this.partition = partition;
@@ -114,5 +119,13 @@ public class KafkaIPEntry implements KafkaEntry {
 
     public void setCollectorTag(byte collectorTag) {
         this.collectorTag = collectorTag;
+    }
+
+    public @Nullable String getError() {
+        return error;
+    }
+
+    public void setError(@Nullable String error) {
+        this.error = error;
     }
 }

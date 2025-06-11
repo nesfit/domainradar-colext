@@ -204,7 +204,8 @@ public class IPEntriesProcessFunction extends KeyedCoProcessFunction<String, Kaf
         var expectedIps = new HashMap<String, Map<Byte, KafkaIPEntry>>();
         for (var gotEntries : _expectedIpsToNumberOfEntries.entries()) {
             if (gotEntries.getValue() < TOTAL_EXPECTED_RECORDS_PER_IPS) {
-                LOG.trace("[{}] Not enough collected data object for an IP", key);
+                LOG.trace("[{}] Not enough collected data objects ({}) for IP {}", key,
+                        gotEntries.getValue(), gotEntries.getKey());
                 return;
             }
 

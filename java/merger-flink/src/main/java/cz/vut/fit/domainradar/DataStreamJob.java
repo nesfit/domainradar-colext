@@ -1,5 +1,6 @@
 package cz.vut.fit.domainradar;
 
+import cz.vut.fit.domainradar.db.PostgresCollectorResultSink;
 import cz.vut.fit.domainradar.serialization.TagRegistry;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.java.tuple.Tuple2;
@@ -100,6 +101,11 @@ public class DataStreamJob {
                 .setDeliveryGuarantee(DeliveryGuarantee.AT_LEAST_ONCE)
                 .build();
 
+        var postgresSink = new PostgresCollectorResultSink(
+                appProperties.getProperty("db.url"),
+                appProperties.getProperty("db.user"),
+                appProperties.getProperty("db.password"));
+
         var zoneStream = makeKafkaDomainStream(env, Topics.OUT_ZONE);
         var dnsStream = makeKafkaDomainStream(env, Topics.OUT_DNS);
         var tlsStream = makeKafkaDomainStream(env, Topics.OUT_TLS);
@@ -119,16 +125,15 @@ public class DataStreamJob {
                 .filter(dnAggregate -> !dnAggregate.getDNSIPs().isEmpty())
                 .uid("dn-data-with-ips-filter")
                 .keyBy(KafkaDomainAggregate::getDomainName);
+
         var mergedResults = ipDataStream.connect(dnDataWithIps)
                 .process(new IPEntriesProcessFunction())
                 .uid("dn-ip-final-merging-processor");
-        var pgSink = new cz.vut.fit.domainradar.db.PostgresCollectorResultSink(
-                appProperties.getProperty("db.url"),
-                appProperties.getProperty("db.user"),
-                appProperties.getProperty("db.password"));
+        // Sink the unified DN-IP metadata to PostgreSQL
         mergedResults
-                .sinkTo(pgSink)
+                .sinkTo(postgresSink)
                 .uid("postgres-sink-with-ips");
+        // Sink the unified DN-IP data to Kafka
         var mergedData = mergedResults
                 .map(new SerdeMappingFunction())
                 .uid("serde-mapper-with-ips")
@@ -146,9 +151,11 @@ public class DataStreamJob {
         var resultsWithoutIpsKM = dnDataWithoutIps
                 .map(dnAggregate -> new KafkaMergedResult(dnAggregate.getDomainName(), dnAggregate, null))
                 .uid("map-to-merged-results");
+        // Sink the unified DN-only metadata to PostgreSQL
         resultsWithoutIpsKM
-                .sinkTo(pgSink)
+                .sinkTo(postgresSink)
                 .uid("postgres-sink-without-ips");
+        // Sink the unified DN-only data to Kafka
         var resultsWithoutIps = resultsWithoutIpsKM
                 .map(new SerdeMappingFunction())
                 .uid("serde-mapper-without-ips")
