@@ -15,7 +15,7 @@ public class KafkaDomainEntryDeserializer
     @Override
     public void deserialize(ConsumerRecord<byte[], byte[]> consumerRecord, Collector<KafkaDomainEntry> collector) {
         var key = new String(consumerRecord.key(), StandardCharsets.UTF_8);
-        var statusMeta = this.parseStatusMeta(consumerRecord.value());
+        var statusMeta = this.parseStatusMeta(consumerRecord.value(), false);
 
         collector.collect(new KafkaDomainEntry(key, consumerRecord.value(), statusMeta.statusCode(), statusMeta.error(),
                 consumerRecord.topic(), consumerRecord.partition(), consumerRecord.offset(), consumerRecord.timestamp()));

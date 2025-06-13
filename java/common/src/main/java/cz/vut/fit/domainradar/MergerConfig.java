@@ -112,6 +112,12 @@ public class MergerConfig {
     public static final boolean DB_ENABLED_DEFAULT = true;
 
     /**
+     * When enabled, the merger will store the QRadar results in a PostgreSQL database.
+     */
+    public static final String DB_QRADAR_CONFIG = "db.qradar.enabled";
+    public static final boolean DB_QRADAR_DEFAULT = false;
+
+    /**
      * When true, the raw data will be stored in the database. If false, only metadata about the collection results will be stored.
      */
     public static final String DB_STORE_DATA_CONFIG = "db.store.data";

@@ -1,7 +1,6 @@
 package cz.vut.fit.domainradar.flink.sinks;
 
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import cz.vut.fit.domainradar.*;
 import cz.vut.fit.domainradar.models.ip.GeoIPData;
 import cz.vut.fit.domainradar.models.ip.NERDData;
@@ -14,6 +13,7 @@ import cz.vut.fit.domainradar.flink.models.KafkaMergedResult;
 import org.apache.flink.api.connector.sink2.Sink;
 import org.apache.flink.api.connector.sink2.SinkWriter;
 import org.apache.flink.api.connector.sink2.WriterInitContext;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -56,20 +56,15 @@ public class PostgresCollectorResultSink implements Sink<KafkaMergedResult> {
     }
 
     @SuppressWarnings("SqlNoDataSourceInspection")
-    private class PgWriter implements SinkWriter<KafkaMergedResult> {
-        private final Logger LOG = LoggerFactory.getLogger(PostgresCollectorResultSink.class);
+    private class PgWriter extends PgWriterBase<KafkaMergedResult> {
+        private static final Logger LOG = LoggerFactory.getLogger(PostgresCollectorResultSink.class);
 
-        private final Connection connection;
-        private final PreparedStatement selectDomain;
-        private final PreparedStatement insertDomain;
         private final PreparedStatement selectIp;
         private final PreparedStatement insertIp;
         private final PreparedStatement insertResult;
-        private final PreparedStatement insertDomainError;
         private final PreparedStatement updateIpGeoData;
         private final PreparedStatement updateIpNerdData;
 
-        private final ObjectMapper mapper;
         private final Map<String, CollectorInfo> collectorCache = new HashMap<>();
         private final TypeReference<CommonIPResult<GeoIPData>> geoRef = new TypeReference<>() {
         };
@@ -77,15 +72,8 @@ public class PostgresCollectorResultSink implements Sink<KafkaMergedResult> {
         };
 
         PgWriter() throws SQLException {
-            LOG.debug("Opening connection");
-            connection = DriverManager.getConnection(dbUrl, dbUser, dbPassword);
-            connection.setAutoCommit(false);
+            super(dbUrl, dbUser, dbPassword, "flink-collector-result-sink", LOG);
 
-            selectDomain = connection.prepareStatement("SELECT id FROM Domain WHERE domain_name = ?");
-            insertDomain = connection.prepareStatement(
-                    "INSERT INTO Domain(domain_name, last_update) VALUES (?, ?)" +
-                            " ON CONFLICT (domain_name) DO UPDATE SET last_update=EXCLUDED.last_update" +
-                            " RETURNING id");
             selectIp = connection.prepareStatement(
                     "SELECT id FROM IP WHERE domain_id = ? AND ip = ?::inet");
             insertIp = connection.prepareStatement(
@@ -95,9 +83,6 @@ public class PostgresCollectorResultSink implements Sink<KafkaMergedResult> {
                             " VALUES (?, ?, ?, ?, ?, ?, ?::jsonb)" +
                             " ON CONFLICT ON CONSTRAINT collection_result_unique DO UPDATE" +
                             " SET status_code=EXCLUDED.status_code, error=EXCLUDED.error, raw_data=EXCLUDED.raw_data");
-            insertDomainError = connection.prepareStatement(
-                    "INSERT INTO Domain_Errors(domain_id, timestamp, source, error, sql_error_code, sql_error_message)" +
-                            " VALUES (?, ?, ?, ?, ?, ?)");
             updateIpGeoData = connection.prepareStatement(
                     "UPDATE IP SET geo_country_code=?, geo_region=?, geo_region_code=?, geo_city=?," +
                             " geo_postal_code=?, geo_latitude=?, geo_longitude=?, geo_timezone=?," +
@@ -107,44 +92,10 @@ public class PostgresCollectorResultSink implements Sink<KafkaMergedResult> {
             updateIpNerdData = connection.prepareStatement(
                     "UPDATE IP SET nerd_reputation=?, nerd_update_timestamp=? WHERE id=?" +
                             " AND (nerd_update_timestamp IS NULL OR nerd_update_timestamp <= ?)");
-
-            mapper = Common.makeMapper().build();
         }
 
         @Override
-        public void write(KafkaMergedResult value, Context context) throws IOException {
-            try {
-                processResult(value);
-                LOG.debug("Issued all commands, commiting");
-                connection.commit();
-            } catch (Exception e) {
-                try {
-                    LOG.warn("Rolling back due to an error");
-                    connection.rollback();
-                } catch (SQLException ex) {
-                    LOG.error("Rollback failed", ex);
-                }
-                throw new IOException("Failed to store merged result", e);
-            }
-        }
-
-        @Override
-        public void flush(boolean endOfInput) throws IOException {
-            try {
-                LOG.trace("Flush – commiting");
-                connection.commit();
-            } catch (SQLException e) {
-                throw new IOException(e);
-            }
-        }
-
-        @Override
-        public void close() throws Exception {
-            LOG.debug("Closing connection");
-            connection.close();
-        }
-
-        private void processResult(KafkaMergedResult merged) throws Exception {
+        protected void processInput(@NotNull KafkaMergedResult merged) throws Exception {
             var domainName = merged.getDomainName();
             LOG.trace("[{}] Processing entry", domainName);
 
@@ -178,30 +129,6 @@ public class PostgresCollectorResultSink implements Sink<KafkaMergedResult> {
                                 domainName, ip);
                     }
                 }
-            }
-        }
-
-        private long getOrCreateDomain(String domainName, long timestamp) throws SQLException {
-            LOG.trace("[{}] Getting domain ID", domainName);
-            selectDomain.setString(1, domainName);
-            try (var rs = selectDomain.executeQuery()) {
-                if (rs.next()) {
-                    return rs.getLong(1);
-                }
-            }
-            LOG.trace("[{}] Domain not found, doing upsert", domainName);
-            insertDomain.setString(1, domainName);
-            insertDomain.setTimestamp(2, new Timestamp(timestamp));
-            try (var rs = insertDomain.executeQuery()) {
-                if (rs.next()) {
-                    return rs.getLong(1);
-                }
-            }
-            LOG.trace("[{}] Didn't get ID from upsert, trying get again", domainName);
-            selectDomain.setString(1, domainName);
-            try (var rs = selectDomain.executeQuery()) {
-                rs.next();
-                return rs.getLong(1);
             }
         }
 
@@ -316,30 +243,6 @@ public class PostgresCollectorResultSink implements Sink<KafkaMergedResult> {
                 insertDomainError(domainId, ts, "Cannot parse JSON.", e);
                 return null;
             }
-        }
-
-        /**
-         * Inserts an error entry into the Domain_Errors table.
-         *
-         * @param domainId The ID of the domain.
-         * @param ts       The timestamp of the error.
-         * @param message  The error message.
-         * @param e        The exception that caused the error, or null if not applicable.
-         * @throws SQLException If an SQL error occurs.
-         */
-        private void insertDomainError(long domainId, long ts, String message, Exception e) throws SQLException {
-            insertDomainError.setLong(1, domainId);
-            insertDomainError.setTimestamp(2, new Timestamp(ts));
-            insertDomainError.setString(3, "flink-collection-results-db-sink");
-            insertDomainError.setString(4, message);
-            if (e instanceof SQLException se) {
-                insertDomainError.setString(5, se.getSQLState());
-                insertDomainError.setString(6, se.getMessage());
-            } else {
-                insertDomainError.setNull(5, Types.VARCHAR);
-                insertDomainError.setString(6, e == null ? null : e.getMessage());
-            }
-            insertDomainError.executeUpdate();
         }
 
         /**

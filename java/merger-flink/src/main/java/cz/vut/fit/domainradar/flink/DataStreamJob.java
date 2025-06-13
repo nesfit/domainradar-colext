@@ -2,17 +2,15 @@ package cz.vut.fit.domainradar.flink;
 
 import cz.vut.fit.domainradar.MergerConfig;
 import cz.vut.fit.domainradar.Topics;
+import cz.vut.fit.domainradar.flink.models.*;
 import cz.vut.fit.domainradar.flink.sinks.PostgresCollectorResultSink;
-import cz.vut.fit.domainradar.flink.models.KafkaDomainAggregate;
-import cz.vut.fit.domainradar.flink.models.KafkaDomainEntry;
-import cz.vut.fit.domainradar.flink.models.KafkaIPEntry;
-import cz.vut.fit.domainradar.flink.models.KafkaMergedResult;
 import cz.vut.fit.domainradar.flink.processors.DomainEntriesProcessFunction;
 import cz.vut.fit.domainradar.flink.processors.IPEntriesProcessFunction;
 import cz.vut.fit.domainradar.flink.processors.SerdeMappingFunction;
 import cz.vut.fit.domainradar.flink.serialization.KafkaDomainEntryDeserializer;
 import cz.vut.fit.domainradar.flink.serialization.KafkaIPEntryDeserializer;
 import cz.vut.fit.domainradar.flink.serialization.KafkaSerializer;
+import cz.vut.fit.domainradar.flink.sinks.PostgresQRadarSink;
 import cz.vut.fit.domainradar.serialization.TagRegistry;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.connector.sink2.Sink;
@@ -25,6 +23,7 @@ import org.apache.flink.connector.kafka.sink.KafkaSink;
 import org.apache.flink.connector.kafka.source.KafkaSource;
 import org.apache.flink.connector.kafka.source.enumerator.initializer.OffsetsInitializer;
 import org.apache.flink.core.execution.CheckpointingMode;
+import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.KeyedStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.kafka.clients.consumer.OffsetResetStrategy;
@@ -32,6 +31,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Properties;
 
 
@@ -57,12 +58,12 @@ public class DataStreamJob {
         });
 
         if (allProperties.getBoolean(MergerConfig.IP_DISABLE_NERD, MergerConfig.IP_DISABLE_NERD_DEFAULT)) {
-            TagRegistry.TAGS.remove("nerd");
+            var nerdId = TagRegistry.TAGS.get("nerd");
+            TagRegistry.TAGS_TO_INCLUDE_IN_MERGED_RESULT.remove(nerdId);
         }
 
         // ==== Flink execution environment ====
         final Configuration pipelineConfig = new Configuration();
-        //pipelineConfig.set(PipelineOptions.FORCE_AVRO, Boolean.TRUE);
         final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment(pipelineConfig);
         env.getConfig().setGlobalJobParameters(allProperties);
 
@@ -116,20 +117,26 @@ public class DataStreamJob {
                 .build();
 
         Sink<KafkaMergedResult> postgresSink = null;
+        Sink<KafkaIPEntry> postgresQRadarSink = null;
         if (allProperties.getBoolean(MergerConfig.DB_ENABLED_CONFIG, MergerConfig.DB_ENABLED_DEFAULT)) {
-            postgresSink = new PostgresCollectorResultSink(
-                    allProperties.get(MergerConfig.DB_URL_CONFIG, MergerConfig.DB_URL_DEFAULT),
-                    allProperties.get(MergerConfig.DB_USERNAME_CONFIG, MergerConfig.DB_USERNAME_DEFAULT),
-                    allProperties.get(MergerConfig.DB_PASSWORD_CONFIG, MergerConfig.DB_PASSWORD_DEFAULT),
+            var url = allProperties.get(MergerConfig.DB_URL_CONFIG, MergerConfig.DB_URL_DEFAULT);
+            var user = allProperties.get(MergerConfig.DB_USERNAME_CONFIG, MergerConfig.DB_USERNAME_DEFAULT);
+            var password = allProperties.get(MergerConfig.DB_PASSWORD_CONFIG, MergerConfig.DB_PASSWORD_DEFAULT);
+
+            postgresSink = new PostgresCollectorResultSink(url, user, password,
                     allProperties.getBoolean(MergerConfig.DB_STORE_DATA_CONFIG, MergerConfig.DB_STORE_DATA_DEFAULT));
+
+            if (allProperties.getBoolean(MergerConfig.DB_QRADAR_CONFIG, MergerConfig.DB_QRADAR_DEFAULT)) {
+                postgresQRadarSink = new PostgresQRadarSink(url, user, password);
+            }
         }
 
         var zoneStream = makeKafkaDomainStream(env, Topics.OUT_ZONE);
         var dnsStream = makeKafkaDomainStream(env, Topics.OUT_DNS);
         var tlsStream = makeKafkaDomainStream(env, Topics.OUT_TLS);
         var rdapDnStream = makeKafkaDomainStream(env, Topics.OUT_RDAP_DN);
-        var ipDataStream = makeKafkaIpStream(env, Topics.OUT_IP)
-                .keyBy(KafkaIPEntry::getDomainName);
+        var ipDataStream = makeKafkaIpStream(env);
+        var qradarStream = makeKafkaQRadarStream(env);
 
         // ==== The pipeline ====
         var dnData = zoneStream.union(dnsStream, tlsStream, rdapDnStream)
@@ -153,6 +160,18 @@ public class DataStreamJob {
             mergedResults
                     .sinkTo(postgresSink)
                     .uid("postgres-sink-with-ips");
+
+            // Create "fake merged results" with only the QRadar entries, and sink them to PostgreSQL as the other
+            // collection results
+            final var qRadarTag = TagRegistry.TAGS.get("qradar");
+            qradarStream
+                    .map(kafkaIPEntry -> new KafkaMergedResult(kafkaIPEntry.getDomainName(),
+                            new KafkaDomainAggregate(kafkaIPEntry.getDomainName(), null, null, null, null),
+                            // This must not be an immutable map to avoid issues with Kryo 2.24
+                            new HashMap<>(Map.of(kafkaIPEntry.getIP(), new HashMap<>(Map.of(qRadarTag.byteValue(), kafkaIPEntry))))))
+                    .uid("qradar-to-merged-results")
+                    .sinkTo(postgresSink)
+                    .uid("postgres-sink-qradar");
         }
 
         // Sink the unified DN-IP data to Kafka
@@ -190,6 +209,11 @@ public class DataStreamJob {
         resultsWithoutIps
                 .sinkTo(sink)
                 .uid("entries-without-ips-sink");
+
+        // ==== A side pipeline for QRadar data ====
+        if (postgresQRadarSink != null) {
+            qradarStream.sinkTo(postgresQRadarSink);
+        }
     }
 
     private static KeyedStream<KafkaDomainEntry, String> makeKafkaDomainStream(final StreamExecutionEnvironment env,
@@ -206,8 +230,8 @@ public class DataStreamJob {
                 .keyBy(KafkaDomainEntry::getDomainName);
     }
 
-    private static KeyedStream<KafkaIPEntry, String>
-    makeKafkaIpStream(final StreamExecutionEnvironment env, final String topic) {
+    private static KeyedStream<KafkaIPEntry, String> makeKafkaIpStream(final StreamExecutionEnvironment env) {
+        final var topic = Topics.OUT_IP;
         final var outOfOrdernessMs =
                 Long.parseLong(appProperties.getProperty(MergerConfig.IP_MAX_OUT_OF_ORDERNESS_MS_CONFIG,
                         MergerConfig.IP_MAX_OUT_OF_ORDERNESS_MS_DEFAULT));
@@ -218,6 +242,19 @@ public class DataStreamJob {
         return env.fromSource(makeKafkaIpSource(topic), makeWatermarkStrategy(outOfOrdernessMs, idlenessSec), "Kafka: " + topic)
                 .uid("source-kafka-ip-" + topic)
                 .keyBy(KafkaIPEntry::getDomainName);
+    }
+
+    private static DataStream<KafkaIPEntry> makeKafkaQRadarStream(final StreamExecutionEnvironment env) {
+        final var topic = Topics.OUT_QRADAR;
+        final var outOfOrdernessMs =
+                Long.parseLong(appProperties.getProperty(MergerConfig.IP_MAX_OUT_OF_ORDERNESS_MS_CONFIG,
+                        MergerConfig.IP_MAX_OUT_OF_ORDERNESS_MS_DEFAULT));
+        final var idlenessSec =
+                Long.parseLong(appProperties.getProperty(MergerConfig.IP_IDLENESS_SEC_CONFIG,
+                        MergerConfig.IP_IDLENESS_SEC_DEFAULT));
+
+        return env.fromSource(makeKafkaQRadarSource(), makeWatermarkStrategy(outOfOrdernessMs, idlenessSec), "Kafka: " + topic)
+                .uid("source-kafka-qradar-" + topic);
     }
 
     private static KafkaSource<KafkaDomainEntry> makeKafkaDomainSource(final String topic) {
@@ -236,6 +273,10 @@ public class DataStreamJob {
                 .setStartingOffsets(OffsetsInitializer.committedOffsets(OffsetResetStrategy.LATEST))
                 .setDeserializer(new KafkaIPEntryDeserializer())
                 .build();
+    }
+
+    private static KafkaSource<KafkaIPEntry> makeKafkaQRadarSource() {
+        return makeKafkaIpSource(Topics.OUT_QRADAR);
     }
 
     private static <T> WatermarkStrategy<T> makeWatermarkStrategy(long outOfOrdernessMs, long idlenessSec) {

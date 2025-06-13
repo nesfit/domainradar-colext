@@ -48,7 +48,7 @@ public class IPEntriesProcessFunction extends KeyedCoProcessFunction<String, Kaf
     private transient long _maxWaitForDomainDataMs;
 
     // TODO: Make the mappings configurable
-    private static final int TOTAL_EXPECTED_RECORDS_PER_IPS = TagRegistry.TAGS.size();
+    private static final int TOTAL_EXPECTED_RECORDS_PER_IPS = TagRegistry.TAGS_TO_INCLUDE_IN_MERGED_RESULT.size();
 
     private static final Logger LOG = LoggerFactory.getLogger(IPEntriesProcessFunction.class);
 
@@ -140,6 +140,11 @@ public class IPEntriesProcessFunction extends KeyedCoProcessFunction<String, Kaf
         final var ip = value.getIP();
         final var collectorTag = value.getCollectorTag();
         final var key = Tuple2.of(ip, collectorTag);
+
+        // Ignore entries from collectors that are not included in the merged result (QRadar)
+        if (!TagRegistry.TAGS_TO_INCLUDE_IN_MERGED_RESULT.contains((int) collectorTag)) {
+            return;
+        }
 
         var shouldProcess = true;
 
@@ -259,7 +264,7 @@ public class IPEntriesProcessFunction extends KeyedCoProcessFunction<String, Kaf
 
         // Check the map contains all required entries
         for (var ip : expectedIps.entrySet()) {
-            for (var tag : TagRegistry.TAGS.values()) {
+            for (var tag : TagRegistry.TAGS_TO_INCLUDE_IN_MERGED_RESULT) {
                 if (!ip.getValue().containsKey(tag.byteValue())) {
                     LOG.trace("[{}] Missing data for {}", key, tag);
                     return;

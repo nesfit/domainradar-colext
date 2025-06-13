@@ -11,7 +11,7 @@ import java.io.IOException;
 public abstract class CommonDeserializer {
     private transient JsonFactory _jsonFactory;
 
-    public record StatusMeta(int statusCode, @Nullable String error) {
+    public record StatusMeta(int statusCode, @Nullable String error, @Nullable String collector) {
     }
 
     /**
@@ -20,14 +20,14 @@ public abstract class CommonDeserializer {
      * @param resultInput The bytes of a JSON-serialized collection {@link Result}.
      * @return A {@link StatusMeta} object containing the status code and error message.
      */
-    public StatusMeta parseStatusMeta(byte[] resultInput) {
+    public StatusMeta parseStatusMeta(byte[] resultInput, boolean includeCollector) {
         if (_jsonFactory == null) {
             _jsonFactory = new JsonFactory();
         }
 
         int statusCode = -1;
-        String error = null;
-        boolean gotOne = false;
+        String error = null, collector = null;
+        var entriesLeft = includeCollector ? 3 : 2; // statusCode, error, collector (if included)
 
         try (JsonParser parser = _jsonFactory.createParser(resultInput)) {
             // Start parsing the JSON
@@ -43,24 +43,31 @@ public abstract class CommonDeserializer {
                         // Move to the next token which is the value of "statusCode"
                         parser.nextToken();
                         statusCode = parser.getIntValue();
-                        if (gotOne) break;
-                        gotOne = true;
+                        entriesLeft--;
                     } else if ("error".equals(fieldName)) {
                         if (parser.nextToken() == JsonToken.VALUE_NULL) {
                             error = null;
                         } else {
                             error = parser.getText();
                         }
-                        if (gotOne) break;
-                        gotOne = true;
+                        entriesLeft--;
+                    } else if (includeCollector && "collector".equals(fieldName)) {
+                        parser.nextToken();
+                        collector = parser.getText();
+                        entriesLeft--;
+                    }
+
+                    // No need to parse further if we got all required fields
+                    if (entriesLeft == 0) {
+                        break;
                     }
                 }
             }
         } catch (IOException e) {
             // TODO: Log?
-            return new StatusMeta(statusCode, error);
+            return new StatusMeta(statusCode, error, collector);
         }
 
-        return new StatusMeta(statusCode, error);
+        return new StatusMeta(statusCode, error, collector);
     }
 }
