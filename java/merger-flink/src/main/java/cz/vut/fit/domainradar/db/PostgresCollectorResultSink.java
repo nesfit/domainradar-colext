@@ -29,11 +29,13 @@ public class PostgresCollectorResultSink implements Sink<KafkaMergedResult> {
     private final String dbUrl;
     private final String dbUser;
     private final String dbPassword;
+    private final boolean storeRawData;
 
-    public PostgresCollectorResultSink(String dbUrl, String dbUser, String dbPassword) {
+    public PostgresCollectorResultSink(String dbUrl, String dbUser, String dbPassword, boolean storeRawData) {
         this.dbUrl = Objects.requireNonNull(dbUrl, "dbUrl");
         this.dbUser = dbUser;
         this.dbPassword = dbPassword;
+        this.storeRawData = storeRawData;
     }
 
     @Deprecated
@@ -50,6 +52,7 @@ public class PostgresCollectorResultSink implements Sink<KafkaMergedResult> {
         }
     }
 
+    @SuppressWarnings("SqlNoDataSourceInspection")
     private class PgWriter implements SinkWriter<KafkaMergedResult> {
         private final Logger LOG = LoggerFactory.getLogger(PostgresCollectorResultSink.class);
 
@@ -143,8 +146,10 @@ public class PostgresCollectorResultSink implements Sink<KafkaMergedResult> {
             LOG.trace("[{}] Processing entry", domainName);
 
             long ts = earliestTimestamp(merged);
-            long domainId = getOrCreateDomain(domainName, ts);
 
+            // Get or create the domain row (its ID)
+            long domainId = getOrCreateDomain(domainName, ts);
+            // Get or create all the IP rows (their IDs)
             Map<String, Long> ipIds = new HashMap<>();
             if (merged.getIPData() != null) {
                 for (var ipEntry : merged.getIPData().entrySet()) {
@@ -248,7 +253,7 @@ public class PostgresCollectorResultSink implements Sink<KafkaMergedResult> {
                         "Unknown collector: " + entry.getTopic(), null);
                 return;
             }
-            CollectorInfo ci = getCollectorInfo(domainId, entry.getTimestamp(), collector);
+            CollectorInfo ci = getCollectorInfo(collector, domainId, entry.getTimestamp());
             if (ci == null) {
                 LOG.warn("[{}] No collector ID found in the database for collector {}", domainName, collector);
                 return;
@@ -268,7 +273,7 @@ public class PostgresCollectorResultSink implements Sink<KafkaMergedResult> {
                         "Unknown collector tag: " + collectorTag, null);
                 return;
             }
-            CollectorInfo ci = getCollectorInfo(domainId, entry.getTimestamp(), collector);
+            CollectorInfo ci = getCollectorInfo(collector, domainId, entry.getTimestamp());
             if (ci == null) {
                 LOG.warn("[{}][{}] No collector ID found in the database for collector {}", domainName, ip, collector);
                 return;
@@ -310,6 +315,15 @@ public class PostgresCollectorResultSink implements Sink<KafkaMergedResult> {
             }
         }
 
+        /**
+         * Inserts an error entry into the Domain_Errors table.
+         *
+         * @param domainId The ID of the domain.
+         * @param ts       The timestamp of the error.
+         * @param message  The error message.
+         * @param e        The exception that caused the error, or null if not applicable.
+         * @throws SQLException If an SQL error occurs.
+         */
         private void insertDomainError(long domainId, long ts, String message, Exception e) throws SQLException {
             insertDomainError.setLong(1, domainId);
             insertDomainError.setTimestamp(2, new Timestamp(ts));
@@ -325,7 +339,16 @@ public class PostgresCollectorResultSink implements Sink<KafkaMergedResult> {
             insertDomainError.executeUpdate();
         }
 
-        private CollectorInfo getCollectorInfo(long domainId, long ts, String name) throws SQLException {
+        /**
+         * Gets the collector ID and "is IP collector" flag from the cache or the database.
+         *
+         * @param name     The collector name.
+         * @param domainId The domain ID (for error reporting).
+         * @param ts       The timestamp of the entry (for error reporting).
+         * @return The collector information, or null if the collector is unknown.
+         * @throws SQLException If an SQL error occurs.
+         */
+        private CollectorInfo getCollectorInfo(String name, long domainId, long ts) throws SQLException {
             CollectorInfo ci = collectorCache.get(name);
             if (ci != null) return ci;
             try (var ps = connection.prepareStatement("SELECT id, is_ip_collector FROM Collector WHERE collector = ?")) {
@@ -342,6 +365,18 @@ public class PostgresCollectorResultSink implements Sink<KafkaMergedResult> {
             return null;
         }
 
+        /**
+         * Inserts a collection result into the database.
+         *
+         * @param domainId    The ID of the domain.
+         * @param ipId        The ID of the IP, or null if not applicable.
+         * @param collectorId The ID of the collector.
+         * @param statusCode  The status code of the collection result.
+         * @param error       The error message, or null if there was no error.
+         * @param ts          The timestamp of the collection result.
+         * @param rawData     The raw data of the collection result, or null if not applicable.
+         * @throws SQLException If an SQL error occurs.
+         */
         private void insertCollectionResult(long domainId, Long ipId, short collectorId, int statusCode,
                                             String error, long ts, byte[] rawData) throws SQLException {
             insertResult.setLong(1, domainId);
@@ -358,10 +393,22 @@ public class PostgresCollectorResultSink implements Sink<KafkaMergedResult> {
                 insertResult.setString(5, error);
             }
             insertResult.setTimestamp(6, new Timestamp(ts));
-            insertResult.setString(7, new String(rawData));
+            if (storeRawData) {
+                insertResult.setString(7, new String(rawData));
+            } else {
+                insertResult.setNull(7, Types.VARCHAR);
+            }
             insertResult.executeUpdate();
         }
 
+        /**
+         * Updates the GEO-ASN (GeoIP) data stored within the row for a given IP.
+         *
+         * @param ipId The ID of the IP.
+         * @param data The GEO-ASN (GeoIP) data to update.
+         * @param ts   The new "GEO-ASN last updated" timestamp.
+         * @throws SQLException If an SQL error occurs.
+         */
         private void updateGeoIpData(long ipId, GeoIPData data, long ts) throws SQLException {
             var ps = updateIpGeoData;
             ps.setString(1, data.countryCode());
@@ -369,13 +416,13 @@ public class PostgresCollectorResultSink implements Sink<KafkaMergedResult> {
             ps.setString(3, data.regionCode());
             ps.setString(4, data.city());
             ps.setString(5, data.postalCode());
-            setDoubleOrNull(ps, 6, data.latitude());
-            setDoubleOrNull(ps, 7, data.longitude());
+            ps.setObject(6, data.latitude(), Types.DOUBLE);
+            ps.setObject(7, data.longitude(), Types.DOUBLE);
             ps.setString(8, data.timezone());
-            setLongOrNull(ps, 9, data.asn());
+            ps.setObject(9, data.asn(), Types.BIGINT);
             ps.setString(10, data.asnOrg());
             ps.setString(11, data.networkAddress());
-            setIntOrNull(ps, 12, data.prefixLength() == null ? null : data.prefixLength().intValue());
+            ps.setObject(12, data.prefixLength(), Types.INTEGER);
             Timestamp tsObj = new Timestamp(ts);
             ps.setTimestamp(13, tsObj);
             ps.setLong(14, ipId);
@@ -383,9 +430,17 @@ public class PostgresCollectorResultSink implements Sink<KafkaMergedResult> {
             ps.executeUpdate();
         }
 
+        /**
+         * Updates the NERD data stored within the row for a given IP.
+         *
+         * @param ipId The ID of the IP.
+         * @param data The NERD data to update.
+         * @param ts   The new "NERD last updated" timestamp.
+         * @throws SQLException If an SQL error occurs.
+         */
         private void updateNerdData(long ipId, NERDData data, long ts) throws SQLException {
             var ps = updateIpNerdData;
-            setDoubleOrNull(ps, 1, data.reputation());
+            ps.setDouble(1, data.reputation());
             Timestamp tsObj = new Timestamp(ts);
             ps.setTimestamp(2, tsObj);
             ps.setLong(3, ipId);
@@ -393,30 +448,13 @@ public class PostgresCollectorResultSink implements Sink<KafkaMergedResult> {
             ps.executeUpdate();
         }
 
-        private void setDoubleOrNull(PreparedStatement ps, int idx, Double n) throws SQLException {
-            if (n == null) {
-                ps.setNull(idx, Types.DOUBLE);
-            } else {
-                ps.setDouble(idx, n);
-            }
-        }
-
-        private void setLongOrNull(PreparedStatement ps, int idx, Long n) throws SQLException {
-            if (n == null) {
-                ps.setNull(idx, Types.BIGINT);
-            } else {
-                ps.setLong(idx, n);
-            }
-        }
-
-        private void setIntOrNull(PreparedStatement ps, int idx, Integer n) throws SQLException {
-            if (n == null) {
-                ps.setNull(idx, Types.INTEGER);
-            } else {
-                ps.setInt(idx, n);
-            }
-        }
-
+        /**
+         * Returns the earliest collection timestamp from the merged result,
+         * or the current time if no data is available.
+         *
+         * @param merged The merged result.
+         * @return The earliest timestamp.
+         */
         private long earliestTimestamp(KafkaMergedResult merged) {
             long ts = Long.MAX_VALUE;
             KafkaDomainAggregate d = merged.getDomainData();

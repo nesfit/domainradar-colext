@@ -96,10 +96,42 @@ public class MergerConfig {
     /**
      * An EXPERIMENTAL option to completely remove the notion of the NERD collector from the merger.
      * When true, the merger will not wait for NERD results and will silently drop them if they come.
-     *
+     * <p>
      * This option will likely be removed in the future.
      */
     public static final String IP_DISABLE_NERD
             = "ip.disable.nerd";
-    public static final String IP_DISABLE_NERD_DEFAULT = "false";
+    public static final boolean IP_DISABLE_NERD_DEFAULT = false;
+
+    /* --- Database settings --- */
+
+    /**
+     * When enabled, the merger will store the collection results in a PostgreSQL database.
+     */
+    public static final String DB_ENABLED_CONFIG = "db.enabled";
+    public static final boolean DB_ENABLED_DEFAULT = true;
+
+    /**
+     * When true, the raw data will be stored in the database. If false, only metadata about the collection results will be stored.
+     */
+    public static final String DB_STORE_DATA_CONFIG = "db.store.data";
+    public static final boolean DB_STORE_DATA_DEFAULT = false;
+
+    /**
+     * The database connection URL.
+     */
+    public static final String DB_URL_CONFIG = "db.url";
+    public static final String DB_URL_DEFAULT = "";
+
+    /**
+     * The database username.
+     */
+    public static final String DB_USERNAME_CONFIG = "db.username";
+    public static final String DB_USERNAME_DEFAULT = "";
+
+    /**
+     * The database password.
+     */
+    public static final String DB_PASSWORD_CONFIG = "db.password";
+    public static final String DB_PASSWORD_DEFAULT = "";
 }

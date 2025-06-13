@@ -3,6 +3,7 @@ package cz.vut.fit.domainradar;
 import cz.vut.fit.domainradar.db.PostgresCollectorResultSink;
 import cz.vut.fit.domainradar.serialization.TagRegistry;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
+import org.apache.flink.api.connector.sink2.Sink;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.utils.ParameterTool;
 import org.apache.flink.configuration.Configuration;
@@ -26,14 +27,15 @@ public class DataStreamJob {
 
     private static final Properties kafkaProperties = new Properties();
     private static final Properties appProperties = new Properties();
+    private static ParameterTool allProperties;
     private static final Logger LOG = LoggerFactory.getLogger(DataStreamJob.class);
 
     public static void main(String[] args) throws Exception {
         // ==== Configuration ====
         // All configuration properties with the "kafka." prefix will be passed to the Kafka source
-        ParameterTool params = ParameterTool.fromPropertiesFile(args[0]);
+        allProperties = ParameterTool.fromPropertiesFile(args[0]);
         LOG.info("Setting application properties:");
-        params.toMap().forEach((k, v) -> {
+        allProperties.toMap().forEach((k, v) -> {
             if (k.startsWith("kafka.")) {
                 kafkaProperties.setProperty(k.substring(6), v);
             } else {
@@ -42,7 +44,7 @@ public class DataStreamJob {
             }
         });
 
-        if (params.getBoolean(MergerConfig.IP_DISABLE_NERD, false)) {
+        if (allProperties.getBoolean(MergerConfig.IP_DISABLE_NERD, MergerConfig.IP_DISABLE_NERD_DEFAULT)) {
             TagRegistry.TAGS.remove("nerd");
         }
 
@@ -50,7 +52,7 @@ public class DataStreamJob {
         final Configuration pipelineConfig = new Configuration();
         //pipelineConfig.set(PipelineOptions.FORCE_AVRO, Boolean.TRUE);
         final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment(pipelineConfig);
-        env.getConfig().setGlobalJobParameters(params);
+        env.getConfig().setGlobalJobParameters(allProperties);
 
         // ==== Checkpointing ====
         env.enableCheckpointing(10000, CheckpointingMode.EXACTLY_ONCE);
@@ -101,10 +103,14 @@ public class DataStreamJob {
                 .setDeliveryGuarantee(DeliveryGuarantee.AT_LEAST_ONCE)
                 .build();
 
-        var postgresSink = new PostgresCollectorResultSink(
-                appProperties.getProperty("db.url"),
-                appProperties.getProperty("db.user"),
-                appProperties.getProperty("db.password"));
+        Sink<KafkaMergedResult> postgresSink = null;
+        if (allProperties.getBoolean(MergerConfig.DB_ENABLED_CONFIG, MergerConfig.DB_ENABLED_DEFAULT)) {
+            postgresSink = new PostgresCollectorResultSink(
+                    allProperties.get(MergerConfig.DB_URL_CONFIG, MergerConfig.DB_URL_DEFAULT),
+                    allProperties.get(MergerConfig.DB_USERNAME_CONFIG, MergerConfig.DB_USERNAME_DEFAULT),
+                    allProperties.get(MergerConfig.DB_PASSWORD_CONFIG, MergerConfig.DB_PASSWORD_DEFAULT),
+                    allProperties.getBoolean(MergerConfig.DB_STORE_DATA_CONFIG, MergerConfig.DB_STORE_DATA_DEFAULT));
+        }
 
         var zoneStream = makeKafkaDomainStream(env, Topics.OUT_ZONE);
         var dnsStream = makeKafkaDomainStream(env, Topics.OUT_DNS);
@@ -129,10 +135,14 @@ public class DataStreamJob {
         var mergedResults = ipDataStream.connect(dnDataWithIps)
                 .process(new IPEntriesProcessFunction())
                 .uid("dn-ip-final-merging-processor");
-        // Sink the unified DN-IP metadata to PostgreSQL
-        mergedResults
-                .sinkTo(postgresSink)
-                .uid("postgres-sink-with-ips");
+
+        if (postgresSink != null) {
+            // Sink the unified DN-IP metadata to PostgreSQL
+            mergedResults
+                    .sinkTo(postgresSink)
+                    .uid("postgres-sink-with-ips");
+        }
+
         // Sink the unified DN-IP data to Kafka
         var mergedData = mergedResults
                 .map(new SerdeMappingFunction())
@@ -151,10 +161,14 @@ public class DataStreamJob {
         var resultsWithoutIpsKM = dnDataWithoutIps
                 .map(dnAggregate -> new KafkaMergedResult(dnAggregate.getDomainName(), dnAggregate, null))
                 .uid("map-to-merged-results");
-        // Sink the unified DN-only metadata to PostgreSQL
-        resultsWithoutIpsKM
-                .sinkTo(postgresSink)
-                .uid("postgres-sink-without-ips");
+
+        if (postgresSink != null) {
+            // Sink the unified DN-only metadata to PostgreSQL
+            resultsWithoutIpsKM
+                    .sinkTo(postgresSink)
+                    .uid("postgres-sink-without-ips");
+        }
+
         // Sink the unified DN-only data to Kafka
         var resultsWithoutIps = resultsWithoutIpsKM
                 .map(new SerdeMappingFunction())
@@ -198,7 +212,7 @@ public class DataStreamJob {
         return KafkaSource.<KafkaDomainEntry>builder()
                 .setProperties(kafkaProperties)
                 .setTopics(topic)
-                .setStartingOffsets(OffsetsInitializer.committedOffsets(OffsetResetStrategy.EARLIEST))
+                .setStartingOffsets(OffsetsInitializer.committedOffsets(OffsetResetStrategy.LATEST))
                 .setDeserializer(new KafkaDomainEntryDeserializer())
                 .build();
     }
@@ -207,7 +221,7 @@ public class DataStreamJob {
         return KafkaSource.<KafkaIPEntry>builder()
                 .setProperties(kafkaProperties)
                 .setTopics(topic)
-                .setStartingOffsets(OffsetsInitializer.committedOffsets(OffsetResetStrategy.EARLIEST))
+                .setStartingOffsets(OffsetsInitializer.committedOffsets(OffsetResetStrategy.LATEST))
                 .setDeserializer(new KafkaIPEntryDeserializer())
                 .build();
     }
