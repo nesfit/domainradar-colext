@@ -4,8 +4,8 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * A POJO representing a Kafka record with a string key.
- * It contains the key, value, status (result) code, topic, partition, offset, and timestamp.
+ * A POJO representing a domain-based collector result entry in Kafka.
+ * It contains the key (domain name), value, status (result) code, topic, partition, offset, and timestamp.
  */
 public class KafkaDomainEntry implements KafkaEntry {
 

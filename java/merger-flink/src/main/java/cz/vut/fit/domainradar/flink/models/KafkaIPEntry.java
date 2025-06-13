@@ -4,8 +4,8 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * A tuple representing a Kafka record with a (domain name, IP) pair key.
- * It contains the key fields, value, topic, partition, offset, and timestamp.
+ * A POJO representing an IP-based collector result entry in Kafka.
+ * It contains the key formed as a (domain name, IP) pair, value, topic, partition, offset, and timestamp.
  */
 public class KafkaIPEntry implements KafkaEntry {
 

@@ -5,6 +5,9 @@ import org.jetbrains.annotations.NotNull;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * A POJO representing a container for the results of all domain-based collectors (zone, DNS, RDAP-DN, TLS).
+ */
 public class KafkaDomainAggregate {
     @NotNull
     private String domainName;

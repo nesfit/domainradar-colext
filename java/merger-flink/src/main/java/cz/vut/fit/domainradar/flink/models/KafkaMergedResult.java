@@ -5,6 +5,10 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.Map;
 
+/**
+ * A POJO representing a merged result for a domain in Kafka.
+ * It contains the domain name, aggregated domain data, and optional IP data.
+ */
 public class KafkaMergedResult {
 
     @NotNull
