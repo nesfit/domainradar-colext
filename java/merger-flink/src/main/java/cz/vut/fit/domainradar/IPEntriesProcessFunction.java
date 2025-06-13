@@ -119,6 +119,8 @@ public class IPEntriesProcessFunction extends KeyedCoProcessFunction<String, Kaf
         final var collectorTag = value.collectorTag;
         final var key = Tuple2.of(ip, collectorTag);
 
+        var shouldProcess = true;
+
         LOG.trace("[{}][{} -> {}] Accepted IP collection result", dn, ip, collectorTag);
         if (_ipAndCollectorToIpData.contains(key)) {
             // If we have already seen this IP-Collector pair, only insert the new value if it's more useful
@@ -129,6 +131,8 @@ public class IPEntriesProcessFunction extends KeyedCoProcessFunction<String, Kaf
 
                 // Prolong the expiration timer to (now + _maxEntryLifetimeAfterEachIpMs)
                 this.updateExpirationTimestamp(ctx, _maxEntryLifetimeAfterEachIpMs);
+            } else {
+                shouldProcess = false;
             }
         } else {
             // Otherwise insert the new IP-Collector pair and increase the "seen data objects for IP" counter
@@ -145,12 +149,14 @@ public class IPEntriesProcessFunction extends KeyedCoProcessFunction<String, Kaf
             this.updateExpirationTimestamp(ctx, _maxEntryLifetimeAfterEachIpMs);
         }
 
-        if (_domainData.value() != null) {
-            // Attempt processing if the domain data has already been ingested by the process function
-            this.processIngestedData(out, ctx);
-        } else {
-            // Otherwise, extend the timer to (now + _maxWaitForDomainDataMs) instead
-            this.updateExpirationTimestamp(ctx, _maxWaitForDomainDataMs);
+        if (shouldProcess) {
+            if (_domainData.value() != null) {
+                // Attempt processing if the domain data has already been ingested by the process function
+                this.processIngestedData(out, ctx);
+            } else {
+                // Otherwise, extend the timer to (now + _maxWaitForDomainDataMs) instead
+                this.updateExpirationTimestamp(ctx, _maxWaitForDomainDataMs);
+            }
         }
 
         LOG.trace("[{}][{} -> {}] Processing IP result done", dn, ip, collectorTag);
