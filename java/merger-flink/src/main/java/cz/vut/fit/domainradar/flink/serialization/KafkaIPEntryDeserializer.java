@@ -29,7 +29,6 @@ public class KafkaIPEntryDeserializer
         if (_keyDeserializer == null) {
             final var mapper = Common.makeMapper().build();
             _keyDeserializer = new JsonDeserializer<>(mapper, IPToProcess.class);
-
             _ipResultDeserializer = new JsonDeserializer<>(mapper, new TypeReference<>() {
             });
         }
@@ -37,10 +36,12 @@ public class KafkaIPEntryDeserializer
         IPToProcess key = _keyDeserializer.deserialize(consumerRecord.topic(), consumerRecord.key());
 
         var value = consumerRecord.value();
-        var statusMeta = this.parseStatusMeta(value);
 
-        // TODO: Use tags
+        // TODO: Include the collector tag directly in the value. Use the tag directly for KafkaIPEntry
+        //       instead of deserializing the value as CommonIPResult<JsonNode> and parse the statusCode
+        //       and error using parseStatusMeta.
         // byte collectorTag = value[value.length - 1];
+
         var deserialized = _ipResultDeserializer.deserialize(consumerRecord.topic(), value);
         var collectorTagOrNull = TagRegistry.TAGS.get(deserialized.collector());
         if (collectorTagOrNull == null) {
@@ -48,9 +49,10 @@ public class KafkaIPEntryDeserializer
                     deserialized.collector());
             return;
         }
+
         var collectorTag = collectorTagOrNull.byteValue();
         collector.collect(new KafkaIPEntry(key.dn(), key.ip(), consumerRecord.value(),
-                statusMeta.statusCode(), statusMeta.error(), collectorTag, consumerRecord.topic(),
+                deserialized.statusCode(), deserialized.error(), collectorTag, consumerRecord.topic(),
                 consumerRecord.partition(), consumerRecord.offset(), consumerRecord.timestamp()));
     }
 

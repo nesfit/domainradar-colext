@@ -5,21 +5,16 @@ import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.connector.kafka.source.reader.deserializer.KafkaRecordDeserializationSchema;
 import org.apache.flink.util.Collector;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.apache.kafka.common.serialization.Deserializer;
-import org.apache.kafka.common.serialization.StringDeserializer;
+
+import java.nio.charset.StandardCharsets;
 
 public class KafkaDomainEntryDeserializer
         extends CommonDeserializer
         implements KafkaRecordDeserializationSchema<KafkaDomainEntry> {
-    private transient Deserializer<String> _keyDeserializer;
 
     @Override
     public void deserialize(ConsumerRecord<byte[], byte[]> consumerRecord, Collector<KafkaDomainEntry> collector) {
-        if (_keyDeserializer == null) {
-            _keyDeserializer = new StringDeserializer();
-        }
-
-        String key = _keyDeserializer.deserialize(consumerRecord.topic(), consumerRecord.key());
+        var key = new String(consumerRecord.key(), StandardCharsets.UTF_8);
         var statusMeta = this.parseStatusMeta(consumerRecord.value());
 
         collector.collect(new KafkaDomainEntry(key, consumerRecord.value(), statusMeta.statusCode(), statusMeta.error(),

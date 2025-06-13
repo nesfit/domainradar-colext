@@ -19,6 +19,11 @@ public class KafkaSerializer<K> implements KafkaRecordSerializationSchema<Tuple2
     private final boolean _isKeyString;
     private transient Serializer<K> _keySerializer;
 
+    public KafkaSerializer(@NotNull String targetTopic, boolean isKeyString) {
+        _targetTopic = targetTopic;
+        _isKeyString = isKeyString;
+    }
+
     @Override
     public void open(SerializationSchema.InitializationContext context, KafkaSinkContext sinkContext) throws Exception {
         KafkaRecordSerializationSchema.super.open(context, sinkContext);
@@ -31,12 +36,6 @@ public class KafkaSerializer<K> implements KafkaRecordSerializationSchema<Tuple2
             _keySerializer = new JsonSerializer<>(objectMapper);
         }
     }
-
-    public KafkaSerializer(@NotNull String targetTopic, boolean isKeyString) {
-        _targetTopic = targetTopic;
-        _isKeyString = isKeyString;
-    }
-
 
     @Nullable
     @Override
