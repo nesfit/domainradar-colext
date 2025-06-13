@@ -6,6 +6,8 @@ import org.jetbrains.annotations.Nullable;
 /**
  * A POJO representing a domain-based collector result entry in Kafka.
  * It contains the key (domain name), value, status (result) code, topic, partition, offset, and timestamp.
+ * The data of the entry is kept in its serialized, byte-array form,
+ * as it is not necessary to deserialize it for the merger's operations.
  */
 public class KafkaDomainEntry implements KafkaEntry {
 

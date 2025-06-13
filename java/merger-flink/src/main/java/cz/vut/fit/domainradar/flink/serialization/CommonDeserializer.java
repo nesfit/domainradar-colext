@@ -15,10 +15,10 @@ public abstract class CommonDeserializer {
     }
 
     /**
-     * Parses the status code and error message only from a JSON-serialized {@link Result}.
+     * Parses the status code and error message only from a JSON-serialized collection {@link Result}.
      *
-     * @param resultInput The bytes of a JSON-serialized Result.
-     * @return The status code.
+     * @param resultInput The bytes of a JSON-serialized collection {@link Result}.
+     * @return A {@link StatusMeta} object containing the status code and error message.
      */
     public StatusMeta parseStatusMeta(byte[] resultInput) {
         if (_jsonFactory == null) {

@@ -6,6 +6,9 @@ import org.jetbrains.annotations.Nullable;
 /**
  * A POJO representing an IP-based collector result entry in Kafka.
  * It contains the key formed as a (domain name, IP) pair, value, topic, partition, offset, and timestamp.
+ * The collector is identified by a collector tag, as registered in the {@link cz.vut.fit.domainradar.serialization.TagRegistry}.
+ * The data of the entry is kept in its serialized, byte-array form,
+ * as it is not necessary to deserialize it for the merger's operations.
  */
 public class KafkaIPEntry implements KafkaEntry {
 
@@ -113,10 +116,22 @@ public class KafkaIPEntry implements KafkaEntry {
         this.ip = ip;
     }
 
+    /**
+     * Returns the collector tag, which is a byte value representing the collector.
+     * The tag is registered in the {@link cz.vut.fit.domainradar.serialization.TagRegistry}.
+     *
+     * @return The collector tag.
+     */
     public byte getCollectorTag() {
         return this.collectorTag;
     }
 
+    /**
+     * Sets the collector tag, which is a byte value representing the collector.
+     * The tag should be registered in the {@link cz.vut.fit.domainradar.serialization.TagRegistry}.
+     *
+     * @param collectorTag The collector tag to set.
+     */
     public void setCollectorTag(byte collectorTag) {
         this.collectorTag = collectorTag;
     }

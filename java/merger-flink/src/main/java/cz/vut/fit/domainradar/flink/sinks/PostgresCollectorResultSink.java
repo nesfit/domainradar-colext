@@ -25,8 +25,7 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * A Flink sink that stores {@link KafkaMergedResult} objects into a PostgreSQL database.
- * It performs the same operations as the former {@code process_collection_results()} procedure.
+ * A Flink sink that stores collection results (meta)data into a PostgreSQL database in a structured way.
  */
 public class PostgresCollectorResultSink implements Sink<KafkaMergedResult> {
 
