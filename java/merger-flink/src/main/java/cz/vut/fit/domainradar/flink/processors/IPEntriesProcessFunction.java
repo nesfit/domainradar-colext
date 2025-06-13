@@ -1,5 +1,10 @@
-package cz.vut.fit.domainradar;
+package cz.vut.fit.domainradar.flink.processors;
 
+import cz.vut.fit.domainradar.MergerConfig;
+import cz.vut.fit.domainradar.flink.models.ResultFitnessComparator;
+import cz.vut.fit.domainradar.flink.models.KafkaDomainAggregate;
+import cz.vut.fit.domainradar.flink.models.KafkaIPEntry;
+import cz.vut.fit.domainradar.flink.models.KafkaMergedResult;
 import cz.vut.fit.domainradar.serialization.TagRegistry;
 import org.apache.flink.api.common.functions.OpenContext;
 import org.apache.flink.api.common.state.MapState;
@@ -115,8 +120,8 @@ public class IPEntriesProcessFunction extends KeyedCoProcessFunction<String, Kaf
                                 KeyedCoProcessFunction<String, KafkaIPEntry, KafkaDomainAggregate, KafkaMergedResult>.Context ctx,
                                 Collector<KafkaMergedResult> out) throws Exception {
         final var dn = ctx.getCurrentKey();
-        final var ip = value.ip;
-        final var collectorTag = value.collectorTag;
+        final var ip = value.getIP();
+        final var collectorTag = value.getCollectorTag();
         final var key = Tuple2.of(ip, collectorTag);
 
         var shouldProcess = true;

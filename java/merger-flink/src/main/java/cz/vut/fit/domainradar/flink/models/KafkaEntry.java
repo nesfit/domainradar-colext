@@ -1,4 +1,4 @@
-package cz.vut.fit.domainradar;
+package cz.vut.fit.domainradar.flink.models;
 
 import org.jetbrains.annotations.NotNull;
 

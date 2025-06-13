@@ -1,7 +1,9 @@
-package cz.vut.fit.domainradar;
+package cz.vut.fit.domainradar.flink.serialization;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
+import cz.vut.fit.domainradar.Common;
+import cz.vut.fit.domainradar.flink.models.KafkaIPEntry;
 import cz.vut.fit.domainradar.models.IPToProcess;
 import cz.vut.fit.domainradar.models.results.CommonIPResult;
 import cz.vut.fit.domainradar.serialization.JsonDeserializer;

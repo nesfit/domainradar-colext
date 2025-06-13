@@ -1,4 +1,4 @@
-package cz.vut.fit.domainradar.db;
+package cz.vut.fit.domainradar.flink.sinks;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -7,6 +7,10 @@ import cz.vut.fit.domainradar.models.ip.GeoIPData;
 import cz.vut.fit.domainradar.models.ip.NERDData;
 import cz.vut.fit.domainradar.models.results.CommonIPResult;
 import cz.vut.fit.domainradar.serialization.TagRegistry;
+import cz.vut.fit.domainradar.flink.models.KafkaDomainAggregate;
+import cz.vut.fit.domainradar.flink.models.KafkaDomainEntry;
+import cz.vut.fit.domainradar.flink.models.KafkaIPEntry;
+import cz.vut.fit.domainradar.flink.models.KafkaMergedResult;
 import org.apache.flink.api.connector.sink2.Sink;
 import org.apache.flink.api.connector.sink2.SinkWriter;
 import org.apache.flink.api.connector.sink2.WriterInitContext;

@@ -127,7 +127,7 @@
                                         implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                                 <transformer
                                         implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                    <mainClass>cz.vut.fit.domainradar.DataStreamJob</mainClass>
+                                    <mainClass>cz.vut.fit.domainradar.flink.DataStreamJob</mainClass>
                                 </transformer>
                             </transformers>
                         </configuration>

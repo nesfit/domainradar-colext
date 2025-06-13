@@ -1,4 +1,4 @@
-package cz.vut.fit.domainradar;
+package cz.vut.fit.domainradar.flink.serialization;
 
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;

@@ -1,6 +1,18 @@
-package cz.vut.fit.domainradar;
+package cz.vut.fit.domainradar.flink;
 
-import cz.vut.fit.domainradar.db.PostgresCollectorResultSink;
+import cz.vut.fit.domainradar.MergerConfig;
+import cz.vut.fit.domainradar.Topics;
+import cz.vut.fit.domainradar.flink.sinks.PostgresCollectorResultSink;
+import cz.vut.fit.domainradar.flink.models.KafkaDomainAggregate;
+import cz.vut.fit.domainradar.flink.models.KafkaDomainEntry;
+import cz.vut.fit.domainradar.flink.models.KafkaIPEntry;
+import cz.vut.fit.domainradar.flink.models.KafkaMergedResult;
+import cz.vut.fit.domainradar.flink.processors.DomainEntriesProcessFunction;
+import cz.vut.fit.domainradar.flink.processors.IPEntriesProcessFunction;
+import cz.vut.fit.domainradar.flink.processors.SerdeMappingFunction;
+import cz.vut.fit.domainradar.flink.serialization.KafkaDomainEntryDeserializer;
+import cz.vut.fit.domainradar.flink.serialization.KafkaIPEntryDeserializer;
+import cz.vut.fit.domainradar.flink.serialization.KafkaSerializer;
 import cz.vut.fit.domainradar.serialization.TagRegistry;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.connector.sink2.Sink;

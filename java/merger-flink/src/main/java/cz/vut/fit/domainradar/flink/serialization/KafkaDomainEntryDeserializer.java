@@ -1,5 +1,6 @@
-package cz.vut.fit.domainradar;
+package cz.vut.fit.domainradar.flink.serialization;
 
+import cz.vut.fit.domainradar.flink.models.KafkaDomainEntry;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.connector.kafka.source.reader.deserializer.KafkaRecordDeserializationSchema;
 import org.apache.flink.util.Collector;

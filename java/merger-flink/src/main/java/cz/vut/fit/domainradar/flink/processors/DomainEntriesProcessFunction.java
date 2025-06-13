@@ -1,5 +1,11 @@
-package cz.vut.fit.domainradar;
+package cz.vut.fit.domainradar.flink.processors;
 
+import cz.vut.fit.domainradar.Common;
+import cz.vut.fit.domainradar.MergerConfig;
+import cz.vut.fit.domainradar.Topics;
+import cz.vut.fit.domainradar.flink.models.ResultFitnessComparator;
+import cz.vut.fit.domainradar.flink.models.KafkaDomainAggregate;
+import cz.vut.fit.domainradar.flink.models.KafkaDomainEntry;
 import cz.vut.fit.domainradar.models.results.DNSResult;
 import cz.vut.fit.domainradar.serialization.JsonDeserializer;
 import org.apache.flink.api.common.functions.AggregateFunction;

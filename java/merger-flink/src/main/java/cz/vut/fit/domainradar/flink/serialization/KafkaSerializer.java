@@ -1,5 +1,6 @@
-package cz.vut.fit.domainradar;
+package cz.vut.fit.domainradar.flink.serialization;
 
+import cz.vut.fit.domainradar.Common;
 import cz.vut.fit.domainradar.serialization.JsonSerializer;
 import org.apache.flink.api.common.serialization.SerializationSchema;
 import org.apache.flink.api.java.tuple.Tuple2;
