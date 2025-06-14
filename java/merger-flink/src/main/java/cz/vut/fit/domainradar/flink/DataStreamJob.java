@@ -171,7 +171,7 @@ public class DataStreamJob {
                             new HashMap<>(Map.of(kafkaIPEntry.getIP(), new HashMap<>(Map.of(qRadarTag.byteValue(), kafkaIPEntry))))))
                     .uid("qradar-to-merged-results")
                     .sinkTo(postgresSink)
-                    .uid("postgres-sink-qradar");
+                    .uid("postgres-sink-qradar-collector-results");
         }
 
         // Sink the unified DN-IP data to Kafka
@@ -212,7 +212,9 @@ public class DataStreamJob {
 
         // ==== A side pipeline for QRadar data ====
         if (postgresQRadarSink != null) {
-            qradarStream.sinkTo(postgresQRadarSink);
+            qradarStream
+                    .sinkTo(postgresQRadarSink)
+                    .uid("postgres-sink-qradar-structured");
         }
     }
 
