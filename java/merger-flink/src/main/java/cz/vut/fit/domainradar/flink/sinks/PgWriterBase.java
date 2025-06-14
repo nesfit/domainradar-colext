@@ -2,15 +2,17 @@ package cz.vut.fit.domainradar.flink.sinks;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import cz.vut.fit.domainradar.Common;
+import cz.vut.fit.domainradar.flink.models.HasDomainName;
 import org.apache.flink.api.connector.sink2.SinkWriter;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 
 import java.io.IOException;
 import java.sql.*;
+import java.time.Instant;
 
 @SuppressWarnings("SqlNoDataSourceInspection")
-abstract class PgWriterBase<T> implements SinkWriter<T> {
+abstract class PgWriterBase<T extends HasDomainName> implements SinkWriter<T> {
     protected final Connection connection;
     protected final Logger logger;
     protected final ObjectMapper mapper;
@@ -56,7 +58,9 @@ abstract class PgWriterBase<T> implements SinkWriter<T> {
             } catch (SQLException ex) {
                 logger.error("Rollback failed", ex);
             }
-            throw new IOException("Failed to store merged result", e);
+            this.tryInsertDomainError(value.getDomainName(),
+                    "Unhandled processing exception", e);
+            throw new IOException("Failed to process an entry", e);
         }
     }
 
@@ -108,18 +112,33 @@ abstract class PgWriterBase<T> implements SinkWriter<T> {
         }
     }
 
+    private void tryInsertDomainError(String domainName, String message, Exception e) {
+        try {
+            logger.debug("[{}] Inserting top-level domain error", domainName);
+            long domainId = getOrCreateDomain(domainName, Instant.now().toEpochMilli());
+            insertDomainError(domainId, message, e);
+            connection.commit();
+        } catch (SQLException ex) {
+            logger.error("[{}] Failed to insert top-level domain error", domainName, ex);
+            try {
+                connection.rollback();
+            } catch (SQLException exc) {
+                logger.error("Rollback failed", ex);
+            }
+        }
+    }
+
     /**
      * Inserts an error entry into the Domain_Errors table.
      *
      * @param domainId The ID of the domain.
-     * @param ts       The timestamp of the error.
      * @param message  The error message.
      * @param e        The exception that caused the error, or null if not applicable.
      * @throws SQLException If an SQL error occurs.
      */
-    protected void insertDomainError(long domainId, long ts, String message, Exception e) throws SQLException {
+    protected void insertDomainError(long domainId, String message, Exception e) throws SQLException {
         insertDomainError.setLong(1, domainId);
-        insertDomainError.setTimestamp(2, new Timestamp(ts));
+        insertDomainError.setTimestamp(2, Timestamp.from(Instant.now()));
         insertDomainError.setString(3, this.entrySourceId);
         insertDomainError.setString(4, message);
         if (e instanceof SQLException se) {

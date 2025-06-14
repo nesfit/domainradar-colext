@@ -7,16 +7,7 @@ import org.jetbrains.annotations.NotNull;
  * This interface defines the structure of a Kafka result record, including the associated domain name,
  * the serialized value, status code, topic, partition, offset, and timestamp.
  */
-public interface KafkaEntry {
-
-    /**
-     * Gets the domain name associated with the Kafka entry.
-     *
-     * @return The domain name as a non-null string.
-     */
-    @NotNull
-    String getDomainName();
-
+public interface KafkaEntry extends HasDomainName {
     /**
      * Gets the serialized collection result.
      *

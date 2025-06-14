@@ -125,8 +125,8 @@ public class PostgresQRadarSink implements Sink<KafkaIPEntry> {
                 return data.data();
             } catch (Exception e) {
                 LOG.warn("[{}][{}] Failed to deserialize QRadar data", entry.getDomainName(), entry.getIP(), e);
-                insertDomainError(domainId, entry.getTimestamp(),
-                        "Cannot parse QRadar result JSON.", e);
+                insertDomainError(domainId,
+                        "Cannot deserialize QRadar result JSON.", e);
                 return null;
             }
         }

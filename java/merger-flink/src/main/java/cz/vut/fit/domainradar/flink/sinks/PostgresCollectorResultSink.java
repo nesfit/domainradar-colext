@@ -1,6 +1,7 @@
 package cz.vut.fit.domainradar.flink.sinks;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import cz.vut.fit.domainradar.*;
 import cz.vut.fit.domainradar.models.ip.GeoIPData;
 import cz.vut.fit.domainradar.models.ip.NERDData;
@@ -148,19 +149,6 @@ public class PostgresCollectorResultSink implements Sink<KafkaMergedResult> {
                 if (rs.next()) {
                     return rs.getLong(1);
                 }
-            } catch (SQLException e) {
-                if (e.getSQLState().equals("22P02")) {
-                    // Invalid IP (cast error) - insert with a placeholder IP (unless we're already doing that)
-                    if (!ip.equals("0.0.0.0")) {
-                        return this.getOrCreateIp(domainId, "0.0.0.0", domainName);
-                    } else {
-                        // Shouldn't happen
-                        throw e;
-                    }
-                } else {
-                    // The error is not cast-related, propagate
-                    throw e;
-                }
             }
             LOG.trace("[{}][{}] Didn't get IP from upsert, trying get again", domainName, ip);
             selectIp.setLong(1, domainId);
@@ -179,7 +167,7 @@ public class PostgresCollectorResultSink implements Sink<KafkaMergedResult> {
             String collector = Topics.TOPICS_TO_COLLECTOR_ID.get(entry.getTopic());
             if (collector == null) {
                 LOG.warn("[{}] Unknown collector for topic {}", domainName, entry.getTopic());
-                insertDomainError(domainId, entry.getTimestamp(),
+                insertDomainError(domainId,
                         "Unknown collector: " + entry.getTopic(), null);
                 return;
             }
@@ -199,7 +187,7 @@ public class PostgresCollectorResultSink implements Sink<KafkaMergedResult> {
             String collector = TagRegistry.COLLECTOR_NAMES.get((int) collectorTag);
             if (collector == null) {
                 LOG.warn("[{}][{}] Unknown IP collector tag {}", domainName, ip, collectorTag);
-                insertDomainError(domainId, entry.getTimestamp(),
+                insertDomainError(domainId,
                         "Unknown collector tag: " + collectorTag, null);
                 return;
             }
@@ -240,7 +228,7 @@ public class PostgresCollectorResultSink implements Sink<KafkaMergedResult> {
                     return null;
                 }
             } catch (Exception e) {
-                insertDomainError(domainId, ts, "Cannot parse JSON.", e);
+                insertDomainError(domainId, "Cannot deserialize JSON.", e);
                 return null;
             }
         }
@@ -267,9 +255,48 @@ public class PostgresCollectorResultSink implements Sink<KafkaMergedResult> {
                     }
                 }
             }
-            insertDomainError(domainId, ts, "Unknown collector: " + name, null);
+            insertDomainError(domainId, "Unknown collector: " + name, null);
             return null;
         }
+
+        private boolean isJsonbValid(byte[] rawData) {
+            JsonNode tree;
+            try {
+                tree = mapper.readTree(rawData);
+                return validateJsonNode(tree);
+            } catch (IOException e) {
+                return false;
+            }
+        }
+
+        private boolean validateJsonNode(JsonNode node) {
+            final var nullChar = "\u0000";
+
+            if (node.isObject()) {
+                var fields = node.fields();
+                while (fields.hasNext()) {
+                    var field = fields.next();
+                    if (!validateJsonNode(field.getValue())) {
+                        return false;
+                    }
+                }
+                return true;
+            } else if (node.isArray()) {
+                for (JsonNode element : node) {
+                    if (!validateJsonNode(element)) {
+                        return false;
+                    }
+                }
+                return true;
+            } else if (node.isTextual()) {
+                var text = node.textValue();
+                // Make a CharSequence with only the NUL character
+                return !text.contains(nullChar);
+            } else {
+                return true;
+            }
+        }
+
 
         /**
          * Inserts a collection result into the database.
@@ -299,11 +326,18 @@ public class PostgresCollectorResultSink implements Sink<KafkaMergedResult> {
                 insertResult.setString(5, error);
             }
             insertResult.setTimestamp(6, new Timestamp(ts));
-            if (storeRawData) {
-                insertResult.setString(7, new String(rawData));
-            } else {
-                insertResult.setNull(7, Types.VARCHAR);
+
+            if (storeRawData && rawData != null) {
+                if (isJsonbValid(rawData)) {
+                    insertResult.setString(7, new String(rawData));
+                    insertResult.executeUpdate();
+                    return;
+                } else {
+                    insertDomainError(domainId, "Cannot deserialize JSON.", null);
+                }
             }
+
+            insertResult.setNull(7, Types.VARCHAR);
             insertResult.executeUpdate();
         }
 
