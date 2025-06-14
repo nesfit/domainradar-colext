@@ -43,6 +43,6 @@ RUN --mount=type=cache,target=/root/.m2/ --mount=type=cache,target=/src/target m
     cp "$OUTPUT_JAR" target.jar
 
 # Use the Flink image for runtime
-FROM docker.io/library/flink:1.20.0-scala_2.12-java17 AS runtime
+FROM docker.io/library/flink:1.20.1-scala_2.12-java17 AS runtime
 COPY --from=build_component /src/target.jar /opt/flink/usrlib/merger-flink.jar
 RUN mkdir /flink-data && chown 9999:9999 /flink-data

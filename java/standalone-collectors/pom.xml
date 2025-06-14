@@ -80,7 +80,13 @@
             </plugin>
             <plugin>
                 <artifactId>maven-surefire-plugin</artifactId>
-                <version>3.5.1</version>
+                <configuration>
+                    <argLine>
+                        -javaagent:${settings.localRepository}/org/mockito/mockito-core/${mockito.version}/mockito-core-${mockito.version}.jar
+                        -Xshare:off
+                        -Djdk.httpclient.allowRestrictedHeaders=host
+                    </argLine>
+                </configuration>
             </plugin>
         </plugins>
     </build>
