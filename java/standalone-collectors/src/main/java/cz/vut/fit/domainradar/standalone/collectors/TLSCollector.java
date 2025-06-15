@@ -20,7 +20,6 @@ import pl.tlinkowski.unij.api.UniLists;
 
 import javax.net.ssl.*;
 import java.security.NoSuchAlgorithmException;
-import java.security.cert.X509Certificate;
 import java.util.Arrays;
 import java.util.Properties;
 import java.util.concurrent.*;
@@ -41,22 +40,31 @@ public class TLSCollector
 
     private final KafkaProducer<String, TLSResult> _producer;
     private final ExecutorService _executor;
-    private final int _timeout;
+    private final int _timeout, _timeoutHTTPOnly;
     private final boolean _tryHTTPOnly;
     private final HTTPSFetcherBase _collector;
 
     public TLSCollector(@NotNull ObjectMapper jsonMapper, @NotNull String appName, @NotNull Properties properties) {
         super(jsonMapper, appName, properties,
                 Serdes.String(), Serdes.String());
+
         _timeout = Integer.parseInt(properties.getProperty(CollectorConfig.TLS_TIMEOUT_MS_CONFIG,
                 CollectorConfig.TLS_TIMEOUT_MS_DEFAULT));
-        _tryHTTPOnly = Boolean.parseBoolean(properties.getProperty(CollectorConfig.TLS_TRY_HTTP_ONLY_CONFIG,
-                CollectorConfig.TLS_TRY_HTTP_ONLY_DEFAULT));
+        _timeoutHTTPOnly = Integer.parseInt(properties.getProperty(CollectorConfig.TLS_HTTPONLY_TIMEOUT_MS_CONFIG,
+                CollectorConfig.TLS_HTTPONLY_TIMEOUT_MS_DEFAULT));
+
+        _tryHTTPOnly = Boolean.parseBoolean(properties.getProperty(CollectorConfig.TLS_HTTPONLY_ENABLED_CONFIG,
+                CollectorConfig.TLS_HTTPONLY_ENABLED_DEFAULT));
+
         var maxRedirects = Integer.parseInt(properties.getProperty(CollectorConfig.TLS_MAX_REDIRECTS_CONFIG,
                 CollectorConfig.TLS_MAX_REDIRECTS_DEFAULT));
+        var maxRedirectsHTTPOnly = Integer.parseInt(
+                properties.getProperty(CollectorConfig.TLS_HTTPONLY_MAX_REDIRECTS_CONFIG,
+                        CollectorConfig.TLS_HTTPONLY_MAX_REDIRECTS_DEFAULT));
 
         _executor = Executors.newVirtualThreadPerTaskExecutor();
-        _collector = new HTTPSFetcherImpl(maxRedirects, _timeout, _executor, Logger);
+        _collector = new HTTPSFetcherImpl(maxRedirects, _timeout, maxRedirectsHTTPOnly, _timeoutHTTPOnly,
+                _executor, Logger);
         _producer = super.createProducer(new StringSerializer(),
                 JsonSerde.of(jsonMapper, TLSResult.class).serializer());
 
@@ -78,6 +86,7 @@ public class TLSCollector
         // The timeout is used for connect and for the communication, so the absolute
         // processing bound must be slightly over its double
         final long futureTimeout = (long) (_timeout * 2.1);
+        final long httpFutureTimeout = (long) (_timeoutHTTPOnly * 1.1);
         buildProcessor(0, futureTimeout);
 
         _parallelProcessor.subscribe(UniLists.of(Topics.IN_TLS));
@@ -95,7 +104,7 @@ public class TLSCollector
                     // Try HTTP to fetch the HTML
                     var httpFuture = _collector.collectHTTPOnly(dn, ip);
                     try {
-                        var html = httpFuture.orTimeout(futureTimeout, TimeUnit.MILLISECONDS).join();
+                        var html = httpFuture.orTimeout(httpFutureTimeout, TimeUnit.MILLISECONDS).join();
                         result = new TLSResult(result.statusCode(), result.error(),
                                 result.lastAttempt(), result.tlsData(), html);
                     } catch (CompletionException e) {

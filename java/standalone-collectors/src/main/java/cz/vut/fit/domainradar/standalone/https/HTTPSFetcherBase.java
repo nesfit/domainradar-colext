@@ -47,13 +47,18 @@ public abstract class HTTPSFetcherBase implements Closeable, AutoCloseable {
                     "Connection: close\r\n\r\n";
 
     protected final Logger _logger;
+    protected HttpClient _httpClient;
+    protected final int _maxRedirectsHttp;
+    protected final int _timeoutHttp;
     protected final int _maxRedirects;
     protected final int _timeout;
-    protected HttpClient _httpClient;
 
-    public HTTPSFetcherBase(int maxRedirects, int timeoutMs, @NotNull Logger logger) {
+    public HTTPSFetcherBase(int maxRedirects, int timeoutMs, int maxRedirectsHttp, int timeoutMsHttp,
+                            @NotNull Logger logger) {
         _maxRedirects = maxRedirects;
         _timeout = timeoutMs;
+        _maxRedirectsHttp = maxRedirectsHttp;
+        _timeoutHttp = timeoutMsHttp;
         _logger = logger;
     }
 
@@ -313,7 +318,7 @@ public abstract class HTTPSFetcherBase implements Closeable, AutoCloseable {
     protected CompletableFuture<String> fetchHTTPContent(@NotNull URI location,
                                                          @Nullable String targetIp, int counter) {
         HttpRequest.Builder reqBuilder = HttpRequest.newBuilder()
-                .timeout(Duration.ofMillis(_timeout))
+                .timeout(Duration.ofMillis(_timeoutHttp))
                 .header("Accept", "*/*")
                 .GET();
 
@@ -331,8 +336,9 @@ public abstract class HTTPSFetcherBase implements Closeable, AutoCloseable {
             // This requires the -Djdk.httpclient.allowRestrictedHeaders=host JVM property to be set
             _logger.trace("[{}] Changing target URI to '{}', using Host header", host, location);
             reqBuilder = reqBuilder
-                    .uri(location)
-                    .header("Host", host);
+                    .uri(location);
+            if (host != null && !host.isEmpty())
+                reqBuilder = reqBuilder.header("Host", host);
         } else {
             // If no target IP is provided, use the original URI
             _logger.trace("[{}] No target IP provided, using the hostname", host);
@@ -359,7 +365,7 @@ public abstract class HTTPSFetcherBase implements Closeable, AutoCloseable {
             // Check if the response is a redirect
             if (response.statusCode() >= 300 && response.statusCode() < 400) {
                 // If the maximum number of redirects has been reached, return null
-                if (counter == _maxRedirects) {
+                if (counter == _maxRedirectsHttp) {
                     _logger.trace("[{}] Maximum redirects limit reached", host);
                     return CompletableFuture.completedFuture(null);
                 }

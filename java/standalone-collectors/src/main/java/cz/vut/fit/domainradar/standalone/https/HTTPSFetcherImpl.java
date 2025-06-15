@@ -16,8 +16,9 @@ public class HTTPSFetcherImpl extends HTTPSFetcherBase {
 
     private final ExecutorService _executor;
 
-    public HTTPSFetcherImpl(int maxRedirects, int timeoutMs, ExecutorService executor, Logger logger) {
-        super(maxRedirects, timeoutMs, logger);
+    public HTTPSFetcherImpl(int maxRedirects, int timeoutMs, int maxRedirectsHttp, int timeoutMsHttp,
+                            ExecutorService executor, Logger logger) {
+        super(maxRedirects, timeoutMs, maxRedirectsHttp, timeoutMsHttp, logger);
         _executor = executor;
     }
 
@@ -25,7 +26,7 @@ public class HTTPSFetcherImpl extends HTTPSFetcherBase {
     protected HttpClient buildHttpClient() {
         return HttpClient.newBuilder()
                 .followRedirects(HttpClient.Redirect.NEVER)
-                .connectTimeout(Duration.ofMillis(_timeout))
+                .connectTimeout(Duration.ofMillis(_timeoutHttp))
                 .version(HttpClient.Version.HTTP_1_1)
                 .executor(_executor)
                 .build();
