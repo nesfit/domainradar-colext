@@ -273,6 +273,9 @@ public abstract class HTTPSFetcherBase implements Closeable, AutoCloseable {
             var uri = new URI(newLocation);
             // Handle relative redirects
             if (!uri.isAbsolute()) {
+                if (!newLocation.startsWith("/")) {
+                    newLocation = "/" + newLocation;
+                }
                 uri = new URI("https", currentLocation, newLocation, "");
             }
             // Check if URI is HTTPS
@@ -382,6 +385,9 @@ public abstract class HTTPSFetcherBase implements Closeable, AutoCloseable {
                     var uri = new URI(newLocation);
                     // Handle relative redirects
                     if (!uri.isAbsolute()) {
+                        if (!newLocation.startsWith("/")) {
+                            newLocation = "/" + newLocation;
+                        }
                         uri = new URI(finalLocation.getScheme(), host, newLocation, "");
                         // Use the original target IP for relative redirects
                         return this.fetchHTTPContent(uri, targetIp, counter + 1);
