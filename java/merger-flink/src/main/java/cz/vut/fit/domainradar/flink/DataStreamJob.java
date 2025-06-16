@@ -142,23 +142,27 @@ public class DataStreamJob {
         var dnData = zoneStream.union(dnsStream, tlsStream, rdapDnStream)
                 .keyBy(KafkaDomainEntry::getDomainName)
                 .process(new DomainEntriesProcessFunction())
+                .name("Process domain entries")
                 .uid("dn-merging-processor")
                 .keyBy(KafkaDomainAggregate::getDomainName);
 
         // Only use the IP merger for entries that actually carried IPs to process
         var dnDataWithIps = dnData
                 .filter(dnAggregate -> !dnAggregate.getDNSIPs().isEmpty())
+                .name("Filter DN data with IPs")
                 .uid("dn-data-with-ips-filter")
                 .keyBy(KafkaDomainAggregate::getDomainName);
 
         var mergedResults = ipDataStream.connect(dnDataWithIps)
                 .process(new IPEntriesProcessFunction())
+                .name("Process IP entries")
                 .uid("dn-ip-final-merging-processor");
 
         if (postgresSink != null) {
             // Sink the unified DN-IP metadata to PostgreSQL
             mergedResults
                     .sinkTo(postgresSink)
+                    .name("Sink collection results to Postgres")
                     .uid("postgres-sink-with-ips");
 
             // Create "fake merged results" with only the QRadar entries, and sink them to PostgreSQL as the other
@@ -169,51 +173,63 @@ public class DataStreamJob {
                             new KafkaDomainAggregate(kafkaIPEntry.getDomainName(), null, null, null, null),
                             // This must not be an immutable map to avoid issues with Kryo 2.24
                             new HashMap<>(Map.of(kafkaIPEntry.getIP(), new HashMap<>(Map.of(qRadarTag.byteValue(), kafkaIPEntry))))))
+                    .name("Map QRadar results to merged results")
                     .uid("qradar-to-merged-results")
                     .sinkTo(postgresSink)
+                    .name("Sink QRadar results to Postgres")
                     .uid("postgres-sink-qradar-collector-results");
         }
 
         // Sink the unified DN-IP data to Kafka
         var mergedData = mergedResults
                 .map(new SerdeMappingFunction())
+                .name("Map merged results to serialized tuples")
                 .uid("serde-mapper-with-ips")
                 .filter(tuple -> tuple.f0 != null)
+                .name("Filter non-null results")
                 .uid("result-with-ips-not-null-filter");
         mergedData
                 .sinkTo(sink)
+                .name("Sink merged results to Kafka")
                 .uid("entries-with-ips-sink");
 
         // Handle the IP-less merged results from DN-based collectors
         var dnDataWithoutIps = dnData
                 .filter(dnAggregate -> dnAggregate.getDNSIPs().isEmpty())
+                .name("Filter DN data without IPs")
                 .uid("dn-data-without-ips-filter")
                 .keyBy(KafkaDomainAggregate::getDomainName);
         var resultsWithoutIpsKM = dnDataWithoutIps
                 .map(dnAggregate -> new KafkaMergedResult(dnAggregate.getDomainName(), dnAggregate, null))
+                .name("Map DN results to merged results")
                 .uid("map-to-merged-results");
 
         if (postgresSink != null) {
             // Sink the unified DN-only metadata to PostgreSQL
             resultsWithoutIpsKM
                     .sinkTo(postgresSink)
+                    .name("Sink collection results without IPs to Postgres")
                     .uid("postgres-sink-without-ips");
         }
 
         // Sink the unified DN-only data to Kafka
         var resultsWithoutIps = resultsWithoutIpsKM
                 .map(new SerdeMappingFunction())
+                .name("Map merged results without IPs to serialized tuples")
                 .uid("serde-mapper-without-ips")
                 .filter(tuple -> tuple.f0 != null)
+                .name("Filter non-null results without IPs")
                 .uid("result-without-ips-not-null-filter");
         resultsWithoutIps
                 .sinkTo(sink)
+                .name("Sink merged results to Kafka")
                 .uid("entries-without-ips-sink");
 
         // ==== A side pipeline for QRadar data ====
         if (postgresQRadarSink != null) {
             qradarStream
                     .sinkTo(postgresQRadarSink)
+                    .name("Sink QRadar results to Postgres")
                     .uid("postgres-sink-qradar-structured");
         }
     }
