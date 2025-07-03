@@ -1,5 +1,8 @@
 # DomainRadar Pipeline
 
+> [!CAUTION]
+> The information below is **not** up to date, it's now kept here mainly for future reference. Refer to the [domainradar](https://github.com/nesfit/domainradar) repository for general information on the setup.
+
 This project contains applications that together make up the core process of DomainRadar:
 - the **data collectors** fetch data on domain names from external sources (such as DNS),
 - the **data merger** combines the data from all the collectors,
