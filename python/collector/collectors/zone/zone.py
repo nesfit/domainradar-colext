@@ -2,7 +2,7 @@
 __author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
 
 import dns.exception
-from dns.resolver import Cache
+from dns.resolver import LRUCache
 
 import common.result_codes as rc
 from collectors.dns_options import DNSCollectorOptions
@@ -26,7 +26,8 @@ class ZoneProcessor(BaseAsyncCollectorProcessor[str, ZoneRequest]):
         component_config = config.get(COLLECTOR, {})
         self._dns_options = DNSCollectorOptions.from_config(component_config)
 
-        cache = Cache()
+        cache_size = config.get("dns_cache_size")
+        cache = LRUCache(cache_size) if cache_size else None
         self._collector = ZoneResolver(self._dns_options, self._logger, cache)
 
     async def process(self, message: Message[str, DNSRequest]) -> list[SimpleMessage]:

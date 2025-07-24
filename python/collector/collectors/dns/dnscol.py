@@ -1,7 +1,7 @@
 """dnscol.py: The processor for the DNS collector."""
 __author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
 
-from dns.resolver import Cache
+from dns.resolver import LRUCache
 
 from collectors.dns.scanner import DNSScanner
 from collectors.dns_options import DNSCollectorOptions
@@ -23,7 +23,8 @@ class DNSProcessor(BaseAsyncCollectorProcessor[str, DNSRequest]):
         component_config = config.get(COLLECTOR, {})
         self._dns_options = DNSCollectorOptions.from_config(component_config)
 
-        cache = Cache()
+        cache_size = config.get("dns_cache_size")
+        cache = LRUCache(cache_size) if cache_size else None
         scanner_child_logger = self._logger.getChild("scanner")
         scanner_child_logger.setLevel(component_config.get("scanner_log_level", "INFO"))
 
