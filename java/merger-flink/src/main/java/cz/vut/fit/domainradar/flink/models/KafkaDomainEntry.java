@@ -1,10 +1,13 @@
-package cz.vut.fit.domainradar;
+package cz.vut.fit.domainradar.flink.models;
 
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
- * A POJO representing a Kafka record with a string key.
- * It contains the key, value, status (result) code, topic, partition, offset, and timestamp.
+ * A POJO representing a domain-based collector result entry in Kafka.
+ * It contains the key (domain name), value, status (result) code, topic, partition, offset, and timestamp.
+ * The data of the entry is kept in its serialized, byte-array form,
+ * as it is not necessary to deserialize it for the merger's operations.
  */
 public class KafkaDomainEntry implements KafkaEntry {
 
@@ -12,23 +15,27 @@ public class KafkaDomainEntry implements KafkaEntry {
     String domainName;
     byte @NotNull [] value;
     int statusCode;
+
+    @Nullable
+    String error;
+
     @NotNull
     String topic;
     int partition;
     long offset;
     long timestamp;
-
     public KafkaDomainEntry() {
         this.domainName = "";
         this.topic = "";
         this.value = new byte[0];
     }
 
-    public KafkaDomainEntry(@NotNull String domainName, byte @NotNull [] value, int statusCode, @NotNull String topic,
-                            int partition, long offset, long timestamp) {
+    public KafkaDomainEntry(@NotNull String domainName, byte @NotNull [] value, int statusCode, @Nullable String error,
+                            @NotNull String topic, int partition, long offset, long timestamp) {
         this.domainName = domainName;
         this.value = value;
         this.statusCode = statusCode;
+        this.error = error;
         this.topic = topic;
         this.partition = partition;
         this.offset = offset;
@@ -58,6 +65,14 @@ public class KafkaDomainEntry implements KafkaEntry {
 
     public void setStatusCode(int statusCode) {
         this.statusCode = statusCode;
+    }
+
+    public @Nullable String getError() {
+        return error;
+    }
+
+    public void setError(@Nullable String error) {
+        this.error = error;
     }
 
     @NotNull

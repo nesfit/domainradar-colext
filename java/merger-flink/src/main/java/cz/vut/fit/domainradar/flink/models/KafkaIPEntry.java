@@ -1,10 +1,14 @@
-package cz.vut.fit.domainradar;
+package cz.vut.fit.domainradar.flink.models;
 
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
- * A tuple representing a Kafka record with a (domain name, IP) pair key.
- * It contains the key fields, value, topic, partition, offset, and timestamp.
+ * A POJO representing an IP-based collector result entry in Kafka.
+ * It contains the key formed as a (domain name, IP) pair, value, topic, partition, offset, and timestamp.
+ * The collector is identified by a collector tag, as registered in the {@link cz.vut.fit.domainradar.serialization.TagRegistry}.
+ * The data of the entry is kept in its serialized, byte-array form,
+ * as it is not necessary to deserialize it for the merger's operations.
  */
 public class KafkaIPEntry implements KafkaEntry {
 
@@ -14,6 +18,8 @@ public class KafkaIPEntry implements KafkaEntry {
     String ip;
     byte @NotNull [] value;
     int statusCode;
+    @Nullable
+    String error;
     byte collectorTag;
     @NotNull
     String topic;
@@ -29,11 +35,13 @@ public class KafkaIPEntry implements KafkaEntry {
     }
 
     public KafkaIPEntry(@NotNull String domainName, @NotNull String ip, byte @NotNull [] value, int statusCode,
-                        byte collectorTag, @NotNull String topic, int partition, long offset, long timestamp) {
+                        @Nullable String error, byte collectorTag,
+                        @NotNull String topic, int partition, long offset, long timestamp) {
         this.domainName = domainName;
         this.ip = ip;
         this.value = value;
         this.statusCode = statusCode;
+        this.error = error;
         this.collectorTag = collectorTag;
         this.topic = topic;
         this.partition = partition;
@@ -108,11 +116,31 @@ public class KafkaIPEntry implements KafkaEntry {
         this.ip = ip;
     }
 
+    /**
+     * Returns the collector tag, which is a byte value representing the collector.
+     * The tag is registered in the {@link cz.vut.fit.domainradar.serialization.TagRegistry}.
+     *
+     * @return The collector tag.
+     */
     public byte getCollectorTag() {
         return this.collectorTag;
     }
 
+    /**
+     * Sets the collector tag, which is a byte value representing the collector.
+     * The tag should be registered in the {@link cz.vut.fit.domainradar.serialization.TagRegistry}.
+     *
+     * @param collectorTag The collector tag to set.
+     */
     public void setCollectorTag(byte collectorTag) {
         this.collectorTag = collectorTag;
+    }
+
+    public @Nullable String getError() {
+        return error;
+    }
+
+    public void setError(@Nullable String error) {
+        this.error = error;
     }
 }

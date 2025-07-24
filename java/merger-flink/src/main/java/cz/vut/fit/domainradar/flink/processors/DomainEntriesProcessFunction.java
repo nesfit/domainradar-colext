@@ -1,5 +1,11 @@
-package cz.vut.fit.domainradar;
+package cz.vut.fit.domainradar.flink.processors;
 
+import cz.vut.fit.domainradar.Common;
+import cz.vut.fit.domainradar.MergerConfig;
+import cz.vut.fit.domainradar.Topics;
+import cz.vut.fit.domainradar.flink.models.ResultFitnessComparator;
+import cz.vut.fit.domainradar.flink.models.KafkaDomainAggregate;
+import cz.vut.fit.domainradar.flink.models.KafkaDomainEntry;
 import cz.vut.fit.domainradar.models.results.DNSResult;
 import cz.vut.fit.domainradar.serialization.JsonDeserializer;
 import org.apache.flink.api.common.functions.AggregateFunction;
@@ -17,6 +23,21 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.time.Duration;
 
+/**
+ * Processes incoming {@link KafkaDomainEntry} domain-based collection results stream keyed by domain name,
+ * aggregates results from the collectors (zone, DNS, RDAP-DN, TLS) and emits a {@link KafkaDomainAggregate} when
+ * all required data is available or when a timeout expires.
+ *
+ * <p>This function maintains state for each key:
+ * <ul>
+ * <li>AggregatingState for partial aggregates.
+ * <li>ValueState for the next expiration timestamp.
+ * <li>ValueState flag indicating if the complete result was already produced.
+ * </ul>
+ *
+ * <p>Timers are registered to enforce maximum entry lifetimes and a grace period after completion.
+ * After the grace period passes, all state for a key (domain name) is cleared.
+ */
 public class DomainEntriesProcessFunction extends KeyedProcessFunction<String, KafkaDomainEntry, KafkaDomainAggregate> {
 
     private transient AggregatingState<KafkaDomainEntry, KafkaDomainAggregate> _domainData;
@@ -30,6 +51,9 @@ public class DomainEntriesProcessFunction extends KeyedProcessFunction<String, K
 
     private static final Logger LOG = LoggerFactory.getLogger(DomainEntriesProcessFunction.class);
 
+    /**
+     * Initializes state descriptors and job parameters for timeouts and deserializer instances.
+     */
     @Override
     public void open(OpenContext openContext) {
         AggregatingStateDescriptor<KafkaDomainEntry, KafkaDomainAggregate, KafkaDomainAggregate> domainDataDescriptor
@@ -56,6 +80,10 @@ public class DomainEntriesProcessFunction extends KeyedProcessFunction<String, K
         _dnsResultDeserializer = new JsonDeserializer<>(mapper, DNSResult.class);
     }
 
+    /**
+     * Handles each incoming {@link KafkaDomainEntry}, aggregates it into the current state,
+     * schedules or cancels timers, and emits a final result when complete data set is available.
+     */
     @Override
     public void processElement(KafkaDomainEntry kafkaDomainEntry,
                                KeyedProcessFunction<String, KafkaDomainEntry, KafkaDomainAggregate>.Context ctx,
@@ -101,6 +129,10 @@ public class DomainEntriesProcessFunction extends KeyedProcessFunction<String, K
         }
     }
 
+    /**
+     * Invoked when an event-time timer fires. Produces incomplete or cleanup results
+     * depending on whether the full data was emitted earlier.
+     */
     @Override
     public void onTimer(long timestamp,
                         KeyedProcessFunction<String, KafkaDomainEntry, KafkaDomainAggregate>.OnTimerContext ctx,
@@ -180,6 +212,21 @@ public class DomainEntriesProcessFunction extends KeyedProcessFunction<String, K
         return dnsResult;
     }
 
+    /**
+     * Returns an aggregate ready for emission if the DNS/TLS requirements are met.
+     * The requirements checked in this method are:
+     * <ul>
+     * <li>DNS result must be present.
+     * <li>If the DNS result bears data, a TLS result must be present if there's a possible source IP (i.e. the DNS
+     *     data contain IPs from A, AAAA, or CNAME.)
+     * </ul>
+     * <p>
+     * Mind that this method should only be called after {@link KafkaDomainAggregate#isMaybeComplete()} returns true,
+     * as this method doesn't check for the presence of the zone and DNS data.
+     *
+     * @return The complete {@link KafkaDomainAggregate}, or null if still waiting.
+     * @throws Exception on polling state.
+     */
     private KafkaDomainAggregate getFinalStateIfComplete() throws Exception {
         var currentState = _domainData.get();
         if (currentState == null)
@@ -214,6 +261,12 @@ public class DomainEntriesProcessFunction extends KeyedProcessFunction<String, K
         return null;
     }
 
+    /**
+     * Utility aggregator combining multiple {@link KafkaDomainEntry} into one {@link KafkaDomainAggregate} based
+     * on the results' usefulness.
+     *
+     * @see ResultFitnessComparator
+     */
     public static final class DomainEntriesAggregator
             implements AggregateFunction<KafkaDomainEntry, KafkaDomainAggregate, KafkaDomainAggregate> {
 

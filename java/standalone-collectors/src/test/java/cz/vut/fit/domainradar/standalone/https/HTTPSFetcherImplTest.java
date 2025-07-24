@@ -42,7 +42,7 @@ class HTTPSFetcherImplTest {
         mockResponse2 = mock(HttpResponse.class);
 
         // Subclass implementation so we can inject our mockHttpClient
-        fetcher = new HTTPSFetcherImpl(2, 1_000,
+        fetcher = new HTTPSFetcherImpl(2, 1_000, 2, 1_000,
                 Executors.newSingleThreadExecutor(),
                 dummyLogger) {
             @Override
@@ -120,7 +120,7 @@ class HTTPSFetcherImplTest {
     @Test
     void collectHTTPOnly_exceedMaxRedirects_returnsNull() throws Exception {
         // shrink redirects to zero
-        HTTPSFetcherImpl zero = new HTTPSFetcherImpl(0, 1_000,
+        HTTPSFetcherImpl zero = new HTTPSFetcherImpl(0, 1_000, 0, 1_000,
                 Executors.newSingleThreadExecutor(), dummyLogger) {
             @Override
             protected HttpClient buildHttpClient() {
@@ -166,7 +166,7 @@ class HTTPSFetcherImplTest {
 
     @Test
     void collect_buildSSLContextFails_returnsInternalError() {
-        HTTPSFetcherImpl badCtx = new HTTPSFetcherImpl(1, 500,
+        HTTPSFetcherImpl badCtx = new HTTPSFetcherImpl(1, 500, 1, 500,
                 Executors.newSingleThreadExecutor(), dummyLogger) {
             @Override
             protected SSLContext buildSSLContext() throws NoSuchAlgorithmException {
@@ -181,7 +181,7 @@ class HTTPSFetcherImplTest {
 
     @Test
     void collect_buildSocketFails_returnsCannotFetch() {
-        HTTPSFetcherImpl badSock = new HTTPSFetcherImpl(1, 500,
+        HTTPSFetcherImpl badSock = new HTTPSFetcherImpl(1, 500, 1, 500,
                 Executors.newSingleThreadExecutor(), dummyLogger) {
             @Override
             protected Socket buildSocket() throws IOException {
@@ -195,7 +195,7 @@ class HTTPSFetcherImplTest {
 
     @Test
     void collect_socketConnectTimeout_returnsTimeout() {
-        HTTPSFetcherImpl tmo = new HTTPSFetcherImpl(1, 50,
+        HTTPSFetcherImpl tmo = new HTTPSFetcherImpl(1, 50, 1, 50,
                 Executors.newSingleThreadExecutor(), dummyLogger) {
             @Override
             protected Socket buildSocket() {
@@ -213,7 +213,7 @@ class HTTPSFetcherImplTest {
 
     @Test
     void collect_socketConnectIllegalArg_returnsUnsupportedAddress() {
-        HTTPSFetcherImpl ill = new HTTPSFetcherImpl(1, 50,
+        HTTPSFetcherImpl ill = new HTTPSFetcherImpl(1, 50, 1, 50,
                 Executors.newSingleThreadExecutor(), dummyLogger) {
             @Override
             protected Socket buildSocket() {

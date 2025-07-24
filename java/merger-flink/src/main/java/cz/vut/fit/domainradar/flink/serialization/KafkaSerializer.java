@@ -1,5 +1,6 @@
-package cz.vut.fit.domainradar;
+package cz.vut.fit.domainradar.flink.serialization;
 
+import cz.vut.fit.domainradar.Common;
 import cz.vut.fit.domainradar.serialization.JsonSerializer;
 import org.apache.flink.api.common.serialization.SerializationSchema;
 import org.apache.flink.api.java.tuple.Tuple2;
@@ -18,6 +19,11 @@ public class KafkaSerializer<K> implements KafkaRecordSerializationSchema<Tuple2
     private final boolean _isKeyString;
     private transient Serializer<K> _keySerializer;
 
+    public KafkaSerializer(@NotNull String targetTopic, boolean isKeyString) {
+        _targetTopic = targetTopic;
+        _isKeyString = isKeyString;
+    }
+
     @Override
     public void open(SerializationSchema.InitializationContext context, KafkaSinkContext sinkContext) throws Exception {
         KafkaRecordSerializationSchema.super.open(context, sinkContext);
@@ -30,12 +36,6 @@ public class KafkaSerializer<K> implements KafkaRecordSerializationSchema<Tuple2
             _keySerializer = new JsonSerializer<>(objectMapper);
         }
     }
-
-    public KafkaSerializer(@NotNull String targetTopic, boolean isKeyString) {
-        _targetTopic = targetTopic;
-        _isKeyString = isKeyString;
-    }
-
 
     @Nullable
     @Override

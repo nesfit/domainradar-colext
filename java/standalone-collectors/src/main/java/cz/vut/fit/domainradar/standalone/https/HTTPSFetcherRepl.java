@@ -19,7 +19,7 @@ public class HTTPSFetcherRepl {
 
         var logger = LoggerFactory.getLogger(HTTPSFetcherRepl.class);
 
-        var fetcher = new HTTPSFetcherImpl(maxRedirects, timeoutMs, executor, logger);
+        var fetcher = new HTTPSFetcherImpl(maxRedirects, timeoutMs, maxRedirects, timeoutMs, executor, logger);
         Scanner scanner = new Scanner(System.in);
 
         while (true) {
@@ -35,12 +35,12 @@ public class HTTPSFetcherRepl {
                 maxRedirects = Integer.parseInt(inputLine.substring(3).trim());
                 logger.info("Max redirects set to {}", maxRedirects);
                 fetcher.close();
-                fetcher = new HTTPSFetcherImpl(maxRedirects, timeoutMs, executor, logger);
+                fetcher = new HTTPSFetcherImpl(maxRedirects, timeoutMs, maxRedirects, timeoutMs, executor, logger);
             } else if (inputLine.startsWith(":t")) {
                 timeoutMs = Integer.parseInt(inputLine.substring(2).trim());
                 logger.info("Timeout set to {}", timeoutMs);
                 fetcher.close();
-                fetcher = new HTTPSFetcherImpl(maxRedirects, timeoutMs, executor, logger);
+                fetcher = new HTTPSFetcherImpl(maxRedirects, timeoutMs, maxRedirects, timeoutMs, executor, logger);
             } else {
                 // Resolve hostname stored in inputLine to IP address
                 InetAddress inetAddress = null;

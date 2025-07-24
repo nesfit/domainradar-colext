@@ -1,11 +1,15 @@
-package cz.vut.fit.domainradar;
+package cz.vut.fit.domainradar.flink.models;
 
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Map;
 
-public class KafkaMergedResult {
+/**
+ * A POJO representing a merged result for a domain in Kafka.
+ * It contains the domain name, aggregated domain data, and optional IP data.
+ */
+public class KafkaMergedResult implements HasDomainName {
 
     @NotNull
     private String domainName;

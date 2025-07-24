@@ -15,9 +15,10 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <flink.version>1.20.0</flink.version>
-        <flink.kafka.version>3.3.0-1.20</flink.kafka.version>
+        <flink.version>1.20.1</flink.version>
+        <flink.kafka.version>3.4.0-1.20</flink.kafka.version>
         <scala.binary.version>2.12</scala.binary.version>
+        <postgres.version>42.7.4</postgres.version>
     </properties>
 
     <repositories>
@@ -76,8 +77,18 @@
             <artifactId>serialization</artifactId>
             <version>${project.version}</version>
         </dependency>
-    </dependencies>
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <version>${postgres.version}</version>
+        </dependency>
 
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
     <build>
         <plugins>
             <plugin>
@@ -121,7 +132,7 @@
                                         implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                                 <transformer
                                         implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                    <mainClass>cz.vut.fit.domainradar.DataStreamJob</mainClass>
+                                    <mainClass>cz.vut.fit.domainradar.flink.DataStreamJob</mainClass>
                                 </transformer>
                             </transformers>
                         </configuration>

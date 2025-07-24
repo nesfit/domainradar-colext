@@ -1,5 +1,8 @@
 import logging
+import sys
 import typing
+import signal
+
 from time import sleep
 from .worker_manager import WorkerManager
 from .message_processor import KafkaMessageProcessor
@@ -86,9 +89,28 @@ class KafkaClient:
             self._request_handler.close()
             # Close down the consumer to commit final offsets
             self._logger.info("Closing the consumer")
+            # Start threads to kill the process if it hangs during shutdown
+            self._start_killer_thread(20, signal.SIGTERM)
+            self._start_killer_thread(40, signal.SIGKILL)
+            # Close the producer to ensure all messages are sent
             self._consumer.close()
+            sys.exit(0)
 
     def _delivery_callback(self, err, msg):
         if err:
             key = msg.key()
             self._logger.warning("Result '%s' failed delivery: %s", key, err)
+
+    def _start_killer_thread(self, timeout_seconds: int, signal_to_send: int):
+        """Start a thread that will kill the process if it doesn't exit within timeout"""
+        import threading
+        import os
+
+        def killer():
+            sleep(timeout_seconds)
+            self._logger.warning("Process hanging during shutdown, forcing termination")
+            os.kill(os.getpid(), signal_to_send)
+
+        killer_thread = threading.Thread(target=killer, daemon=True)
+        killer_thread.start()
+        return killer_thread

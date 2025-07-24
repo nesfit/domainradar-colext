@@ -42,9 +42,18 @@ public class CollectorConfig {
     public static final String TLS_MAX_REDIRECTS_DOC = "The maximum number of HTTP redirects to follow.";
     public static final String TLS_MAX_REDIRECTS_DEFAULT = "2";
 
-    public static final String TLS_TRY_HTTP_ONLY_CONFIG = "collectors.tls.try.http.only";
-    public static final String TLS_TRY_HTTP_ONLY_DOC = "Whether to try fetching HTML through a HTTP client if TLS fails.";
-    public static final String TLS_TRY_HTTP_ONLY_DEFAULT = "true";
+    public static final String TLS_HTTPONLY_ENABLED_CONFIG = "collectors.tls.httponly.enabled";
+    public static final String TLS_HTTPONLY_ENABLED_DOC = "Whether to try fetching HTML through a HTTP client if TLS fails.";
+    public static final String TLS_HTTPONLY_ENABLED_DEFAULT = "true";
+
+    public static final String TLS_HTTPONLY_TIMEOUT_MS_CONFIG = "collectors.tls.httponly.timeout";
+    public static final String TLS_HTTPONLY_TIMEOUT_MS_DOC = "The operation timeout in the HTTP-only mode (milliseconds).";
+    public static final String TLS_HTTPONLY_TIMEOUT_MS_DEFAULT = "3000";
+
+    public static final String TLS_HTTPONLY_MAX_REDIRECTS_CONFIG = "collectors.tls.httponly.max.redirects";
+    public static final String TLS_HTTPONLY_MAX_REDIRECTS_DOC = "The maximum number of HTTP redirects to follow in the HTTP-only mode.";
+    public static final String TLS_HTTPONLY_MAX_REDIRECTS_DEFAULT = "1";
+
 
     /* --- QRadar collector --- */
     public static final String QRADAR_URL_CONFIG = "collectors.qradar.url";
