@@ -30,34 +30,35 @@ class ZoneProcessor(BaseAsyncCollectorProcessor[str, ZoneRequest]):
         cache = LRUCache(cache_size) if cache_size else None
         self._collector = ZoneResolver(self._dns_options, self._logger, cache)
 
-    async def process(self, message: Message[str, DNSRequest]) -> list[SimpleMessage]:
+    async def process(self, message: Message[str, ZoneRequest]) -> list[SimpleMessage]:
         logger = self._logger
         dn = message.key
         req = message.value
+        label = message.value.label if req else None
         ret = []
 
         logger.k_trace("Processing zone", dn)
         if dn.endswith(".arpa"):
             result = ZoneResult(status_code=rc.INVALID_DOMAIN_NAME,
                                 error=".arpa domain names not supported",
-                                zone=None)
+                                zone=None, label=label)
         else:
             try:
                 zone_info = await self._collector.get_zone_info(dn)
             except dns.exception.Timeout:
                 logger.k_debug("Timeout", dn)
                 result = ZoneResult(status_code=rc.TIMEOUT,
-                                    error=f"Timeout ({self._dns_options.timeout} s)", zone=None)
+                                    error=f"Timeout ({self._dns_options.timeout} s)", zone=None, label=label)
             except dns.resolver.NoNameservers as e:
                 logger.k_debug("No nameservers", dn)
-                result = ZoneResult(status_code=rc.CANNOT_FETCH, error="SERVFAIL: " + str(e), zone=None)
+                result = ZoneResult(status_code=rc.CANNOT_FETCH, error="SERVFAIL: " + str(e), zone=None, label=label)
             else:
                 if zone_info is None:
                     logger.k_debug("Zone not found", dn)
-                    result = ZoneResult(status_code=rc.NOT_FOUND, error="Zone not found", zone=None)
+                    result = ZoneResult(status_code=rc.NOT_FOUND, error="Zone not found", zone=None, label=label)
                 else:
                     logger.k_trace("Zone found: %s", dn, zone_info.zone)
-                    result = ZoneResult(status_code=0, zone=zone_info)
+                    result = ZoneResult(status_code=0, zone=zone_info, label=label)
 
         ret.append(('processed_zone', message.key_raw, dump_model(result)))
 

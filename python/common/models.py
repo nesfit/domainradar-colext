@@ -99,6 +99,7 @@ class ZoneRequest(CustomBaseModel):
     dns_types_to_collect: Optional[list[str]] = Field(None, alias="dnsTypesToCollect")
     dns_types_to_process_IPs_from: Optional[list[str]] = Field(None,
                                                                alias="dnsTypesToProcessIPsFrom")
+    label: Optional[str] = None
 
 
 class DNSRequest(CustomBaseModel):
@@ -153,6 +154,7 @@ class WHOISResult(Result):
 
 class ZoneResult(Result):
     zone: Optional[ZoneInfo] = None
+    label: Optional[str] = None
 
 
 class DNSResult(Result):
