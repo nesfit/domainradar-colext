@@ -67,23 +67,8 @@ public class DataStreamJob {
         final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment(pipelineConfig);
         env.getConfig().setGlobalJobParameters(allProperties);
 
-        // ==== Checkpointing ====
-        env.enableCheckpointing(10000, CheckpointingMode.EXACTLY_ONCE);
-        final var checkpointConfig = env.getCheckpointConfig();
-        // Retain the last checkpoint both when the job fails and when it is manually cancelled
-        checkpointConfig.setExternalizedCheckpointRetention(ExternalizedCheckpointRetention.RETAIN_ON_CANCELLATION);
-        // Checkpoints may sometimes take longer than on average, don't congest the system
-        // with additional checkpoint runs
-        checkpointConfig.setMinPauseBetweenCheckpoints(5000);
-        // Checkpoints have to complete within 30 seconds, or are discarded
-        checkpointConfig.setCheckpointTimeout(30000);
-        // Two consecutive checkpoint failures are tolerated
-        checkpointConfig.setTolerableCheckpointFailureNumber(5);
-        // Allow only one checkpoint to be in progress at the same time
-        checkpointConfig.setMaxConcurrentCheckpoints(1);
-        // TODO: Determine if unaligned checkpoints help the pipeline
-        //       (especially under heavy load)
-        // checkpointConfig.enableUnalignedCheckpoints();
+        // Checkpointing
+        configureCheckpoints(env);
 
         // Create the pipeline
         makePipeline(env);
@@ -91,6 +76,33 @@ public class DataStreamJob {
 
         // ==== Execution ====
         env.execute("DomainRadar Data Merger");
+    }
+
+    /**
+     * Configure checkpointing with our defaults if not already configured.
+     *
+     * @param env The Flink execution environment
+     */
+    private static void configureCheckpoints(StreamExecutionEnvironment env) {
+        if (env.getCheckpointInterval() != -1)
+            return; // Checkpointing already configured
+
+        env.enableCheckpointing(30000, CheckpointingMode.EXACTLY_ONCE);
+        final var checkpointConfig = env.getCheckpointConfig();
+        // Retain the last checkpoint both when the job fails and when it is manually cancelled
+        checkpointConfig.setExternalizedCheckpointRetention(ExternalizedCheckpointRetention.RETAIN_ON_CANCELLATION);
+        // Checkpoints may sometimes take longer than on average, don't congest the system
+        // with additional checkpoint runs
+        checkpointConfig.setMinPauseBetweenCheckpoints(5000);
+        // Checkpoints have to complete within 60 seconds, or are discarded
+        checkpointConfig.setCheckpointTimeout(60000);
+        // Two consecutive checkpoint failures are tolerated
+        checkpointConfig.setTolerableCheckpointFailureNumber(5);
+        // Allow only one checkpoint to be in progress at the same time
+        checkpointConfig.setMaxConcurrentCheckpoints(1);
+        // TODO: Determine if unaligned checkpoints help the pipeline
+        //       (especially under heavy load)
+        checkpointConfig.enableUnalignedCheckpoints();
     }
 
     private static void makeTestPipeline(StreamExecutionEnvironment env) {
