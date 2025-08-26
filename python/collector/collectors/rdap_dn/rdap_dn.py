@@ -102,8 +102,13 @@ class RDAPDNProcessor(BaseAsyncCollectorProcessor[str, RDAPDomainRequest]):
                                   rdap_data=rdap_data, entities=entities,
                                   rdap_target=rdap_target)
 
-        logger.k_trace("Sending RDAP result", dn)
-        return [(self._output_topic, message.key_raw, dump_model(result))]
+        logger.k_trace("Producing RDAP result", dn)
+        return_messages = [(self._output_topic, message.key_raw, dump_model(result))]
+        if err_code != rc.OK:
+            # If there was an error, we can try to get WHOIS data for the domain as a fallback
+            # Re-use the raw value of the original message as the WHOIS request is the same as RDAP-DN
+            return_messages.append(('to_process_WHOIS', message.key_raw, message.value_raw))
+        return return_messages
 
     async def fetch_rdap(self, domain_name) \
             -> tuple[DomainResponse | None, list | None, int | None, str | None]:
