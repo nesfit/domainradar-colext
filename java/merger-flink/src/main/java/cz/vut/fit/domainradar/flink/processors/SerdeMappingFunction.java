@@ -27,6 +27,7 @@ public class SerdeMappingFunction extends RichMapFunction<KafkaMergedResult, Tup
     private transient Deserializer<DNSResult> _dnsResultDeserializer;
     private transient Deserializer<TLSResult> _tlsResultDeserializer;
     private transient Deserializer<RDAPDomainResult> _rdapDnResultDeserializer;
+    private transient Deserializer<WHOISResult> _whoisResultDeserializer;
     private transient Deserializer<ZoneResult> _zoneResultDeserializer;
     private transient Serializer<AllCollectedData> _finalResultSerializer;
     private transient Deserializer<CommonIPResult<JsonNode>> _ipResultDeserializer;
@@ -37,6 +38,7 @@ public class SerdeMappingFunction extends RichMapFunction<KafkaMergedResult, Tup
         _dnsResultDeserializer = new JsonDeserializer<>(mapper, DNSResult.class);
         _tlsResultDeserializer = new JsonDeserializer<>(mapper, TLSResult.class);
         _rdapDnResultDeserializer = new JsonDeserializer<>(mapper, RDAPDomainResult.class);
+        _whoisResultDeserializer = new JsonDeserializer<>(mapper, WHOISResult.class);
         _zoneResultDeserializer = new JsonDeserializer<>(mapper, ZoneResult.class);
         _ipResultDeserializer = new JsonDeserializer<>(mapper, new TypeReference<>() {
         });
@@ -50,6 +52,7 @@ public class SerdeMappingFunction extends RichMapFunction<KafkaMergedResult, Tup
         final var zoneData = domainData.getZoneData();
         final var dnsData = domainData.getDNSData();
         final var rdapDnData = domainData.getRDAPData();
+        final var whoisData = domainData.getWHOISData();
         final var tlsData = domainData.getTLSData();
 
         // This should not happen
@@ -68,6 +71,10 @@ public class SerdeMappingFunction extends RichMapFunction<KafkaMergedResult, Tup
         final var rdapDnResult = rdapDnData == null
                 ? null
                 : _rdapDnResultDeserializer.deserialize(Topics.OUT_RDAP_DN, rdapDnData.getValue());
+        // The WHOIS result can be null if RDAP-DN was successful
+        final var whoisResult = whoisData == null
+                ? null
+                : _whoisResultDeserializer.deserialize(Topics.OUT_WHOIS, whoisData.getValue());
 
         // We don't need to go through the IPs if the original DNS result did not require any
         final var ipData = (dnsResult.ips() == null || dnsResult.ips().isEmpty())
@@ -91,9 +98,11 @@ public class SerdeMappingFunction extends RichMapFunction<KafkaMergedResult, Tup
 
         final var allCollectedData = new AllCollectedData(
                 zoneResult.zone(),
+                zoneResult.label(),
                 dnsResult,
                 tlsResult,
                 rdapDnResult,
+                whoisResult,
                 ipData
         );
 

@@ -14,6 +14,7 @@ public class KafkaDomainAggregate {
     private KafkaDomainEntry zoneData;
     private KafkaDomainEntry dnsData;
     private KafkaDomainEntry rdapData;
+    private KafkaDomainEntry whoisData;
     private KafkaDomainEntry tlsData;
     @NotNull
     private List<String> dnsIps;
@@ -25,6 +26,7 @@ public class KafkaDomainAggregate {
                 ", zoneData: " + (zoneData == null ? "null" : (zoneData.statusCode + "/" + zoneData.timestamp)) +
                 ", dnsData: " + (dnsData == null ? "null" : (dnsData.statusCode + "/" + dnsData.timestamp)) +
                 ", rdapData: " + (rdapData == null ? "null" : (rdapData.statusCode + "/" + rdapData.timestamp)) +
+                ", whoisData: " + (whoisData == null ? "null" : (whoisData.statusCode + "/" + whoisData.timestamp)) +
                 ", tlsData: " + (tlsData == null ? "null" : (tlsData.statusCode + "/" + tlsData.timestamp)) +
                 ", dnsIps len: " + dnsIps.size() +
                 '}';
@@ -36,11 +38,12 @@ public class KafkaDomainAggregate {
     }
 
     public KafkaDomainAggregate(@NotNull String domainName, KafkaDomainEntry zoneData, KafkaDomainEntry dnsData,
-                                KafkaDomainEntry rdapDnData, KafkaDomainEntry tlsData) {
+                                KafkaDomainEntry rdapDnData, KafkaDomainEntry whoisData, KafkaDomainEntry tlsData) {
         this.domainName = domainName;
         this.zoneData = zoneData;
         this.dnsData = dnsData;
         this.rdapData = rdapDnData;
+        this.whoisData = whoisData;
         this.tlsData = tlsData;
         this.dnsIps = new ArrayList<>();
     }
@@ -77,6 +80,14 @@ public class KafkaDomainAggregate {
         this.rdapData = rdapData;
     }
 
+    public KafkaDomainEntry getWHOISData() {
+        return whoisData;
+    }
+
+    public void setWHOISData(KafkaDomainEntry whoisData) {
+        this.whoisData = whoisData;
+    }
+
     public KafkaDomainEntry getTLSData() {
         return tlsData;
     }
@@ -86,7 +97,10 @@ public class KafkaDomainAggregate {
     }
 
     public boolean isMaybeComplete() {
-        return zoneData != null && dnsData != null && rdapData != null;
+        return zoneData != null
+                && dnsData != null
+                && rdapData != null
+                && (rdapData.statusCode == 0 || whoisData != null);
     }
 
     public @NotNull List<String> getDNSIPs() {

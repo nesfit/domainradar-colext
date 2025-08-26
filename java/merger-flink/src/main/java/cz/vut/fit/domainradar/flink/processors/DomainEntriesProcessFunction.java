@@ -25,7 +25,7 @@ import java.time.Duration;
 
 /**
  * Processes incoming {@link KafkaDomainEntry} domain-based collection results stream keyed by domain name,
- * aggregates results from the collectors (zone, DNS, RDAP-DN, TLS) and emits a {@link KafkaDomainAggregate} when
+ * aggregates results from the collectors (zone, DNS, RDAP-DN, WHOIS, TLS) and emits a {@link KafkaDomainAggregate} when
  * all required data is available or when a timeout expires.
  *
  * <p>This function maintains state for each key:
@@ -104,7 +104,8 @@ public class DomainEntriesProcessFunction extends KeyedProcessFunction<String, K
             ctx.timerService().deleteEventTimeTimer(expirationTimestamp);
         }
 
-        // If zone, DNS and RDAP-DN data are present, we can check verify TLS presence and populate the IPs
+        // If zone, DNS and RDAP-DN (and WHOIS, if necessary) data are present,
+        // we can check verify TLS presence and populate the IPs
         if (currentState.isMaybeComplete()) {
             currentState = this.getFinalStateIfComplete();
         } else {
@@ -282,14 +283,16 @@ public class DomainEntriesProcessFunction extends KeyedProcessFunction<String, K
             }
 
             switch (kafkaDomainEntry.getTopic()) {
+                case Topics.OUT_ZONE -> aggregate.setZoneData(
+                        ResultFitnessComparator.getMoreUseful(aggregate.getZoneData(), kafkaDomainEntry));
                 case Topics.OUT_DNS -> aggregate.setDNSData(
                         ResultFitnessComparator.getMoreUseful(aggregate.getDNSData(), kafkaDomainEntry));
                 case Topics.OUT_RDAP_DN -> aggregate.setRDAPData(
                         ResultFitnessComparator.getMoreUseful(aggregate.getRDAPData(), kafkaDomainEntry));
+                case Topics.OUT_WHOIS -> aggregate.setWHOISData(
+                        ResultFitnessComparator.getMoreUseful(aggregate.getWHOISData(), kafkaDomainEntry));
                 case Topics.OUT_TLS -> aggregate.setTLSData(
                         ResultFitnessComparator.getMoreUseful(aggregate.getTLSData(), kafkaDomainEntry));
-                case Topics.OUT_ZONE -> aggregate.setZoneData(
-                        ResultFitnessComparator.getMoreUseful(aggregate.getZoneData(), kafkaDomainEntry));
             }
 
             return aggregate;
@@ -302,10 +305,11 @@ public class DomainEntriesProcessFunction extends KeyedProcessFunction<String, K
 
         @Override
         public KafkaDomainAggregate merge(KafkaDomainAggregate left, KafkaDomainAggregate right) {
+            left.setZoneData(ResultFitnessComparator.getMoreUseful(left.getZoneData(), right.getZoneData()));
             left.setDNSData(ResultFitnessComparator.getMoreUseful(left.getDNSData(), right.getDNSData()));
             left.setRDAPData(ResultFitnessComparator.getMoreUseful(left.getRDAPData(), right.getRDAPData()));
+            left.setWHOISData(ResultFitnessComparator.getMoreUseful(left.getWHOISData(), right.getWHOISData()));
             left.setTLSData(ResultFitnessComparator.getMoreUseful(left.getTLSData(), right.getTLSData()));
-            left.setZoneData(ResultFitnessComparator.getMoreUseful(left.getZoneData(), right.getZoneData()));
             return left;
         }
     }

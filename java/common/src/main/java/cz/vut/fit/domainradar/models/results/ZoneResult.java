@@ -9,11 +9,13 @@ import java.time.Instant;
 /**
  * A record representing a result of the zone collector.
  *
- * @param zone The collected zone data.
+ * @param zone  The collected zone data.
+ * @param label An optional label copied over from the request.
  */
 public record ZoneResult(int statusCode,
                          @Nullable String error,
                          @NotNull Instant lastAttempt,
-                         @Nullable ZoneInfo zone
+                         @Nullable ZoneInfo zone,
+                         @Nullable String label
 ) implements Result {
 }

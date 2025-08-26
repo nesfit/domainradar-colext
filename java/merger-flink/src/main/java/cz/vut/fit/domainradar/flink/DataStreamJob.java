@@ -135,11 +135,12 @@ public class DataStreamJob {
         var dnsStream = makeKafkaDomainStream(env, Topics.OUT_DNS);
         var tlsStream = makeKafkaDomainStream(env, Topics.OUT_TLS);
         var rdapDnStream = makeKafkaDomainStream(env, Topics.OUT_RDAP_DN);
+        var whoisStream = makeKafkaDomainStream(env, Topics.OUT_WHOIS);
         var ipDataStream = makeKafkaIpStream(env);
         var qradarStream = makeKafkaQRadarStream(env);
 
         // ==== The pipeline ====
-        var dnData = zoneStream.union(dnsStream, tlsStream, rdapDnStream)
+        var dnData = zoneStream.union(dnsStream, tlsStream, rdapDnStream, whoisStream)
                 .keyBy(KafkaDomainEntry::getDomainName)
                 .process(new DomainEntriesProcessFunction())
                 .name("Process domain entries")
@@ -170,7 +171,7 @@ public class DataStreamJob {
             final var qRadarTag = TagRegistry.TAGS.get("qradar");
             qradarStream
                     .map(kafkaIPEntry -> new KafkaMergedResult(kafkaIPEntry.getDomainName(),
-                            new KafkaDomainAggregate(kafkaIPEntry.getDomainName(), null, null, null, null),
+                            new KafkaDomainAggregate(kafkaIPEntry.getDomainName(), null, null, null, null, null),
                             // This must not be an immutable map to avoid issues with Kryo 2.24
                             new HashMap<>(Map.of(kafkaIPEntry.getIP(), new HashMap<>(Map.of(qRadarTag.byteValue(), kafkaIPEntry))))))
                     .name("Map QRadar results to merged results")

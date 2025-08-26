@@ -12,6 +12,7 @@ public final class TagRegistry {
             "nerd", 20,
             "rdap-ip", 30,
             "rtt", 40,
+            "whois", 50,
             "qradar", 120
     );
 
@@ -20,6 +21,7 @@ public final class TagRegistry {
             20, "nerd",
             30, "rdap-ip",
             40, "rtt",
+            50, "whois",
             120, "qradar"
     );
 

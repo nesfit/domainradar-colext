@@ -20,9 +20,11 @@ import java.util.Map;
  */
 public record AllCollectedData(
         ZoneInfo zone,
+        @Nullable String label,
         DNSResult dnsResult,
         @Nullable TLSResult tlsResult,
         @Nullable RDAPDomainResult rdapDomainResult,
+        @Nullable WHOISResult whoisResult,
         @Nullable Map<String, Map<String, CommonIPResult<JsonNode>>> ipResults
 ) {
 }
