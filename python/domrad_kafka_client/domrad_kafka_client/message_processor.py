@@ -1,7 +1,7 @@
 import abc
 import dataclasses
 import logging
-from typing import Awaitable, TypeVar, Generic, Literal
+from typing import Awaitable, TypeVar, Generic, Literal, Any
 
 from domrad_kafka_client.types import SimpleMessage
 
@@ -17,6 +17,7 @@ class Message(Generic[TKey, TValue]):
     value: TValue | None
     partition: int
     offset: int
+    custom_data: Any = None  # Field for use by the message processor implementation
 
 
 class _KafkaMessageProcessorBase(Generic[TKey, TValue], abc.ABC):
