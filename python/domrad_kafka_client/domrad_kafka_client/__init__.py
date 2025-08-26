@@ -1,3 +1,4 @@
+import os
 from typing import Type
 import multiprocessing as mp
 
@@ -14,10 +15,14 @@ def run_client(input_topic: str, processor_type: Type[KafkaMessageProcessor], ap
     if app_id_override:
         config["client"]["app_id"] = app_id_override
 
-    util.init_logging()
-    kafka_client = KafkaClient(config, input_topic, processor_type)
-    kafka_client.run()
-    util.finalize_logging()
+    if os.getenv("DOMRAD_PROCESS_STANDALONE"):
+        from .standalone import run_cli
+        run_cli(config, processor_type)
+    else:
+        util.init_logging()
+        kafka_client = KafkaClient(config, input_topic, processor_type)
+        kafka_client.run()
+        util.finalize_logging()
 
 
 __all__ = [
