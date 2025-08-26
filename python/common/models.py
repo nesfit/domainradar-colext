@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field, ConfigDict, AliasGenerator
 from pydantic.alias_generators import to_camel
 
 from common import timestamp_now_millis
-from common import result_codes as rc
+
 
 class CustomBaseModel(BaseModel):
     model_config = ConfigDict(
@@ -112,6 +112,10 @@ class RDAPDomainRequest(CustomBaseModel):
     zone: Optional[str] = None
 
 
+class WHOISRequest(CustomBaseModel):
+    zone: Optional[str] = None
+
+
 class IPProcessRequest(CustomBaseModel):
     collectors: Optional[list[str]] = None
 
@@ -138,12 +142,13 @@ class RTTResult(IPResult):
 
 class RDAPDomainResult(Result):
     rdap_target: str = Field("", alias="rdapTarget")
-    whois_status_code: int = Field(rc.WHOIS_NOT_PERFORMED, alias="whoisStatusCode")
     rdap_data: Optional[dict] = Field(None, alias="rdapData")
     entities: Optional[list[dict]] = None
-    whois_error: Optional[str] = Field(None, alias="whoisError")
-    raw_whois_data: Optional[str] = Field(None, alias="whoisRaw")
-    parsed_whois_data: Optional[dict] = Field(None, alias="whoisParsed")
+
+
+class WHOISResult(Result):
+    whois_target: str = Field("", alias="whoisTarget")
+    raw_response: Optional[str] = Field(None, alias="whoisRaw")
 
 
 class ZoneResult(Result):

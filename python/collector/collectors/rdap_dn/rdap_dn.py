@@ -4,12 +4,9 @@ __author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
 import asyncio
 from typing import Literal
 
-import asyncwhois
 import httpx
 import tldextract
 import whodap
-from asyncwhois.errors import *
-from asyncwhois.query import DomainQuery
 from whodap.errors import *
 from whodap.response import DomainResponse
 
@@ -33,9 +30,7 @@ class RDAPDNProcessor(BaseAsyncCollectorProcessor[str, RDAPDomainRequest]):
         component_config = config.get(COLLECTOR, {})
         self._httpx_client = httpx.AsyncClient(verify=make_rdap_ssl_context(), follow_redirects=True,
                                                timeout=component_config.get("http_timeout", 5))
-        self._whois_client = asyncwhois.client.DomainClient()
         self._rdap_client = None
-
         self._rate_limiters = config.get("rate_limiter", {})
 
     # def deserialize(self, message: Message[str, RDAPDomainRequest]):
@@ -43,7 +38,7 @@ class RDAPDNProcessor(BaseAsyncCollectorProcessor[str, RDAPDomainRequest]):
     #     # TODO: pre-process TLD?
 
     def get_rl_bucket_key(self, message: Message[str, RDAPDomainRequest]) -> str | Literal['default'] | None:
-        _, tld, endpoint = extract_known_tld(message.key, self._rdap_client)
+        _, tld, endpoint = extract_known_tld(message.key, self._rdap_client.iana_dns_server_map)
         if endpoint in self._rate_limiters:
             return endpoint
         return tld
@@ -69,8 +64,6 @@ class RDAPDNProcessor(BaseAsyncCollectorProcessor[str, RDAPDomainRequest]):
         req = message.value
         logger.k_trace("Processing RDAP", dn)
 
-        # The default WHOIS results are empty and with a status code signalising that WHOIS was not used
-        whois_raw, whois_parsed, whois_err_code, whois_err_msg = None, None, rc.WHOIS_NOT_PERFORMED, None
         zone = None
 
         # Extract the zone DN if present in the request
@@ -99,12 +92,7 @@ class RDAPDNProcessor(BaseAsyncCollectorProcessor[str, RDAPDomainRequest]):
                     logger.k_trace("Retrying on target %s", dn, rdap_target)
                     rdap_data, entities, err_code, err_msg = await self.fetch_rdap(rdap_target)
 
-        if rdap_data is None:
-            # Only try WHOIS if no RDAP data is available at any level of the source DN
-            logger.k_debug("No RDAP, trying WHOIS for %s", dn, zone or dn)
-            (whois_raw, whois_parsed,
-             whois_err_code, whois_err_msg) = await self.fetch_whois(zone or dn)
-        else:
+        if rdap_data is not None:
             logger.k_trace("Got RDAP data for %s", dn, rdap_target)
             # Convert the SimpleNamespace objects to JSON-serializable dictionaries
             rdap_data = rdap_data.to_dict()
@@ -112,9 +100,7 @@ class RDAPDNProcessor(BaseAsyncCollectorProcessor[str, RDAPDomainRequest]):
 
         result = RDAPDomainResult(status_code=err_code, error=err_msg,
                                   rdap_data=rdap_data, entities=entities,
-                                  rdap_target=rdap_target,
-                                  whois_status_code=whois_err_code, whois_error=whois_err_msg,
-                                  raw_whois_data=whois_raw, parsed_whois_data=whois_parsed)
+                                  rdap_target=rdap_target)
 
         logger.k_trace("Sending RDAP result", dn)
         return [(self._output_topic, message.key_raw, dump_model(result))]
@@ -124,7 +110,7 @@ class RDAPDNProcessor(BaseAsyncCollectorProcessor[str, RDAPDomainRequest]):
         client = self._rdap_client
         logger = self._logger
 
-        domain, tld, rdap_base = extract_known_tld(domain_name, client)
+        domain, tld, rdap_base = extract_known_tld(domain_name, client.iana_dns_server_map)
         if domain is None or tld is None:
             return None, None, rc.NO_ENDPOINT, None
 
@@ -158,49 +144,3 @@ class RDAPDNProcessor(BaseAsyncCollectorProcessor[str, RDAPDomainRequest]):
         except Exception as e:
             logger.k_warning("Unhandled exception", domain_name, e=e)
             return None, None, rc.INTERNAL_ERROR, str(e)
-
-    async def fetch_whois(self, domain_name) -> tuple[
-        str | None, dict | None, int | None, str | None]:
-        client = self._whois_client
-        logger = self._logger
-
-        suffix = tldextract.extract(domain_name).suffix
-        suffix = suffix.split(".")[-1]
-        # noinspection PyProtectedMember
-        endpoint = DomainQuery._get_server_name(suffix) or DomainQuery.iana_server
-
-        try:
-            whois_raw, whois_parsed = await client.aio_whois(domain_name)
-
-            if whois_parsed is not None:
-                whois_parsed = {k: v for k, v in whois_parsed.items() if v is not None
-                                and (not isinstance(v, list) or len(v) > 0)}
-
-            return whois_raw, whois_parsed, 0, None
-        except NotFoundError as e:
-            logger.k_debug("WHOIS not found", domain_name)
-            return None, None, rc.NOT_FOUND, str(e)
-        except WhoIsError as e:
-            msg = str(e).lower()
-            if "rate" in msg or "limit" in msg:
-                logger.k_info("WHOIS remote rate limited: %s: %s", domain_name, endpoint, msg)
-                # TODO: Implement and use explicit RL bucket filling mechanism
-                return None, None, rc.RATE_LIMITED, str(e)
-            elif "domain not found" in msg:
-                logger.k_debug("WHOIS not found", domain_name)
-                return None, None, rc.NOT_FOUND, str(e)
-
-            logger.k_debug("WHOIS other error: %s: %s", domain_name, endpoint, msg)
-            return None, None, rc.CANNOT_FETCH, str(e)
-        except ConnectionResetError as e:
-            logger.k_debug("WHOIS connection reset error", domain_name)
-            return None, None, rc.CANNOT_FETCH, str(e)
-        except TimeoutError as e:
-            logger.k_debug("WHOIS timeout", domain_name)
-            return None, None, rc.TIMEOUT, str(e)
-        except Exception as e:
-            logger.k_warning("Unhandled WHOIS exception", domain_name, e=e)
-            if isinstance(e, IOError):
-                return None, None, rc.INTERNAL_ERROR, str(e)
-            else:
-                return None, None, rc.CANNOT_FETCH, str(e)

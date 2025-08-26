@@ -73,7 +73,7 @@ def make_rdap_ssl_context():
     return context
 
 
-def extract_known_tld(domain_name: str, client: DNSClient) -> tuple[str | None, str | None, str | None]:
+def extract_known_tld(domain_name: str, iana_tlds: dict[str, str]) -> tuple[str | None, str | None, str | None]:
     """
     Extract a TLD (or another suffix) registered in the IANA DNS RDAP bootstrap file.
     The bootstrap data are taken from the given DNSClient instance.
@@ -89,7 +89,6 @@ def extract_known_tld(domain_name: str, client: DNSClient) -> tuple[str | None, 
     # Try the SLD first
     tld = '.'.join(parts[-2:])
 
-    iana_tlds = client.iana_dns_server_map
     if tld not in iana_tlds:
         # SLD not found in IANA's registry, try the TLD
         domain = '.'.join(parts[:-1])

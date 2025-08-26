@@ -30,7 +30,7 @@ class BaseAsyncCollectorProcessor(AsyncKafkaMessageProcessor[TCollectorKey, TCol
         self._value_class = value_class
         self._result_class = result_class
 
-    def deserialize(self, message: Message[TCollectorKey, TCollectorRequest]):
+    def deserialize(self, message: Message[TCollectorKey, TCollectorRequest]) -> None:
         if issubclass(self._key_class, str):
             message.key = message.key_raw.decode("utf-8")
         else:
