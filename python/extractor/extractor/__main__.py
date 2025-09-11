@@ -20,6 +20,8 @@ def extract_one(file):
         data = f.read()
 
     data = json.loads(data)
+    if "domain_name" not in data:
+        data["domain_name"] = input("Domain name? ")
     extractor.init_transformations({})
     df: DataFrame
     if isinstance(data, list):
