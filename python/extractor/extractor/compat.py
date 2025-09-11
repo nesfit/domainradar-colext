@@ -356,8 +356,8 @@ class CompatibilityTransformation:
 
         if whois_parsed is not None:
             reg_date = whois_parsed.get("created_date", whois_parsed.get("created", None))
-            exp_date = whois_parsed.get("expires_date", whois_parsed.get("updated", None))
-            last_changed_date = whois_parsed.get("updated_date", whois_parsed.get("expires", None))
+            exp_date = whois_parsed.get("expires_date", whois_parsed.get("expires", None))
+            last_changed_date = whois_parsed.get("updated_date", whois_parsed.get("updated", None))
 
         has_all = reg_date is not None and exp_date is not None and last_changed_date is not None
         if not has_all and whois_raw:
