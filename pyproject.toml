@@ -1,0 +1,27 @@
+[project]
+name = "thor-collectors"
+version = "1.0.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "asyncwhois >=1.1.12",
+    "whodap >=0.1.13",
+    "icmplib >=3.0.4",
+    "tldextract >=5.3.0",
+    "dnspython >=2.8.0",
+    "pydantic >=2.12.5",
+    "kafka-multiprocessor"
+]
+
+[tool.uv.workspace]
+members = [
+    "kafka-multiprocessor",
+]
+
+[tool.uv.sources]
+kafka-multiprocessor = { workspace = true }
+
+[build-system]
+requires = ["uv_build>=0.9.16,<0.10.0"]
+build-backend = "uv_build"
