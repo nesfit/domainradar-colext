@@ -13,10 +13,25 @@ from . import util
 import redis
 from typing import Type, Union, Awaitable
 
-from pyrate_limiter import BucketFactory, RateItem, AbstractBucket, TimeClock, RedisBucket, Rate, Limiter, \
-    LimiterDelayException, BucketFullException, InMemoryBucket, MonotonicClock
+from pyrate_limiter import (
+    BucketFactory,
+    RateItem,
+    AbstractBucket,
+    TimeClock,
+    RedisBucket,
+    Rate,
+    Limiter,
+    LimiterDelayException,
+    BucketFullException,
+    MonotonicClock,
+)
 
-from .message_processor import KafkaMessageProcessor, AsyncKafkaMessageProcessor, Message, SyncKafkaMessageProcessor
+from .message_processor import (
+    KafkaMessageProcessor,
+    AsyncKafkaMessageProcessor,
+    Message,
+    SyncKafkaMessageProcessor,
+)
 
 _process: mp.Process | None = None
 
@@ -33,7 +48,9 @@ def _get_rate_limiter_section(config: dict, bucket_key: str) -> dict | None:
 
     rate_limiter_config = config.get("rate_limiter", {})
     rl_config_for_key = rate_limiter_config.get(bucket_key)
-    if (rl_config_for_key is None or not isinstance(rl_config_for_key, dict)) and bucket_key != "default":
+    if (
+        rl_config_for_key is None or not isinstance(rl_config_for_key, dict)
+    ) and bucket_key != "default":
         rl_config_for_key = rate_limiter_config.get("default", None)
     if not isinstance(rl_config_for_key, dict):
         return None
@@ -50,8 +67,9 @@ class _LoopError(Exception):
 
 
 class _CustomBucketFactory(BucketFactory):
-
-    def __init__(self, config: dict, redis_pool: redis.ConnectionPool | redis.asyncio.ConnectionPool) -> None:
+    def __init__(
+        self, config: dict, redis_pool: redis.ConnectionPool | redis.asyncio.ConnectionPool
+    ) -> None:
         super().__init__()
         self._config = config
         self._clock = MonotonicClock()
@@ -73,7 +91,8 @@ class _CustomBucketFactory(BucketFactory):
 
     def get(self, item: RateItem) -> Union[AbstractBucket, Awaitable[AbstractBucket]]:
         bucket = self._buckets.get(item.name, None)
-        if bucket is not None: return bucket
+        if bucket is not None:
+            return bucket
 
         # b = InMemoryBucket(self.get_rates(item.name))
         # self.schedule_leak(b, self._clock)
@@ -81,9 +100,12 @@ class _CustomBucketFactory(BucketFactory):
         # return b
 
         if isinstance(self._pool, redis.asyncio.ConnectionPool):
+
             async def make_bucket():
                 async_redis_db = redis.asyncio.Redis(connection_pool=self._pool, db=0)
-                async_bucket = await RedisBucket.init(self.get_rates(item.name), async_redis_db, item.name)
+                async_bucket = await RedisBucket.init(
+                    self.get_rates(item.name), async_redis_db, item.name
+                )
                 self.schedule_leak(async_bucket, self._clock)
                 self._buckets[item.name] = async_bucket
                 return async_bucket
@@ -98,10 +120,16 @@ class _CustomBucketFactory(BucketFactory):
 
 
 class WorkerProcess:
-    def __init__(self, worker_id: int, config: dict, processor_type: Type[KafkaMessageProcessor],
-                 to_process: mp.Queue, processed: mp.Queue):
+    def __init__(
+        self,
+        worker_id: int,
+        config: dict,
+        processor_type: Type[KafkaMessageProcessor],
+        to_process: mp.Queue,
+        processed: mp.Queue,
+    ):
         self._config = config
-        self._logger = logging.getLogger(f"worker")
+        self._logger = logging.getLogger("worker")
         self._to_process = to_process
         self._processed = processed
 
@@ -146,8 +174,12 @@ class WorkerProcess:
                     self._logger.info("Interrupted. Shutting down")
                     self._running = False
                 except _LoopError as e:
-                    self._logger.debug("Processed with error at p=%s, o=%s", partition, offset,
-                                       exc_info=e.__cause__)
+                    self._logger.debug(
+                        "Processed with error at p=%s, o=%s",
+                        partition,
+                        offset,
+                        exc_info=e.__cause__,
+                    )
                     ret = e.error_messages_to_send
                 except Exception as e:
                     self._logger.error("Unexpected error. Shutting down", exc_info=e)
@@ -192,7 +224,8 @@ class WorkerProcess:
 
     def _get_limiter(self, bucket_key: str) -> Limiter:
         limiter = self._limiters.get(bucket_key, None)
-        if limiter is not None: return limiter
+        if limiter is not None:
+            return limiter
 
         rl_config_for_key = _get_rate_limiter_section(self._config, bucket_key)
         imm = rl_config_for_key.get("immediate", False)
@@ -200,8 +233,12 @@ class WorkerProcess:
         if not imm:
             delay = rl_config_for_key.get("max_wait", 10)
 
-        limiter = Limiter(self._bucket_factory, TimeClock(), raise_when_fail=True,
-                          max_delay=(delay * 1000) if delay else None)
+        limiter = Limiter(
+            self._bucket_factory,
+            TimeClock(),
+            raise_when_fail=True,
+            max_delay=(delay * 1000) if delay else None,
+        )
         self._limiters[bucket_key] = limiter
         return limiter
 
@@ -218,8 +255,11 @@ class WorkerProcess:
                 return 0
             except (LimiterDelayException, BucketFullException) as e:
                 self._logger.debug("Rate limited: " + str(e))
-                return SyncKafkaMessageProcessor.ERROR_RATE_LIMITED_IMMEDIATE if limiter.max_delay is None \
+                return (
+                    SyncKafkaMessageProcessor.ERROR_RATE_LIMITED_IMMEDIATE
+                    if limiter.max_delay is None
                     else SyncKafkaMessageProcessor.ERROR_RATE_LIMITED_WITH_TIMEOUT
+                )
             except AssertionError as e:
                 # Re-acquire not successful due to a race
                 self._logger.warning("Rate limiter assertion error, trying again", exc_info=e)
@@ -233,18 +273,25 @@ class WorkerProcess:
 
     @staticmethod
     def _serialize(value: dict) -> bytes:
-        return json.dumps(value, indent=None, separators=(',', ':')).encode("utf-8")
+        return json.dumps(value, indent=None, separators=(",", ":")).encode("utf-8")
 
 
 class AioWorkerProcess(WorkerProcess):
     SLEEP = 0.05
 
-    def __init__(self, worker_id: int, config: dict, processor_type: Type[AsyncKafkaMessageProcessor],
-                 to_process: mp.Queue, processed: mp.Queue):
+    def __init__(
+        self,
+        worker_id: int,
+        config: dict,
+        processor_type: Type[AsyncKafkaMessageProcessor],
+        to_process: mp.Queue,
+        processed: mp.Queue,
+    ):
         super().__init__(worker_id, config, processor_type, to_process, processed)
 
     def run(self):
         import asyncio
+
         self._logger.info("Starting AIO loop")
         try:
             asyncio.run(self._run_async())
@@ -255,7 +302,9 @@ class AioWorkerProcess(WorkerProcess):
         self._logger.info("Finished (PID %s)", os.getpid())
 
     def _init_rate_limiting(self):
-        redis_pool = redis.asyncio.ConnectionPool.from_url(self._config.get("client", {}).get("redis_uri"))
+        redis_pool = redis.asyncio.ConnectionPool.from_url(
+            self._config.get("client", {}).get("redis_uri")
+        )
         self._bucket_factory = _CustomBucketFactory(config=self._config, redis_pool=redis_pool)
 
     async def _do_rate_limit(self, message) -> int:
@@ -270,8 +319,11 @@ class AioWorkerProcess(WorkerProcess):
                 return 0
             except (LimiterDelayException, BucketFullException):
                 self._logger.debug("Rate limited")
-                return SyncKafkaMessageProcessor.ERROR_RATE_LIMITED_IMMEDIATE if limiter.max_delay is None \
+                return (
+                    SyncKafkaMessageProcessor.ERROR_RATE_LIMITED_IMMEDIATE
+                    if limiter.max_delay is None
                     else SyncKafkaMessageProcessor.ERROR_RATE_LIMITED_WITH_TIMEOUT
+                )
             except AssertionError as e:
                 # Re-acquire not successful due to a race
                 self._logger.warning("Rate limiter assertion error, trying again", exc_info=e)
@@ -344,8 +396,12 @@ class AioWorkerProcess(WorkerProcess):
                     self._logger.info("Interrupted. Shutting down")
                     self._running = False
                 except _LoopError as e:
-                    self._logger.debug("Processed with error at p=%s, o=%s", partition, offset,
-                                       exc_info=e.__cause__)
+                    self._logger.debug(
+                        "Processed with error at p=%s, o=%s",
+                        partition,
+                        offset,
+                        exc_info=e.__cause__,
+                    )
                     ret = e.error_messages_to_send
                 except Exception as e:
                     self._logger.error("Unexpected error. Shutting down", exc_info=e)
@@ -373,8 +429,14 @@ def sigterm_handler(signal_num, stack_frame):
         _process = None
 
 
-def init_process(worker_id: int, config: dict, processor_type: Type[KafkaMessageProcessor],
-                 to_process: mp.Queue, processed: mp.Queue, logger_config: dict):
+def init_process(
+    worker_id: int,
+    config: dict,
+    processor_type: Type[KafkaMessageProcessor],
+    to_process: mp.Queue,
+    processed: mp.Queue,
+    logger_config: dict,
+):
     global _process
 
     util.add_logging_trace_level()

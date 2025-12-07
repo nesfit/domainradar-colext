@@ -1,4 +1,5 @@
 """whois.py: The processor for the WHOIS collector."""
+
 __author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
 
 import socket
@@ -23,13 +24,14 @@ COMPONENT_NAME = "collector-" + COLLECTOR
 
 class WHOISProcessor(BaseAsyncCollectorProcessor[str, WHOISRequest]):
     def __init__(self, config: dict):
-        super().__init__(config, COMPONENT_NAME, 'processed_WHOIS', str, WHOISRequest, WHOISResult)
+        super().__init__(config, COMPONENT_NAME, "processed_WHOIS", str, WHOISRequest, WHOISResult)
         self._logger = log.init("worker")
 
         component_config = config.get(COLLECTOR, {})
 
-        self._endpoint_provider = IanaDBGenerator(component_config.get("iana_db_path"),
-                                                  component_config.get("iana_db_lifetime"))
+        self._endpoint_provider = IanaDBGenerator(
+            component_config.get("iana_db_path"), component_config.get("iana_db_lifetime")
+        )
         self._logger.info("Loading IANA WHOIS DB")
 
         db = self._endpoint_provider.get_db()  # Preload the DB
@@ -51,7 +53,9 @@ class WHOISProcessor(BaseAsyncCollectorProcessor[str, WHOISRequest]):
         _, tld, endpoint = extract_known_tld(message.key, db)
         message.custom_data = (tld, endpoint)
 
-    def get_rl_bucket_key(self, message: Message[str, WHOISRequest]) -> str | Literal['default'] | None:
+    def get_rl_bucket_key(
+        self, message: Message[str, WHOISRequest]
+    ) -> str | Literal["default"] | None:
         # Rate limit by endpoint (if such rate limiter definition exists), otherwise by TLD
         tld, endpoint = message.custom_data
         if endpoint in self._rate_limiters:
@@ -93,16 +97,23 @@ class WHOISProcessor(BaseAsyncCollectorProcessor[str, WHOISRequest]):
                 if reg_whois_target != target:
                     target = reg_whois_target
                     logger.k_trace("Retrying on target %s", dn, target)
-                    whois_raw, whois_err_code, whois_err_msg = await self.fetch_whois(target, target_endpoint)
+                    whois_raw, whois_err_code, whois_err_msg = await self.fetch_whois(
+                        target, target_endpoint
+                    )
 
-        result = WHOISResult(status_code=whois_err_code, error=whois_err_msg,
-                             whois_target=target, raw_response=whois_raw)
+        result = WHOISResult(
+            status_code=whois_err_code,
+            error=whois_err_msg,
+            whois_target=target,
+            raw_response=whois_raw,
+        )
 
         logger.k_trace("Sending WHOIS result", dn)
         return [(self._output_topic, message.key_raw, dump_model(result))]
 
-    async def fetch_whois(self, domain_name: str, target_endpoint: str | None) -> tuple[
-        str | None, int | None, str | None]:
+    async def fetch_whois(
+        self, domain_name: str, target_endpoint: str | None
+    ) -> tuple[str | None, int | None, str | None]:
         client = self._whois_client
         logger = self._logger
 
@@ -111,7 +122,9 @@ class WHOISProcessor(BaseAsyncCollectorProcessor[str, WHOISRequest]):
             return None, rc.NO_ENDPOINT, None
 
         try:
-            whois_raw = await client.query_async(query=domain_name, server=target_endpoint, timeout=self._timeout)
+            whois_raw = await client.query_async(
+                query=domain_name, server=target_endpoint, timeout=self._timeout
+            )
             if (err_code := find_error(whois_raw)) is not None:
                 # Produce the NOT_FOUND or RATE_LIMITED error code if we can find it in the response
                 return whois_raw, err_code, None

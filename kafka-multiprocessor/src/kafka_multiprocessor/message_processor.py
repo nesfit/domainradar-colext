@@ -5,8 +5,8 @@ from typing import Awaitable, TypeVar, Generic, Literal, Any
 
 from .types import SimpleMessage
 
-TKey = TypeVar('TKey')
-TValue = TypeVar('TValue')
+TKey = TypeVar("TKey")
+TValue = TypeVar("TValue")
 
 
 @dataclasses.dataclass
@@ -27,6 +27,7 @@ class _KafkaMessageProcessorBase(Generic[TKey, TValue], abc.ABC):
     and asynchronous Kafka message processors. Derived classes must implement the abstract
     methods for deserialization, processing, and error handling.
     """
+
     ERROR_RATE_LIMITED_IMMEDIATE = 1
     ERROR_RATE_LIMITED_WITH_TIMEOUT = 2
 
@@ -39,7 +40,7 @@ class _KafkaMessageProcessorBase(Generic[TKey, TValue], abc.ABC):
         self._config = config
         self._logger = logging.getLogger("worker")
 
-    def get_rl_bucket_key(self, message: Message[TKey, TValue]) -> str | Literal['default'] | None:
+    def get_rl_bucket_key(self, message: Message[TKey, TValue]) -> str | Literal["default"] | None:
         """
         Get the rate limiter bucket key for the given message.
 
@@ -61,8 +62,9 @@ class _KafkaMessageProcessorBase(Generic[TKey, TValue], abc.ABC):
         pass
 
     @abc.abstractmethod
-    def process(self, message: Message[TKey, TValue]) -> \
-            list[SimpleMessage] | Awaitable[list[SimpleMessage]]:
+    def process(
+        self, message: Message[TKey, TValue]
+    ) -> list[SimpleMessage] | Awaitable[list[SimpleMessage]]:
         """
         Process the given message and return a list of messages to respond with.
         This method returns a list if used within a `SyncKafkaMessageProcessor`, or an awaitable if used
@@ -75,7 +77,9 @@ class _KafkaMessageProcessorBase(Generic[TKey, TValue], abc.ABC):
         pass
 
     @abc.abstractmethod
-    def process_error(self, message: Message[TKey, TValue], error: BaseException | int) -> list[SimpleMessage]:
+    def process_error(
+        self, message: Message[TKey, TValue], error: BaseException | int
+    ) -> list[SimpleMessage]:
         """
         Handle an error that occurred during message processing and return a list of messages to respond with.
         This method is called when an unhandled exception occurs during the call to `self.deserialize` or

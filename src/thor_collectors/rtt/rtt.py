@@ -1,4 +1,5 @@
 """rtt.py: The processor for the RTT collector."""
+
 __author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
 
 from icmplib import async_ping, ICMPSocketError, DestinationUnreachable, TimeExceeded
@@ -16,7 +17,9 @@ COMPONENT_NAME = "collector-" + COLLECTOR
 
 class RTTProcessor(BaseAsyncCollectorProcessor[IPToProcess, IPProcessRequest]):
     def __init__(self, config: dict):
-        super().__init__(config, COMPONENT_NAME, 'collected_IP_data', IPToProcess, IPProcessRequest, RTTResult)
+        super().__init__(
+            config, COMPONENT_NAME, "collected_IP_data", IPToProcess, IPProcessRequest, RTTResult
+        )
         self._logger = log.init("worker")
 
         component_config = config.get(COLLECTOR, {})
@@ -25,7 +28,9 @@ class RTTProcessor(BaseAsyncCollectorProcessor[IPToProcess, IPProcessRequest]):
         self._timeout = component_config.get("timeout_ms", 1000) / 1000
         self._interval = component_config.get("interval_ms", 1000) / 1000
 
-    async def process(self, message: Message[IPToProcess, IPProcessRequest]) -> list[SimpleMessage]:
+    async def process(
+        self, message: Message[IPToProcess, IPProcessRequest]
+    ) -> list[SimpleMessage]:
         logger = self._logger
         dn_ip = message.key
         process_request = message.value
@@ -44,11 +49,21 @@ class RTTProcessor(BaseAsyncCollectorProcessor[IPToProcess, IPProcessRequest]):
     async def process_entry(self, dn_ip) -> RTTResult:
         rtt_data = None
         try:
-            ping_result = await async_ping(dn_ip.ip, count=self._count, timeout=self._timeout, interval=self._interval,
-                                           privileged=self._privileged)
-            rtt_data = RTTData(min=ping_result.min_rtt, avg=ping_result.avg_rtt, max=ping_result.max_rtt,
-                               sent=ping_result.packets_sent, received=ping_result.packets_received,
-                               jitter=ping_result.jitter)
+            ping_result = await async_ping(
+                dn_ip.ip,
+                count=self._count,
+                timeout=self._timeout,
+                interval=self._interval,
+                privileged=self._privileged,
+            )
+            rtt_data = RTTData(
+                min=ping_result.min_rtt,
+                avg=ping_result.avg_rtt,
+                max=ping_result.max_rtt,
+                sent=ping_result.packets_sent,
+                received=ping_result.packets_received,
+                jitter=ping_result.jitter,
+            )
             code = 0
             err_msg = None
         except ICMPSocketError as e:

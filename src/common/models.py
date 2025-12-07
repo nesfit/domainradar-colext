@@ -1,4 +1,5 @@
 """models.py: Pydantic models for the common data structures used in the components."""
+
 __author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
 
 from typing import Optional
@@ -11,16 +12,14 @@ from common import timestamp_now_millis
 
 class CustomBaseModel(BaseModel):
     model_config = ConfigDict(
-        alias_generator=AliasGenerator(
-            validation_alias=to_camel,
-            serialization_alias=to_camel
-        ),
+        alias_generator=AliasGenerator(validation_alias=to_camel, serialization_alias=to_camel),
         # Allow to instantiate models with the defined field names instead of aliases
-        populate_by_name=True
+        populate_by_name=True,
     )
 
 
 # ---- Plain models ---- #
+
 
 class IPToProcess(CustomBaseModel):
     domain_name: str = Field(alias="dn")
@@ -93,20 +92,21 @@ class DNSData(CustomBaseModel):
 
 # ---- Requests ---- #
 
+
 class ZoneRequest(CustomBaseModel):
     collect_dns: bool = Field(True, alias="collectDNS")
     collect_RDAP: bool = Field(True, alias="collectRDAP")
     dns_types_to_collect: Optional[list[str]] = Field(None, alias="dnsTypesToCollect")
-    dns_types_to_process_IPs_from: Optional[list[str]] = Field(None,
-                                                               alias="dnsTypesToProcessIPsFrom")
+    dns_types_to_process_IPs_from: Optional[list[str]] = Field(
+        None, alias="dnsTypesToProcessIPsFrom"
+    )
     label: Optional[str] = None
 
 
 class DNSRequest(CustomBaseModel):
     zone_info: ZoneInfo = Field(alias="zoneInfo")
     dns_types_to_collect: Optional[list[str]] = Field(None, alias="typesToCollect")
-    dns_types_to_process_IPs_from: Optional[list[str]] = Field(None,
-                                                               alias="typesToProcessIPsFrom")
+    dns_types_to_process_IPs_from: Optional[list[str]] = Field(None, alias="typesToProcessIPsFrom")
 
 
 class RDAPDomainRequest(CustomBaseModel):
@@ -122,6 +122,7 @@ class IPProcessRequest(CustomBaseModel):
 
 
 # ---- Results ---- #
+
 
 class Result(CustomBaseModel):
     status_code: int = Field(0, alias="statusCode")

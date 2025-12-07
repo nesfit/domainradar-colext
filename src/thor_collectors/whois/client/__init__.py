@@ -22,7 +22,7 @@ NOT_FOUND_MESSAGES = [
     "object does not exist",
     "domain you requested is not known",
     "invalid pattern",
-    "invalid domain"
+    "invalid domain",
 ]
 
 RATE_LIMITED_MESSAGES = [
@@ -40,7 +40,7 @@ RATE_LIMITED_MESSAGES = [
     "excessive querying",
     "ratelimited",
     "query looks similar to automated requests",
-    "number of requests per client per time interval is restricted"
+    "number of requests per client per time interval is restricted",
 ]
 
 
@@ -54,7 +54,6 @@ def find_error(whois_response: str) -> int | None:
 
 
 class WhoisClient:
-
     def __init__(self):
         self._dns_cache = Cache()
         self._resolver = dns.resolver.Resolver(configure=True)
@@ -127,7 +126,9 @@ class WhoisClient:
         except Exception:
             return None
 
-    async def query_async(self, query: str, server: str, timeout: float = 5.0, bufsize: int = 65536) -> str:
+    async def query_async(
+        self, query: str, server: str, timeout: float = 5.0, bufsize: int = 65536
+    ) -> str:
         """
         Perform a WHOIS query using asyncio.
 

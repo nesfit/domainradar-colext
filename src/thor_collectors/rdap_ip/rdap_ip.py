@@ -1,4 +1,5 @@
 """rdap_ip.py: The processor for the RDAP-IP collector."""
+
 __author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
 
 import asyncio
@@ -8,7 +9,8 @@ from typing import Literal
 import httpx
 import whodap
 from whodap import IPv4Client, IPv6Client
-from whodap.errors import *
+from whodap.errors import (BadStatusCode, MalformedQueryError,
+                           NotFoundError, RateLimitError, WhodapError)
 from whodap.response import IPv4Response, IPv6Response
 
 import common.result_codes as rc
@@ -25,30 +27,51 @@ COMPONENT_NAME = "collector-" + COLLECTOR
 
 class RDAPIPProcessor(BaseAsyncCollectorProcessor[IPToProcess, IPProcessRequest]):
     def __init__(self, config: dict):
-        super().__init__(config, COMPONENT_NAME, 'collected_IP_data', IPToProcess, IPProcessRequest, RDAPIPResult)
+        super().__init__(
+            config,
+            COMPONENT_NAME,
+            "collected_IP_data",
+            IPToProcess,
+            IPProcessRequest,
+            RDAPIPResult,
+        )
         self._logger = log.init("worker")
 
         component_config = config.get(COLLECTOR, {})
-        self._httpx_client = httpx.AsyncClient(verify=make_rdap_ssl_context(), follow_redirects=True,
-                                               timeout=component_config.get("http_timeout", 5))
+        self._httpx_client = httpx.AsyncClient(
+            verify=make_rdap_ssl_context(),
+            follow_redirects=True,
+            timeout=component_config.get("http_timeout", 5),
+        )
         self._ipv4_client = None
         self._ipv6_client = None
 
-    def get_rl_bucket_key(self, message: Message[IPToProcess, IPProcessRequest]) -> str | Literal['default'] | None:
+    def get_rl_bucket_key(
+        self, message: Message[IPToProcess, IPProcessRequest]
+    ) -> str | Literal["default"] | None:
         ip = ipaddress.ip_address(message.key.ip)
         # noinspection PyProtectedMember
-        rdap_target = self._ipv4_client._get_rdap_server(ip) if ip.version == 4 \
+        rdap_target = (
+            self._ipv4_client._get_rdap_server(ip)
+            if ip.version == 4
             else self._ipv6_client._get_rdap_server(ip)
+        )
         return rdap_target
 
     async def init_async(self):
         while True:
             try:
-                self._ipv4_client = await whodap.IPv4Client.new_aio_client(httpx_client=self._httpx_client)
-                self._ipv6_client = await whodap.IPv6Client.new_aio_client(httpx_client=self._httpx_client)
+                self._ipv4_client = await whodap.IPv4Client.new_aio_client(
+                    httpx_client=self._httpx_client
+                )
+                self._ipv6_client = await whodap.IPv6Client.new_aio_client(
+                    httpx_client=self._httpx_client
+                )
                 break
             except Exception as e:
-                self._logger.error("Error initializing RDAP clients. Retrying in 5 seconds.", exc_info=e)
+                self._logger.error(
+                    "Error initializing RDAP clients. Retrying in 5 seconds.", exc_info=e
+                )
                 await asyncio.sleep(5)
 
     async def close_async(self):
@@ -56,7 +79,9 @@ class RDAPIPProcessor(BaseAsyncCollectorProcessor[IPToProcess, IPProcessRequest]
         await self._ipv6_client.aio_close()
         await self._httpx_client.aclose()
 
-    async def process(self, message: Message[IPToProcess, IPProcessRequest]) -> list[SimpleMessage]:
+    async def process(
+        self, message: Message[IPToProcess, IPProcessRequest]
+    ) -> list[SimpleMessage]:
         logger = self._logger
         dn_ip = message.key
         process_request = message.value
@@ -73,21 +98,24 @@ class RDAPIPProcessor(BaseAsyncCollectorProcessor[IPToProcess, IPProcessRequest]
         if rdap_data is not None:
             rdap_data = rdap_data.to_dict()
 
-        result = RDAPIPResult(status_code=err_code, error=err_msg,
-                              collector=COLLECTOR,
-                              data=rdap_data)
+        result = RDAPIPResult(
+            status_code=err_code, error=err_msg, collector=COLLECTOR, data=rdap_data
+        )
 
         return [(self._output_topic, message.key_raw, dump_model(result))]
 
-    async def fetch_ip(self, dn, address) \
-            -> tuple[IPv4Response | IPv6Response | None, int | None, str | None]:
+    async def fetch_ip(
+        self, dn, address
+    ) -> tuple[IPv4Response | IPv6Response | None, int | None, str | None]:
         client_v4: IPv4Client = self._ipv4_client
         client_v6: IPv6Client = self._ipv6_client
         logger = self._logger
 
         ip = ipaddress.ip_address(address)
         # noinspection PyProtectedMember
-        rdap_target = client_v4._get_rdap_server(ip) if ip.version == 4 else client_v6._get_rdap_server(ip)
+        rdap_target = (
+            client_v4._get_rdap_server(ip) if ip.version == 4 else client_v6._get_rdap_server(ip)
+        )
 
         try:
             if ip.version == 4:

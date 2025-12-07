@@ -64,7 +64,7 @@ def add_logging_trace_level() -> None:
     logger_class = logging.getLoggerClass()
 
     if not hasattr(logging, "TRACE"):
-        logging.addLevelName(trace_const, 'TRACE')
+        logging.addLevelName(trace_const, "TRACE")
         setattr(logging, "TRACE", trace_const)
         setattr(logger_class, "trace", trace)
 
@@ -85,19 +85,14 @@ def init_logging() -> None:
             if logger.isEnabledFor(record.levelno):
                 logger.handle(record)
 
-    config = _config.get("logging", {
-        'version': 1,
-        'handlers': {
-            'console': {
-                'class': 'logging.StreamHandler',
-                'level': 'INFO'
-            }
+    config = _config.get(
+        "logging",
+        {
+            "version": 1,
+            "handlers": {"console": {"class": "logging.StreamHandler", "level": "INFO"}},
+            "root": {"handlers": ["console"], "level": "INFO"},
         },
-        'root': {
-            'handlers': ['console'],
-            'level': 'INFO'
-        }
-    })
+    )
 
     _log_queue = mp.Queue()
     logging.config.dictConfig(config)
@@ -113,18 +108,10 @@ def get_worker_logger_config() -> dict:
     level = _config.get("logging", {}).get("worker_level", "INFO")
 
     return {
-        'version': 1,
-        'disable_existing_loggers': True,
-        'handlers': {
-            'queue': {
-                'class': 'logging.handlers.QueueHandler',
-                'queue': _log_queue
-            }
-        },
-        'root': {
-            'handlers': ['queue'],
-            'level': level
-        }
+        "version": 1,
+        "disable_existing_loggers": True,
+        "handlers": {"queue": {"class": "logging.handlers.QueueHandler", "queue": _log_queue}},
+        "root": {"handlers": ["queue"], "level": level},
     }
 
 
@@ -146,8 +133,9 @@ def make_client_settings(config: dict) -> dict:
         ret["ssl.certificate.location"] = config["connection"]["ssl"]["client_cert_file"]
         ret["ssl.key.location"] = config["connection"]["ssl"]["client_key_file"]
         ret["ssl.key.password"] = config["connection"]["ssl"]["client_key_password"]
-        ret["ssl.endpoint.identification.algorithm"] = \
+        ret["ssl.endpoint.identification.algorithm"] = (
             "https" if config["connection"]["ssl"]["check_hostname"] else "none"
+        )
 
     return ret
 
@@ -166,7 +154,7 @@ def make_consumer_settings(config: dict) -> dict:
 
 def make_producer_settings(config: dict) -> dict:
     ret = make_client_settings(config)
-    ret["transactional.id"] = f'{config["client"]["app_id"]}-at-{platform.node()}'
+    ret["transactional.id"] = f"{config['client']['app_id']}-at-{platform.node()}"
     ret = ret | config.get("producer", {})
 
     return ret

@@ -1,10 +1,11 @@
 """rdap_util.py: Utility functions for the RDAP collectors."""
+
 __author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
 
 import ssl
 from typing import List
 
-from whodap import DomainResponse, DNSClient
+from whodap import DomainResponse
 from whodap.client import RDAPClient
 from whodap.response import RDAPResponse
 
@@ -45,7 +46,9 @@ async def fetch_entities(response: DomainResponse, client: RDAPClient) -> List[R
                 entity_response = None
                 try:
                     # noinspection PyProtectedMember
-                    entity_response = await client._aio_get_authoritative_response(link.href, [link.href])
+                    entity_response = await client._aio_get_authoritative_response(
+                        link.href, [link.href]
+                    )
                 finally:
                     if entity_response is None:
                         # If the entity could not be fetched, add the original entity
@@ -73,7 +76,9 @@ def make_rdap_ssl_context():
     return context
 
 
-def extract_known_tld(domain_name: str, iana_tlds: dict[str, str]) -> tuple[str | None, str | None, str | None]:
+def extract_known_tld(
+    domain_name: str, iana_tlds: dict[str, str]
+) -> tuple[str | None, str | None, str | None]:
     """
     Extract a TLD (or another suffix) registered in the IANA DNS RDAP bootstrap file.
     The bootstrap data are taken from the given DNSClient instance.
@@ -81,17 +86,17 @@ def extract_known_tld(domain_name: str, iana_tlds: dict[str, str]) -> tuple[str 
     :return: A tuple with the domain, the suffix part and the RDAP server base URL.
     All are None if the TLD is not found in the IANA's registry.
     """
-    parts = domain_name.split('.')
+    parts = domain_name.split(".")
     if len(parts) < 2:
         return None, None, None
 
-    domain = '.'.join(parts[:-2])
+    domain = ".".join(parts[:-2])
     # Try the SLD first
-    tld = '.'.join(parts[-2:])
+    tld = ".".join(parts[-2:])
 
     if tld not in iana_tlds:
         # SLD not found in IANA's registry, try the TLD
-        domain = '.'.join(parts[:-1])
+        domain = ".".join(parts[:-1])
         tld = parts[-1]
 
     if tld not in iana_tlds:

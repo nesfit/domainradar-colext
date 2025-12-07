@@ -1,4 +1,5 @@
 """rdap_dn.py: The processor for the RDAP-DN collector."""
+
 __author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
 
 import asyncio
@@ -7,7 +8,8 @@ from typing import Literal
 import httpx
 import tldextract
 import whodap
-from whodap.errors import *
+from whodap.errors import (BadStatusCode, MalformedQueryError,
+                           NotFoundError, RateLimitError, WhodapError)
 from whodap.response import DomainResponse
 
 import common.result_codes as rc
@@ -24,12 +26,17 @@ COMPONENT_NAME = "collector-" + COLLECTOR
 
 class RDAPDNProcessor(BaseAsyncCollectorProcessor[str, RDAPDomainRequest]):
     def __init__(self, config: dict):
-        super().__init__(config, COMPONENT_NAME, 'processed_RDAP_DN', str, RDAPDomainRequest, RDAPDomainResult)
+        super().__init__(
+            config, COMPONENT_NAME, "processed_RDAP_DN", str, RDAPDomainRequest, RDAPDomainResult
+        )
         self._logger = log.init("worker")
 
         component_config = config.get(COLLECTOR, {})
-        self._httpx_client = httpx.AsyncClient(verify=make_rdap_ssl_context(), follow_redirects=True,
-                                               timeout=component_config.get("http_timeout", 5))
+        self._httpx_client = httpx.AsyncClient(
+            verify=make_rdap_ssl_context(),
+            follow_redirects=True,
+            timeout=component_config.get("http_timeout", 5),
+        )
         self._rdap_client = None
         self._rate_limiters = config.get("rate_limiter", {})
 
@@ -37,7 +44,9 @@ class RDAPDNProcessor(BaseAsyncCollectorProcessor[str, RDAPDomainRequest]):
     #     super().deserialize(message)
     #     # TODO: pre-process TLD?
 
-    def get_rl_bucket_key(self, message: Message[str, RDAPDomainRequest]) -> str | Literal['default'] | None:
+    def get_rl_bucket_key(
+        self, message: Message[str, RDAPDomainRequest]
+    ) -> str | Literal["default"] | None:
         _, tld, endpoint = extract_known_tld(message.key, self._rdap_client.iana_dns_server_map)
         if endpoint in self._rate_limiters:
             return endpoint
@@ -46,10 +55,14 @@ class RDAPDNProcessor(BaseAsyncCollectorProcessor[str, RDAPDomainRequest]):
     async def init_async(self):
         while True:
             try:
-                self._rdap_client = await whodap.DNSClient.new_aio_client(httpx_client=self._httpx_client)
+                self._rdap_client = await whodap.DNSClient.new_aio_client(
+                    httpx_client=self._httpx_client
+                )
                 break
             except Exception as e:
-                self._logger.error("Error initializing RDAP client. Retrying in 5 seconds.", exc_info=e)
+                self._logger.error(
+                    "Error initializing RDAP client. Retrying in 5 seconds.", exc_info=e
+                )
                 await asyncio.sleep(5)
 
     async def close_async(self):
@@ -98,20 +111,25 @@ class RDAPDNProcessor(BaseAsyncCollectorProcessor[str, RDAPDomainRequest]):
             rdap_data = rdap_data.to_dict()
             entities = [e.to_dict() for e in entities]
 
-        result = RDAPDomainResult(status_code=err_code, error=err_msg,
-                                  rdap_data=rdap_data, entities=entities,
-                                  rdap_target=rdap_target)
+        result = RDAPDomainResult(
+            status_code=err_code,
+            error=err_msg,
+            rdap_data=rdap_data,
+            entities=entities,
+            rdap_target=rdap_target,
+        )
 
         logger.k_trace("Producing RDAP result", dn)
         return_messages = [(self._output_topic, message.key_raw, dump_model(result))]
         if err_code != rc.OK:
             # If there was an error, we can try to get WHOIS data for the domain as a fallback
             # Re-use the raw value of the original message as the WHOIS request is the same as RDAP-DN
-            return_messages.append(('to_process_WHOIS', message.key_raw, message.value_raw))
+            return_messages.append(("to_process_WHOIS", message.key_raw, message.value_raw))
         return return_messages
 
-    async def fetch_rdap(self, domain_name) \
-            -> tuple[DomainResponse | None, list | None, int | None, str | None]:
+    async def fetch_rdap(
+        self, domain_name
+    ) -> tuple[DomainResponse | None, list | None, int | None, str | None]:
         client = self._rdap_client
         logger = self._logger
 

@@ -1,14 +1,14 @@
 """util.py: A collection of shared utility functions for all the components."""
+
 __author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
 
 import json
 import logging
 import os
-import ssl
 import sys
 import tomllib
 from datetime import datetime
-from typing import TypeVar, Type, Any, cast
+from typing import TypeVar, Type, Any
 
 import pydantic
 from pydantic import ValidationError, BaseModel
@@ -83,7 +83,7 @@ def timestamp_now_millis() -> int:
     return int(datetime.now().timestamp() * 1e3)
 
 
-TModel = TypeVar('TModel', bound=BaseModel)
+TModel = TypeVar("TModel", bound=BaseModel)
 
 
 def ensure_model(model_class: Type[TModel], data: dict | str | bytes | None) -> TModel | None:
@@ -115,18 +115,30 @@ def ensure_model(model_class: Type[TModel], data: dict | str | bytes | None) -> 
     try:
         return model_class.model_validate(data)
     except ValidationError as e:
-        _logger.warning("Invalid model",
-                        extra={"properties": {"input_data": data, "model": model_class.__name__, "errors": e.errors()}})
+        _logger.warning(
+            "Invalid model",
+            extra={
+                "properties": {
+                    "input_data": data,
+                    "model": model_class.__name__,
+                    "errors": e.errors(),
+                }
+            },
+        )
         return None
     except Exception as e:
-        _logger.error("Error validating model", exc_info=e,
-                      extra={"properties": {"input_data": data, "model": model_class.__name__}})
+        _logger.error(
+            "Error validating model",
+            exc_info=e,
+            extra={"properties": {"input_data": data, "model": model_class.__name__}},
+        )
         return None
 
 
 def dump_model(obj: Any) -> bytes:
     if isinstance(obj, pydantic.BaseModel):
-        return obj.model_dump_json(indent=None, by_alias=True,
-                                   context={"separators": (',', ':')}).encode('utf-8', errors='ignore')
+        return obj.model_dump_json(
+            indent=None, by_alias=True, context={"separators": (",", ":")}
+        ).encode("utf-8", errors="ignore")
     else:
-        return json.dumps(obj, indent=None, separators=(',', ':')).encode('utf-8', errors='ignore')
+        return json.dumps(obj, indent=None, separators=(",", ":")).encode("utf-8", errors="ignore")

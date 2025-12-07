@@ -1,4 +1,5 @@
 """resolver.py: The zone resolver."""
+
 __author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
 
 from logging import Logger
@@ -20,7 +21,9 @@ class ZoneResolver:
     It uses the provided DNSCollectorOptions to configure the DNS queries and timeouts.
     """
 
-    def __init__(self, options: DNSCollectorOptions, logger: Logger, cache: dns.resolver.Cache | None = None):
+    def __init__(
+        self, options: DNSCollectorOptions, logger: Logger, cache: dns.resolver.Cache | None = None
+    ):
         self._options = options
         self._logger = logger
 
@@ -53,17 +56,17 @@ class ZoneResolver:
 
         soa_record = None
 
-        if name_parts.domain != '' and name_parts.suffix != '':
+        if name_parts.domain != "" and name_parts.suffix != "":
             # Normal case, domain and suffix are present
             domain = "." + name_parts.fqdn
-            from_dot_index = domain.rindex('.', 0, len(domain) - len(name_parts.suffix) - 1)
-        elif name_parts.domain != '' and name_parts.suffix == '':
+            from_dot_index = domain.rindex(".", 0, len(domain) - len(name_parts.suffix) - 1)
+        elif name_parts.domain != "" and name_parts.suffix == "":
             # Invalid suffix, the domain name cannot exist in global DNS
             return None
-        elif name_parts.domain == '' and name_parts.suffix != '':
+        elif name_parts.domain == "" and name_parts.suffix != "":
             # Only suffix, the domain name is an eTLD, process it as a domain
             domain = "." + name_parts.suffix
-            from_dot_index = domain.rindex('.', 0, len(domain) - 1)
+            from_dot_index = domain.rindex(".", 0, len(domain) - 1)
         else:
             # Neither domain nor suffix found, invalid input
             return None
@@ -71,7 +74,7 @@ class ZoneResolver:
         input_name = dns.name.from_text(domain_name)
         zone = None
         while True:
-            domain_to_check = domain[from_dot_index + 1:]
+            domain_to_check = domain[from_dot_index + 1 :]
             try:
                 answer = await self._dns.resolve(domain_to_check, rdt.SOA)
                 if len(answer) == 0 or answer[0].rdtype != rdt.SOA:
@@ -80,10 +83,15 @@ class ZoneResolver:
                 # to the SOA of the CNAME target. We need to check if the SOA is for the correct domain.
                 if input_name.is_subdomain(answer.rrset.name):
                     soa = answer[0]  # type: dns.rdtypes.ANY.SOA.SOA
-                    soa_record = SOARecord(primary_ns=soa.mname.to_text(True),
-                                           resp_mailbox_dname=soa.rname.to_text(True),
-                                           serial=str(soa.serial), refresh=soa.refresh,
-                                           retry=soa.retry, expire=soa.expire, min_ttl=soa.minimum)
+                    soa_record = SOARecord(
+                        primary_ns=soa.mname.to_text(True),
+                        resp_mailbox_dname=soa.rname.to_text(True),
+                        serial=str(soa.serial),
+                        refresh=soa.refresh,
+                        retry=soa.retry,
+                        expire=soa.expire,
+                        min_ttl=soa.minimum,
+                    )
                     zone = domain_to_check
             except dns.resolver.NoAnswer:
                 pass
@@ -95,7 +103,7 @@ class ZoneResolver:
             if from_dot_index <= 0:
                 break
 
-            from_dot_index = domain.rindex('.', 0, from_dot_index - 1)
+            from_dot_index = domain.rindex(".", 0, from_dot_index - 1)
 
         if zone is None:
             # No active zone found
@@ -116,14 +124,24 @@ class ZoneResolver:
 
         has_dnskey = await self._has_dnskey(zone)
 
-        return ZoneInfo(soa=soa_record, zone=zone, primary_nameserver_ips=primary_ns_ips,
-                        secondary_nameservers=nameservers, secondary_nameserver_ips=nameserver_ips,
-                        public_suffix=name_parts.suffix, has_dnskey=has_dnskey)
+        return ZoneInfo(
+            soa=soa_record,
+            zone=zone,
+            primary_nameserver_ips=primary_ns_ips,
+            secondary_nameservers=nameservers,
+            secondary_nameserver_ips=nameserver_ips,
+            public_suffix=name_parts.suffix,
+            has_dnskey=has_dnskey,
+        )
 
     async def _has_dnskey(self, domain_name: str) -> bool | None:
         try:
             dnskey_rrset = await self._dns.resolve(domain_name, rdt.DNSKEY)
-            return dnskey_rrset is not None and len(dnskey_rrset) != 0 and dnskey_rrset.rdtype == rdt.DNSKEY
+            return (
+                dnskey_rrset is not None
+                and len(dnskey_rrset) != 0
+                and dnskey_rrset.rdtype == rdt.DNSKEY
+            )
         except dns.resolver.NoAnswer:
             return False
         except dns.exception.DNSException:

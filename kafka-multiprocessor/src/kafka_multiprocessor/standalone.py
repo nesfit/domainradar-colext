@@ -50,15 +50,31 @@ def run_cli(config: dict, processor_type: Type[KafkaMessageProcessor]):
     add_logging_trace_level()
 
     # Build specs
-    key_spec = InputSpec("null", None) if args.no_key else (
-        InputSpec("stdin", "-") if args.key_file == "-" else
-        (InputSpec("file", args.key_file) if args.key_file is not None else
-         InputSpec("literal", args.key))
+    key_spec = (
+        InputSpec("null", None)
+        if args.no_key
+        else (
+            InputSpec("stdin", "-")
+            if args.key_file == "-"
+            else (
+                InputSpec("file", args.key_file)
+                if args.key_file is not None
+                else InputSpec("literal", args.key)
+            )
+        )
     )
-    value_spec = InputSpec("null", None) if args.no_value else (
-        InputSpec("stdin", "-") if args.value_file == "-" else
-        (InputSpec("file", args.value_file) if args.value_file is not None else
-         InputSpec("literal", args.value))
+    value_spec = (
+        InputSpec("null", None)
+        if args.no_value
+        else (
+            InputSpec("stdin", "-")
+            if args.value_file == "-"
+            else (
+                InputSpec("file", args.value_file)
+                if args.value_file is not None
+                else InputSpec("literal", args.value)
+            )
+        )
     )
 
     # Disallow consuming stdin twice
@@ -72,6 +88,7 @@ def run_cli(config: dict, processor_type: Type[KafkaMessageProcessor]):
     processor = processor_type(config)
     if isinstance(processor, AsyncKafkaMessageProcessor):
         import asyncio
+
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         loop.run_until_complete(processor.init_async())
@@ -87,11 +104,11 @@ def run_cli(config: dict, processor_type: Type[KafkaMessageProcessor]):
         print(f"--- Output to topic '{out_topic}' ---")
         if out_key is not None:
             print(f"Key ({len(out_key)} bytes):")
-            print(out_key.decode('utf-8', 'replace'))
+            print(out_key.decode("utf-8", "replace"))
         else:
             print("Key: None")
         if out_value is not None:
             print(f"Value ({len(out_value)} bytes):")
-            print(out_value.decode('utf-8', 'replace'))
+            print(out_value.decode("utf-8", "replace"))
         else:
             print("Value: None")

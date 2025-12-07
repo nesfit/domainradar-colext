@@ -1,5 +1,6 @@
 """
-iana_db.py: Provides an interface for fetching WHOIS servers for TLDs from the IANA Root Zone Database.
+iana_db.py: Provides an interface for fetching WHOIS servers for TLDs from the IANA Root Zone
+            Database.
 
 The code is heavily inspired by a similar module in the PyFunceble project:
 https://pyfunceble.readthedocs.io/en/latest/code/PyFunceble.cli.scripts.html#PyFunceble.cli.scripts.iana.IanaDBGenerator
@@ -19,6 +20,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 """
+
 __author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
 
 import concurrent.futures
@@ -151,9 +153,7 @@ class IanaDBGenerator:
 
         return None
 
-    def _get_extension_and_referrer_from_block(
-            self, block: str
-    ) -> tuple[str | None, str | None]:
+    def _get_extension_and_referrer_from_block(self, block: str) -> tuple[str | None, str | None]:
         """
         Given an HTML block, we try to extract an extension and it's underlying
         referrer (WHOIS server).
@@ -191,7 +191,7 @@ class IanaDBGenerator:
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             for extension, whois_server in executor.map(
-                    self._get_extension_and_referrer_from_block, raw_data
+                self._get_extension_and_referrer_from_block, raw_data
             ):
                 if extension:
                     self._database[extension] = whois_server

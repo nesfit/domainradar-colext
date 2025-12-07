@@ -1,4 +1,5 @@
 """dnscol.py: The processor for the DNS collector."""
+
 __author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
 
 from dns.resolver import LRUCache
@@ -17,7 +18,7 @@ COMPONENT_NAME = "collector-" + COLLECTOR
 
 class DNSProcessor(BaseAsyncCollectorProcessor[str, DNSRequest]):
     def __init__(self, config: dict):
-        super().__init__(config, COMPONENT_NAME, 'processed_DNS', str, DNSRequest, DNSResult)
+        super().__init__(config, COMPONENT_NAME, "processed_DNS", str, DNSRequest, DNSResult)
         self._logger = log.init("worker")
 
         component_config = config.get(COLLECTOR, {})
@@ -47,12 +48,12 @@ class DNSProcessor(BaseAsyncCollectorProcessor[str, DNSRequest]):
                 for ip in result.ips:
                     ip_to_process = IPToProcess(ip=ip.ip, dn=dn)
                     logger.k_trace("Sending IP %s to process", dn, ip.ip)
-                    ret.append(('to_process_IP', dump_model(ip_to_process), None))
+                    ret.append(("to_process_IP", dump_model(ip_to_process), None))
 
             ip_for_tls = self.get_ip_for_tls(result.dns_data)
             if ip_for_tls is not None:
                 logger.k_trace("Sending TLS request", dn)
-                ret.append(('to_process_TLS', message.key_raw, ip_for_tls.encode('utf-8')))
+                ret.append(("to_process_TLS", message.key_raw, ip_for_tls.encode("utf-8")))
 
         return ret
 
@@ -61,8 +62,11 @@ class DNSProcessor(BaseAsyncCollectorProcessor[str, DNSRequest]):
         if dns_data is None:
             return None
 
-        if dns_data.cname is not None and dns_data.cname.related_ips is not None \
-                and len(dns_data.cname.related_ips) > 0:
+        if (
+            dns_data.cname is not None
+            and dns_data.cname.related_ips is not None
+            and len(dns_data.cname.related_ips) > 0
+        ):
             return next(iter(dns_data.cname.related_ips))
         elif dns_data.a is not None and len(dns_data.a) > 0:
             return next(iter(dns_data.a))

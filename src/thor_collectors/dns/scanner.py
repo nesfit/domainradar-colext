@@ -1,4 +1,5 @@
 """scanner.py: The DNS scanner."""
+
 __author__ = "Ondřej Ondryáš <xondry02@vut.cz>"
 
 import asyncio
@@ -18,7 +19,15 @@ from dns.rrset import RRset
 
 from thor_collectors.dns_options import DNSCollectorOptions
 from common import result_codes as rc
-from common.models import DNSData, CNAMERecord, MXRecord, NSRecord, IPFromRecord, DNSRequest, DNSResult
+from common.models import (
+    DNSData,
+    CNAMERecord,
+    MXRecord,
+    NSRecord,
+    IPFromRecord,
+    DNSRequest,
+    DNSResult,
+)
 
 
 class DNSScanner:
@@ -29,7 +38,9 @@ class DNSScanner:
     It uses the provided DNSCollectorOptions to configure the DNS queries and timeouts.
     """
 
-    def __init__(self, options: DNSCollectorOptions, logger: Logger, cache: dns.resolver.Cache | None = None):
+    def __init__(
+        self, options: DNSCollectorOptions, logger: Logger, cache: dns.resolver.Cache | None = None
+    ):
         self._options = options
         self._logger = logger
 
@@ -85,23 +96,36 @@ class DNSScanner:
 
         all_requests = []
 
-        if 'A' in types:
-            all_requests.append(self._resolve_a_or_aaaa(domain, 'A', primary_ns_ips, ret, ret_ips, 'A' in adr_types))
-        if 'AAAA' in types:
+        if "A" in types:
             all_requests.append(
-                self._resolve_a_or_aaaa(domain, 'AAAA', primary_ns_ips, ret, ret_ips, 'AAAA' in adr_types))
-        if 'CNAME' in types:
-            all_requests.append(self._resolve_cname(domain, primary_ns_ips, ret, ret_ips, 'CNAME' in adr_types))
-        if 'MX' in types:
-            all_requests.append(self._resolve_mx(domain, primary_ns_ips, ret, ret_ips, 'MX' in adr_types))
-        if 'NS' in types:
-            all_requests.append(self._resolve_ns(domain, primary_ns_ips, ret, ret_ips, 'NS' in adr_types))
-        if 'TXT' in types:
+                self._resolve_a_or_aaaa(
+                    domain, "A", primary_ns_ips, ret, ret_ips, "A" in adr_types
+                )
+            )
+        if "AAAA" in types:
+            all_requests.append(
+                self._resolve_a_or_aaaa(
+                    domain, "AAAA", primary_ns_ips, ret, ret_ips, "AAAA" in adr_types
+                )
+            )
+        if "CNAME" in types:
+            all_requests.append(
+                self._resolve_cname(domain, primary_ns_ips, ret, ret_ips, "CNAME" in adr_types)
+            )
+        if "MX" in types:
+            all_requests.append(
+                self._resolve_mx(domain, primary_ns_ips, ret, ret_ips, "MX" in adr_types)
+            )
+        if "NS" in types:
+            all_requests.append(
+                self._resolve_ns(domain, primary_ns_ips, ret, ret_ips, "NS" in adr_types)
+            )
+        if "TXT" in types:
             all_requests.append(self._resolve_txt(domain, primary_ns_ips, ret))
 
         await asyncio.gather(*all_requests)
 
-        ret_errors = ret['errors']
+        ret_errors = ret["errors"]
         if len(ret_errors) == 0:
             ret_errors = None
         elif len(ret_errors) == len(types):
@@ -110,27 +134,37 @@ class DNSScanner:
             for error_str in ret_errors.values():
                 if error_str != self._timeout_error:
                     # At least one error is not a timeout
-                    return DNSResult(status_code=rc.OTHER_DNS_ERROR,
-                                     dns_data=DNSData(errors=ret_errors),
-                                     error="All queries failed")
-            return DNSResult(status_code=rc.TIMEOUT,
-                             error=f"All queries timed out ({self._timeout_error} s)")
+                    return DNSResult(
+                        status_code=rc.OTHER_DNS_ERROR,
+                        dns_data=DNSData(errors=ret_errors),
+                        error="All queries failed",
+                    )
+            return DNSResult(
+                status_code=rc.TIMEOUT, error=f"All queries timed out ({self._timeout_error} s)"
+            )
 
         dns_data = DNSData(
-            a=ret.get('A'),
-            aaaa=ret.get('AAAA'),
-            cname=ret.get('CNAME'),
-            mx=ret.get('MX'),
-            ns=ret.get('NS'),
-            txt=ret.get('TXT'),
-            ttl_values=ret.get('ttls', {}),
-            errors=ret_errors
+            a=ret.get("A"),
+            aaaa=ret.get("AAAA"),
+            cname=ret.get("CNAME"),
+            mx=ret.get("MX"),
+            ns=ret.get("NS"),
+            txt=ret.get("TXT"),
+            ttl_values=ret.get("ttls", {}),
+            errors=ret_errors,
         )
 
         return DNSResult(status_code=0, dns_data=dns_data, ips=ret_ips)
 
-    async def _resolve_a_or_aaaa(self, domain: Name, record_type: Literal['A', 'AAAA'], primary_ns: list[str],
-                                 result: dict, ips: list[IPFromRecord], add_ips: bool):
+    async def _resolve_a_or_aaaa(
+        self,
+        domain: Name,
+        record_type: Literal["A", "AAAA"],
+        primary_ns: list[str],
+        result: dict,
+        ips: list[IPFromRecord],
+        add_ips: bool,
+    ):
         """Resolves an A or AAAA record set for a given domain name and populates a result object."""
         data = await self._resolve_record_base(domain, record_type, primary_ns, result)
         if data is None:
@@ -142,10 +176,16 @@ class DNSScanner:
             if add_ips:
                 ips.append(IPFromRecord(ip=a_record.address, type=record_type))
 
-    async def _resolve_cname(self, domain: Name, primary_ns: list[str], result: dict, ips: list[IPFromRecord],
-                             add_ips: bool):
+    async def _resolve_cname(
+        self,
+        domain: Name,
+        primary_ns: list[str],
+        result: dict,
+        ips: list[IPFromRecord],
+        add_ips: bool,
+    ):
         """Resolves a CNAME record for a given domain name and populates a result object."""
-        data = await self._resolve_record_base(domain, 'CNAME', primary_ns, result)
+        data = await self._resolve_record_base(domain, "CNAME", primary_ns, result)
         if data is None:
             return
 
@@ -154,62 +194,82 @@ class DNSScanner:
 
         value = data[0].target  # type: Name
         related_ips = await self._resolve_ips(value)
-        result['CNAME'] = CNAMERecord(value=value.to_text(True), related_ips=related_ips)
+        result["CNAME"] = CNAMERecord(value=value.to_text(True), related_ips=related_ips)
         if add_ips:
             for related_ip in related_ips:
-                ips.append(IPFromRecord(ip=related_ip, type='CNAME'))
+                ips.append(IPFromRecord(ip=related_ip, type="CNAME"))
 
-    async def _resolve_mx(self, domain: Name, primary_ns: list[str], result: dict, ips: list[IPFromRecord],
-                          add_ips: bool):
+    async def _resolve_mx(
+        self,
+        domain: Name,
+        primary_ns: list[str],
+        result: dict,
+        ips: list[IPFromRecord],
+        add_ips: bool,
+    ):
         """Resolves an MX record set for a given domain name and populates a result object."""
-        data = await self._resolve_record_base(domain, 'MX', primary_ns, result)
+        data = await self._resolve_record_base(domain, "MX", primary_ns, result)
         if data is None:
             return
 
-        result['MX'] = []
+        result["MX"] = []
         for mx_record in data:  # type: dns.rdtypes.ANY.MX.MX
             related_ips = await self._resolve_ips(mx_record.exchange)
-            result['MX'].append(MXRecord(value=mx_record.exchange.to_text(True), priority=mx_record.preference,
-                                         related_ips=related_ips))
+            result["MX"].append(
+                MXRecord(
+                    value=mx_record.exchange.to_text(True),
+                    priority=mx_record.preference,
+                    related_ips=related_ips,
+                )
+            )
             if add_ips:
                 for related_ip in related_ips:
-                    ips.append(IPFromRecord(ip=related_ip, type='MX'))
+                    ips.append(IPFromRecord(ip=related_ip, type="MX"))
 
-    async def _resolve_ns(self, domain: Name, primary_ns: list[str], result: dict, ips: list[IPFromRecord],
-                          add_ips: bool):
+    async def _resolve_ns(
+        self,
+        domain: Name,
+        primary_ns: list[str],
+        result: dict,
+        ips: list[IPFromRecord],
+        add_ips: bool,
+    ):
         """Resolves a NS record set for a given domain name and populates a result object."""
-        data = await self._resolve_record_base(domain, 'NS', primary_ns, result)
+        data = await self._resolve_record_base(domain, "NS", primary_ns, result)
         if data is None:
             return
 
-        result['NS'] = []
+        result["NS"] = []
         for ns_record in data:  # type: dns.rdtypes.ANY.NS.NS
             related_ips = await self._resolve_ips(ns_record.target)
-            result['NS'].append(NSRecord(nameserver=ns_record.target.to_text(True), related_ips=related_ips))
+            result["NS"].append(
+                NSRecord(nameserver=ns_record.target.to_text(True), related_ips=related_ips)
+            )
             if add_ips:
                 for related_ip in related_ips:
-                    ips.append(IPFromRecord(ip=related_ip, type='NS'))
+                    ips.append(IPFromRecord(ip=related_ip, type="NS"))
 
     async def _resolve_txt(self, domain: Name, primary_ns: list[str], result: dict):
         """
         Resolves a TXT record set for a given domain name and populates a result object.
         Checks the TXT records for known values, such as SPF, DKIM and DMARC control strings.
         """
-        data = await self._resolve_record_base(domain, 'TXT', primary_ns, result)
+        data = await self._resolve_record_base(domain, "TXT", primary_ns, result)
         if data is None:
             return
 
-        result['TXT'] = []
+        result["TXT"] = []
         for txt_record in data:  # type: dns.rdtypes.ANY.TXT.TXT
             for string in txt_record.strings:
                 try:
-                    text_orig = string.decode('utf-8')
+                    text_orig = string.decode("utf-8")
                 except UnicodeDecodeError:
-                    text_orig = string.decode('ascii', errors='backslashreplace')
-                result['TXT'].append(text_orig)
+                    text_orig = string.decode("ascii", errors="backslashreplace")
+                result["TXT"].append(text_orig)
 
-    async def _resolve_record_base(self, domain: Name, record_type: str, primary_ns: list[str],
-                                   result: dict[str, Any]) -> Optional[RRset]:
+    async def _resolve_record_base(
+        self, domain: Name, record_type: str, primary_ns: list[str], result: dict[str, Any]
+    ) -> Optional[RRset]:
         """
         Common base for record resolving. Populates the corresponding DNSSEC, TTL and source of resolution metadata
         values in a result object. Consumes exceptions, returns None when there's an error, the resulting RRset
@@ -220,20 +280,21 @@ class DNSScanner:
             data, _, from_primary, err = await self._resolve(domain, record_type, primary_ns)
             if data is None or data.name != domain:
                 if err is not None:
-                    result['errors'][record_type] = err
+                    result["errors"][record_type] = err
                 return None
 
-            result['ttls'][record_type] = data.ttl
+            result["ttls"][record_type] = data.ttl
             if len(data) == 0:
-                result['errors'][record_type] = f"Got answer but no record data"  # Shouldn't happen
+                result["errors"][record_type] = "Got answer but no record data"  # Shouldn't happen
                 return None
 
             return data
         except Exception as e:
-            result['errors'][record_type] = str(e)
+            result["errors"][record_type] = str(e)
 
-    async def _resolve(self, domain: Name, record_type: str, primary_ns: Optional[list[str]]) -> \
-            tuple[Optional[RRset], Optional[RRset], bool, Optional[str]]:
+    async def _resolve(
+        self, domain: Name, record_type: str, primary_ns: Optional[list[str]]
+    ) -> tuple[Optional[RRset], Optional[RRset], bool, Optional[str]]:
         """
         Queries a record set of a given type for a domain. Tries to use provided IP addresses of the primary nameserver.
         When a query to a primary NS fails, the address is removed from the provided list. When no addresses are left,
@@ -281,8 +342,9 @@ class DNSScanner:
             query = dns.message.make_query(domain, record_type, use_edns=True, want_dnssec=True)
             # noinspection PyBroadException
             try:
-                response, _ = await dns.asyncquery.udp_with_fallback(query, ns_to_try, self._options.timeout,
-                                                                     udp_sock=None)
+                response, _ = await dns.asyncquery.udp_with_fallback(
+                    query, ns_to_try, self._options.timeout, udp_sock=None
+                )
                 res_data, res_sig = get_response_pair(response)
                 return res_data, res_sig, True, None
             except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer, KeyError):
@@ -294,7 +356,8 @@ class DNSScanner:
                     return None, None, True, self._timeout_error
                 else:
                     self._logger.debug(
-                        f"{domain}: {record_type} timeout, {retries_left} retries left (pNS {ns_to_try})")
+                        f"{domain}: {record_type} timeout, {retries_left} retries left (pNS {ns_to_try})"
+                    )
                     if len(primary_ns) > nameserver_count_threshold:
                         del primary_ns[0]
                     else:

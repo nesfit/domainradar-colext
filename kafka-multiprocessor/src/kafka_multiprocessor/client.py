@@ -11,7 +11,9 @@ import confluent_kafka as ck
 
 
 class KafkaClient:
-    def __init__(self, config: dict, input_topic: str, processor_type: typing.Type[KafkaMessageProcessor]):
+    def __init__(
+        self, config: dict, input_topic: str, processor_type: typing.Type[KafkaMessageProcessor]
+    ):
         self._config = config
         self._input_topic = input_topic
         self._processor_type = processor_type
@@ -39,8 +41,9 @@ class KafkaClient:
         self._producer.init_transactions()
         self._logger.info("Producer initialized")
 
-        self._request_handler = WorkerManager(self._config, self._input_topic, self._processor_type,
-                                              self._consumer, self._producer)
+        self._request_handler = WorkerManager(
+            self._config, self._input_topic, self._processor_type, self._consumer, self._producer
+        )
         sleep(self._client_config.get("init_wait", 0))
         self._run_consume_loop()
 
@@ -72,7 +75,9 @@ class KafkaClient:
 
                     if msg.error():
                         # TODO: Handle error
-                        self._logger.warning("Consumer error", exc_info=ck.KafkaException(msg.error()))
+                        self._logger.warning(
+                            "Consumer error", exc_info=ck.KafkaException(msg.error())
+                        )
                         continue
 
                     # Pass the message to the handler

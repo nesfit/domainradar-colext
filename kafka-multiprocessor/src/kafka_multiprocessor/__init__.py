@@ -1,16 +1,24 @@
 import os
-from typing import Type, Callable
+from typing import Type, Callable, Any
 import multiprocessing as mp
 
 from . import util
 
 from .client import KafkaClient
-from .message_processor import *
+from .message_processor import (
+    KafkaMessageProcessor,
+    SyncKafkaMessageProcessor,
+    AsyncKafkaMessageProcessor,
+    Message,
+)
 from .types import SimpleMessage
 
 
-def run_client(input_topic: str, processor_type: Type[KafkaMessageProcessor], 
-               app_id_override: str | Callable[[dict[str, Any]], str | None] | None = None):
+def run_client(
+    input_topic: str,
+    processor_type: Type[KafkaMessageProcessor],
+    app_id_override: str | Callable[[dict[str, Any]], str | None] | None = None,
+):
     config = util.read_config()
     mp.set_start_method(config.get("client", {}).get("mp_start_method", "forkserver"))
 
@@ -21,6 +29,7 @@ def run_client(input_topic: str, processor_type: Type[KafkaMessageProcessor],
 
     if os.getenv("DOMRAD_PROCESS_STANDALONE"):
         from .standalone import run_cli
+
         run_cli(config, processor_type)
     else:
         util.init_logging()
@@ -36,5 +45,5 @@ __all__ = [
     "SyncKafkaMessageProcessor",
     "AsyncKafkaMessageProcessor",
     "SimpleMessage",
-    "Message"
+    "Message",
 ]
