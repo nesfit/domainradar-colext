@@ -25,3 +25,20 @@ kafka-multiprocessor = { workspace = true }
 [build-system]
 requires = ["uv_build>=0.9.16,<0.10.0"]
 build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+    "ruff>=0.14.8",
+]
+
+[tool.ruff]
+line-length = 99
+target-version = "py313"
+
+[tool.ruff.lint]
+extend-select = ["E501"]
+
+[tool.ruff.format]
+docstring-code-format = true
+docstring-code-line-length = 79
