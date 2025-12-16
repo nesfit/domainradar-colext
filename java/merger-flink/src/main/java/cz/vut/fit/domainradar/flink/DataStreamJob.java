@@ -68,22 +68,22 @@ public class DataStreamJob {
         env.getConfig().setGlobalJobParameters(allProperties);
 
         // ==== Checkpointing ====
-        env.enableCheckpointing(10000, CheckpointingMode.EXACTLY_ONCE);
+        env.enableCheckpointing(60000, CheckpointingMode.EXACTLY_ONCE);
         final var checkpointConfig = env.getCheckpointConfig();
         // Retain the last checkpoint both when the job fails and when it is manually cancelled
         checkpointConfig.setExternalizedCheckpointRetention(ExternalizedCheckpointRetention.RETAIN_ON_CANCELLATION);
         // Checkpoints may sometimes take longer than on average, don't congest the system
         // with additional checkpoint runs
-        checkpointConfig.setMinPauseBetweenCheckpoints(5000);
-        // Checkpoints have to complete within 30 seconds, or are discarded
-        checkpointConfig.setCheckpointTimeout(30000);
+        checkpointConfig.setMinPauseBetweenCheckpoints(30000);
+        // Checkpoints have to complete within 60 seconds, or are discarded
+        checkpointConfig.setCheckpointTimeout(90000);
         // Two consecutive checkpoint failures are tolerated
-        checkpointConfig.setTolerableCheckpointFailureNumber(5);
+        checkpointConfig.setTolerableCheckpointFailureNumber(3);
         // Allow only one checkpoint to be in progress at the same time
         checkpointConfig.setMaxConcurrentCheckpoints(1);
         // TODO: Determine if unaligned checkpoints help the pipeline
         //       (especially under heavy load)
-        // checkpointConfig.enableUnalignedCheckpoints();
+        checkpointConfig.enableUnalignedCheckpoints();
 
         // Create the pipeline
         makePipeline(env);
