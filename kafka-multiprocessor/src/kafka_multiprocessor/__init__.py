@@ -20,7 +20,9 @@ def run_client(
     app_id_override: str | Callable[[dict[str, Any]], str | None] | None = None,
 ):
     config = util.read_config()
-    mp.set_start_method(config.get("client", {}).get("mp_start_method", "forkserver"))
+    mp_start_method = config.get("client", {}).get("mp_start_method", "forkserver")
+    if mp.get_start_method(allow_none=True) is None:
+        mp.set_start_method(mp_start_method)
 
     if callable(app_id_override):
         app_id_override = app_id_override(config)

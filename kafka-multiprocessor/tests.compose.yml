@@ -1,0 +1,47 @@
+services:
+  redpanda:
+    image: redpandadata/redpanda:latest
+    command:
+      - redpanda
+      - start
+      - --overprovisioned
+      - --smp
+      - "1"
+      - --memory
+      - "1G"
+      - --reserve-memory
+      - "0M"
+      - --node-id
+      - "0"
+      - --check=false
+      - --kafka-addr
+      - PLAINTEXT://0.0.0.0:9092
+      - --advertise-kafka-addr
+      - PLAINTEXT://redpanda:9092,PLAINTEXT_HOST://localhost:29092
+      - --set
+      - redpanda.auto_create_topics_enabled=true
+    ports:
+      - "29092:29092"
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  tests:
+    build:
+      context: .
+      dockerfile: tests.Dockerfile
+    working_dir: /work
+    volumes:
+      - ./tests:/work/tests
+      - ./src:/work/src
+    environment:
+      KAFKA_BROKERS: redpanda:9092
+      KAFKA_INPUT_TOPIC: integration-input
+      KAFKA_OUTPUT_TOPIC: integration-output
+      REDIS_URI: redis://redis:6379/0
+    depends_on:
+      - redpanda
+      - redis
+    command: ["pytest"]
