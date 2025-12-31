@@ -41,7 +41,8 @@ def _get_rate_limiter_section(config: dict, bucket_key: str) -> dict | None:
     Get the rate limiter configuration section for the given bucket key.
     :param config: The application configuration.
     :param bucket_key: The bucket key to get the configuration for.
-    :return: The rate limiter configuration section for the given bucket key or None if not found (or not a dictionary).
+    :return: The rate limiter configuration section for the given bucket key or None if not found
+             (or not a dictionary).
     """
     assert bucket_key is not None
     assert config is not None

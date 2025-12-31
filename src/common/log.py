@@ -73,8 +73,8 @@ class _CustomLoggerT(logging.Logger):
         """
         Logs an info level message with a key.
 
-        This method is similar to the standard info method, but it includes a key in the log output.
-        The key can be used to group related log messages.
+        This method is similar to the standard info method, but it includes
+        a key in the log output. The key can be used to group related log messages.
 
         Args:
             message (str): The message to be logged.

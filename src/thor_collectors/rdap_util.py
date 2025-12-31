@@ -14,17 +14,19 @@ async def fetch_entities(response: DomainResponse, client: RDAPClient) -> List[R
     """
     Asynchronously fetches RDAP entities related to a given domain response.
 
-    This function takes a DomainResponse object and an RDAPClient object as input. It checks if the response has
-    entities. If not, it returns an empty list.
+    This function takes a DomainResponse object and an RDAPClient object as input.
+    It checks if the response has entities. If not, it returns an empty list.
 
-    For each entity in the response, it checks if the entity has links and does not have a vcardArray. If so, it
-    iterates over the links. It then tries to get a RDAP response for the link's href. If it fails, it adds the original
-    entity to the result and breaks the loop.
+    For each entity in the response, it checks if the entity has links
+    and does not have a vcardArray. If so, it iterates over the links. It then tries to get
+    a RDAP response for the link's href. If it fails, it adds the original entity to the result
+    and breaks the loop.
 
-    If it succeeds, it reads the response, creates an RDAPResponse object from the response JSON, and adds the original
-    entity's roles to the fetched entity if they exist. It then adds the fetched entity to the result. If the entity
-    does not have links or has a vcardArray, it adds the entity to the result. Finally, it deletes the entities from the
-    original response and returns the result.
+    If it succeeds, it reads the response, creates an RDAPResponse object from the response JSON,
+    and adds the original entity's roles to the fetched entity if they exist. It then adds
+    the fetched entity to the result. If the entity does not have links or has a vcardArray,
+    it adds the entity to the result. Finally, it deletes the entities from the original response
+    and returns the result.
 
     Args:
         response (DomainResponse): The domain response to fetch entities for.
@@ -57,7 +59,8 @@ async def fetch_entities(response: DomainResponse, client: RDAPClient) -> List[R
 
                 entity_response_json = entity_response.read()
                 fetched_entity = RDAPResponse.from_json(entity_response_json)
-                # Add the original "roles" array from the source entity to the entity fetched from the link
+                # Add the original "roles" array from the source entity to the entity fetched from
+                # the link
                 if hasattr(entity, "roles"):
                     fetched_entity.roles = entity.roles
                 result.append(fetched_entity)

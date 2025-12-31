@@ -19,8 +19,8 @@ def get_config_file() -> str:
     Retrieves the path to the configuration file.
 
     The function retrieves the path from the environment variable APP_CONFIG_FILE.
-    If the environment variable is not set, it defaults to './config.toml'. The function checks if the file
-    exists and raises a FileNotFoundError if it does not.
+    If the environment variable is not set, it defaults to './config.toml'.
+    The function checks if the file exists and raises a FileNotFoundError if it does not.
 
     Returns:
         str: The path to the configuration file.

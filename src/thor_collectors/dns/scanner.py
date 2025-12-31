@@ -34,7 +34,8 @@ class DNSScanner:
     """
     A class used to perform DNS scans.
 
-    This class provides methods to perform DNS scans for different types of DNS records (A, AAAA, CNAME, MX, NS, TXT).
+    This class provides methods to perform DNS scans for different types of DNS records
+    (A, AAAA, CNAME, MX, NS, TXT).
     It uses the provided DNSCollectorOptions to configure the DNS queries and timeouts.
     """
 
@@ -57,19 +58,23 @@ class DNSScanner:
         """
         Asynchronously scans DNS records for a given domain name based on the provided request.
 
-        This method takes a domain name and a DNSRequest object as input. It uses the DNSRequest object to determine
-        which types of DNS records to collect for the domain name. The method then performs DNS queries to collect the
-        requested records and returns a DNSResult object containing the results of the queries.
+        This method takes a domain name and a DNSRequest object as input.
+        It uses the DNSRequest object to determine which types of DNS records to collect for
+        the domain name. The method then performs DNS queries to collect the requested records
+        and returns a DNSResult object containing the results of the queries.
 
-        If the method encounters an error while performing a DNS query, it logs the error and continues with the next
-        query. If all queries fail, the method returns a DNSResult object with an error status.
+        If the method encounters an error while performing a DNS query, it logs the error
+        and continues with the next query. If all queries fail, the method returns a DNSResult
+        object with an error status.
 
         Args:
             domain_name (str): The domain name to scan.
-            request (DNSRequest): The request object specifying which types of DNS records to collect.
+            request (DNSRequest): The request object specifying which types of DNS records
+                                  to collect.
 
         Returns:
-            DNSResult: The result of the DNS scan, including any collected DNS records and any errors that occurred.
+            DNSResult: The result of the DNS scan, including any collected DNS records and any
+                       errors that occurred.
         """
 
         zone = request.zone_info
@@ -165,7 +170,9 @@ class DNSScanner:
         ips: list[IPFromRecord],
         add_ips: bool,
     ):
-        """Resolves an A or AAAA record set for a given domain name and populates a result object."""
+        """
+        Resolves an A or AAAA record set for a given domain name and populates a result object.
+        """
         data = await self._resolve_record_base(domain, record_type, primary_ns, result)
         if data is None:
             return
@@ -271,9 +278,10 @@ class DNSScanner:
         self, domain: Name, record_type: str, primary_ns: list[str], result: dict[str, Any]
     ) -> Optional[RRset]:
         """
-        Common base for record resolving. Populates the corresponding DNSSEC, TTL and source of resolution metadata
-        values in a result object. Consumes exceptions, returns None when there's an error, the resulting RRset
-        doesn't match the queried domain name or when it's empty.
+        Common base for record resolving. Populates the corresponding DNSSEC, TTL and source
+        of resolution metadata values in a result object. Consumes exceptions, returns None when
+        there's an error, the resulting RRset doesn't match the queried domain name
+        or when it's empty.
         """
         # noinspection PyBroadException
         try:
@@ -296,9 +304,10 @@ class DNSScanner:
         self, domain: Name, record_type: str, primary_ns: Optional[list[str]]
     ) -> tuple[Optional[RRset], Optional[RRset], bool, Optional[str]]:
         """
-        Queries a record set of a given type for a domain. Tries to use provided IP addresses of the primary nameserver.
-        When a query to a primary NS fails, the address is removed from the provided list. When no addresses are left,
-        uses dnspython's stub resolver with the globally configured DNS server address(es).
+        Queries a record set of a given type for a domain. Tries to use provided IP addresses
+        of the primary nameserver. When a query to a primary NS fails, the address is removed
+        from the provided list. When no addresses are left, uses dnspython's stub resolver
+        with the globally configured DNS server address(es).
         """
 
         # noinspection PyShadowingNames
@@ -356,7 +365,8 @@ class DNSScanner:
                     return None, None, True, self._timeout_error
                 else:
                     self._logger.debug(
-                        f"{domain}: {record_type} timeout, {retries_left} retries left (pNS {ns_to_try})"
+                        f"{domain}: {record_type} timeout, "
+                        f"{retries_left} retries left (pNS {ns_to_try})"
                     )
                     if len(primary_ns) > nameserver_count_threshold:
                         del primary_ns[0]

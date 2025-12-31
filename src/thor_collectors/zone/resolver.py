@@ -36,17 +36,19 @@ class ZoneResolver:
 
     async def get_zone_info(self, domain_name: str) -> ZoneInfo | None:
         """
-        Finds the zone domain name and SOA record of the most specific zone (deepest point of delegation)
-        in which the input domain name resides.
+        Finds the zone domain name and SOA record of the most specific zone
+        (deepest point of delegation) in which the input domain name resides.
 
-        * When domain_name contains an eTLD (e.g. 'cz', 'co.uk' or 'hakodate.hokkaido.jp'), the resolution is
-          performed so the result is the SOA record of the eTLD.
-        * However, if domain_name is any other DN, the eTLD is skipped (e.g. for 'fit.vut.cz', the query is made
-          for 'vut.cz' and 'fit.vut.cz' but not 'cz').
+        * When domain_name contains an eTLD (e.g. 'cz', 'co.uk' or 'hakodate.hokkaido.jp'),
+          the resolution is performed so the result is the SOA record of the eTLD.
+        * However, if domain_name is any other DN, the eTLD is skipped (e.g. for 'fit.vut.cz',
+          the query is made for 'vut.cz' and 'fit.vut.cz' but not 'cz').
 
-        :raises dns.resolver.Timeout: if any DNS query in the process of determining the zone timed out.
-        :return: None if the input is empty or an IP address, has invalid suffix (eTLD), or no active zone was found.
-            | :class:`ZoneInfo` if the zone domain name and SOA record were found.
+        :raises dns.resolver.Timeout: if any DNS query in the process of determining
+                                      the zone timed out.
+        :return: None if the input is empty or an IP address, has invalid suffix (eTLD),
+                 or no active zone was found. | :class:`ZoneInfo` if the zone domain name
+                 and SOA record were found.
         """
         name_parts = tldextract.extract(domain_name)
 
@@ -79,8 +81,9 @@ class ZoneResolver:
                 answer = await self._dns.resolve(domain_to_check, rdt.SOA)
                 if len(answer) == 0 or answer[0].rdtype != rdt.SOA:
                     break
-                # Some unicorn DNS servers return a SOA in the Answer section even for CNAMEs... and it points
-                # to the SOA of the CNAME target. We need to check if the SOA is for the correct domain.
+                # Some unicorn DNS servers return a SOA in the Answer section even for CNAMEs...
+                # and it points to the SOA of the CNAME target.
+                # We need to check if the SOA is for the correct domain.
                 if input_name.is_subdomain(answer.rrset.name):
                     soa = answer[0]  # type: dns.rdtypes.ANY.SOA.SOA
                     soa_record = SOARecord(

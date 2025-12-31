@@ -78,19 +78,20 @@ class WHOISProcessor(BaseAsyncCollectorProcessor[str, WHOISRequest]):
             zone = None
 
         if zone is not None:
-            # If the zone DN is available, get WHOIS data for it. There's no point in trying the actual
-            # source domain name, WHOIS provide the same data for points of delegation
+            # If the zone DN is available, get WHOIS data for it. There's no point in trying
+            # the actual source domain name, WHOIS provide the same data for points of delegation
             target = zone
         else:
-            # If the zone DN is not available, try to get WHOIS data for the actual source domain name
+            # If the zone DN is not available,
+            # try to get WHOIS data for the actual source domain name
             target = dn
 
         whois_raw, whois_err_code, whois_err_msg = await self.fetch_whois(target, target_endpoint)
         logger.k_trace("Got result %s for target %s", dn, whois_err_code, target)
 
         if whois_err_code == rc.NOT_FOUND:
-            # If the WHOIS data is not found for the source DN, try to get it for the registered domain name
-            # (i.e. one level above the public suffix)
+            # If the WHOIS data is not found for the source DN, try to get it for the registered
+            # domain name (i.e. one level above the public suffix)
             target_parts = tldextract.extract(target)
             if target_parts.domain != "" and target_parts.suffix != "":
                 reg_whois_target = target_parts.domain + "." + target_parts.suffix
@@ -126,7 +127,8 @@ class WHOISProcessor(BaseAsyncCollectorProcessor[str, WHOISRequest]):
                 query=domain_name, server=target_endpoint, timeout=self._timeout
             )
             if (err_code := find_error(whois_raw)) is not None:
-                # Produce the NOT_FOUND or RATE_LIMITED error code if we can find it in the response
+                # Produce the NOT_FOUND or RATE_LIMITED error code
+                # if we can find it in the response
                 return whois_raw, err_code, None
             return whois_raw, rc.OK, None
         except (TimeoutError, socket.timeout) as e:

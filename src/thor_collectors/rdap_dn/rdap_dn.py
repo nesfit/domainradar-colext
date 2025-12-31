@@ -84,19 +84,20 @@ class RDAPDNProcessor(BaseAsyncCollectorProcessor[str, RDAPDomainRequest]):
             zone = req.zone
 
         if zone is not None:
-            # If the zone DN is available, get RDAP data for it. There's no point in trying the actual
-            # source domain name, RDAP should only provide data for points of delegation
+            # If the zone DN is available, get RDAP data for it. There's no point in trying the
+            # actual source domain name, RDAP should only provide data for points of delegation
             rdap_target = zone
         else:
-            # If the zone DN is not available, try to get RDAP data for the actual source domain name
+            # If the zone DN is not available, try to get RDAP data for the actual
+            # source domain name
             rdap_target = dn
 
         rdap_data, entities, err_code, err_msg = await self.fetch_rdap(rdap_target)
         logger.k_trace("Got result %s for target %s", dn, err_code, rdap_target)
 
         if rdap_data is None:
-            # If the RDAP data is not available for the source DN, try to get it for the registered domain name
-            # (i.e. one level above the public suffix)
+            # If the RDAP data is not available for the source DN, try to get it for
+            # the registered domain name (i.e. one level above the public suffix)
             target_parts = tldextract.extract(rdap_target)
             if target_parts.domain != "" and target_parts.suffix != "":
                 reg_rdap_target = target_parts.domain + "." + target_parts.suffix
@@ -123,7 +124,8 @@ class RDAPDNProcessor(BaseAsyncCollectorProcessor[str, RDAPDomainRequest]):
         return_messages = [(self._output_topic, message.key_raw, dump_model(result))]
         if err_code != rc.OK:
             # If there was an error, we can try to get WHOIS data for the domain as a fallback
-            # Re-use the raw value of the original message as the WHOIS request is the same as RDAP-DN
+            # Re-use the raw value of the original message as the WHOIS request
+            # is the same as RDAP-DN
             return_messages.append(("to_process_WHOIS", message.key_raw, message.value_raw))
         return return_messages
 

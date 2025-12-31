@@ -27,8 +27,8 @@ def get_config_file() -> str:
     Retrieves the path to the configuration file.
 
     The function retrieves the path from the environment variable APP_CONFIG_FILE.
-    If the environment variable is not set, it defaults to './config.toml'. The function checks if the file
-    exists and raises a FileNotFoundError if it does not.
+    If the environment variable is not set, it defaults to './config.toml'.
+    The function checks if the file exists and raises a FileNotFoundError if it does not.
 
     Returns:
         str: The path to the configuration file.
@@ -90,11 +90,13 @@ def ensure_model(model_class: Type[TModel], data: dict | str | bytes | None) -> 
     """
     Validates the provided data against the specified Pydantic model class.
 
-    This function takes a model class and a dictionary of data as input. It attempts to validate the data against
-    the model class using the model's `model_validate` method. If the data is valid, the function returns the validated
-    model. If the data is not valid, the function logs a warning and returns None.
+    This function takes a model class and a dictionary of data as input. It attempts to validate
+    the data against the model class using the model's `model_validate` method.
+    If the data is valid, the function returns the validated model.
+    If the data is not valid, the function logs a warning and returns None.
 
-    If an exception occurs during the validation process, the function logs an error and returns None.
+    If an exception occurs during the validation process, the function logs an error
+    and returns None.
 
     Args:
         model_class (Type[TModel]): The class of the model against which to validate the data.
