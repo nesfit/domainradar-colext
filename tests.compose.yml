@@ -28,19 +28,38 @@ services:
     ports:
       - "6379:6379"
 
-  tests:
+  tests-multiprocessor:
     build:
       context: .
       dockerfile: tests.Dockerfile
-    working_dir: /work
+    working_dir: /work/kafka-multiprocessor
     volumes:
-      - ./tests:/work/tests
-      - ./src:/work/src
+      - ./kafka-multiprocessor/tests:/work/kafka-multiprocessor/tests
+      - ./kafka-multiprocessor/src:/work/kafka-multiprocessor/src
     environment:
       KAFKA_BROKERS: redpanda:9092
       KAFKA_INPUT_TOPIC: integration-input
       KAFKA_OUTPUT_TOPIC: integration-output
       REDIS_URI: redis://redis:6379/0
+    depends_on:
+      - redpanda
+      - redis
+    command: ["pytest"]
+
+  tests-collectors:
+    build:
+      context: .
+      dockerfile: tests.Dockerfile
+    working_dir: /work/
+    volumes:
+      - ./tests:/work/tests
+      - ./kafka-multiprocessor/src:/work/kafka-multiprocessor/src
+      - ./src:/work/src
+    environment:
+      KAFKA_BROKERS: redpanda:9092
+      REDIS_URI: redis://redis:6379/0
+      WHOIS_NETWORK_TEST: 1
+      TESTS_ALLOW_NETWORK: 1
     depends_on:
       - redpanda
       - redis
