@@ -3,7 +3,7 @@ Thor Collectors
 
 Purpose
 -------
-Thor Collectors is a suite of Kafka-driven, multiprocessing collectors used to
+Thor Python Collectors is a suite of Kafka-driven, multiprocessing collectors used to
 gather domain-related threat intelligence data. Each collector is a small
 service that consumes messages from an input topic, enriches or resolves data,
 and produces one or more output messages. The project uses the in-repo
@@ -69,19 +69,63 @@ Configuration
 - `kafka-multiprocessor` supports optional Redis-backed rate limiting; the
   collectors use it for RDAP/WHOIS when enabled.
 
-Running collectors
-------------------
+Running the collectors
+----------------------
+The project is managed by [*uv*](https://docs.astral.sh/uv/). Install *uv* before proceeding
+with any commands.
+
 Each collector has a module entry point that starts the Kafka worker pool using
 `kafka-multiprocessor`:
 
 ```bash
 export APP_CONFIG_FILE=./config.toml
-python -m thor_collectors.zone
-python -m thor_collectors.dns
-python -m thor_collectors.rdap_dn
-python -m thor_collectors.whois
-python -m thor_collectors.rdap_ip
-python -m thor_collectors.rtt
+uv run python -m thor_collectors.zone
+uv run python -m thor_collectors.dns
+uv run python -m thor_collectors.rdap_dn
+uv run python -m thor_collectors.whois
+uv run python -m thor_collectors.rdap_ip
+uv run python -m thor_collectors.rtt
+```
+
+Testing
+-------
+
+Run the **unit test** suite with pytest:
+
+```bash
+uv run pytest
+```
+
+**Integration tests** are also available. They are marked with `integration` and require 
+extra environment  variables (network and Kafka):
+
+```bash
+export KAFKA_BROKERS=localhost:29092
+export REDIS_URI=redis://localhost:6379
+export TESTS_ALLOW_NETWORK=1
+export WHOIS_NETWORK_TEST=1
+uv run pytest
+```
+
+To run the full integration stack (Redpanda + Redis) in Docker, use the provided Compose file:
+
+```bash
+docker compose -f tests.compose.yml up --build
+```
+
+Docker runtime image
+--------------------
+
+Build the image and run a collector by setting `THOR_COLLECTOR_MODULE`.
+Remember to mount your configuration file (and possibly the SSL certificates if needed).
+
+```bash
+docker build -t thor-collectors .
+docker run --rm \
+  -e THOR_COLLECTOR_MODULE=thor_collectors.zone \
+  -e APP_CONFIG_FILE=/app/config.toml \
+  -v "$PWD/config.toml:/app/config.toml:ro" \
+  thor-collectors
 ```
 
 Repository layout
