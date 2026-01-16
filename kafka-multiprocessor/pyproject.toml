@@ -5,7 +5,7 @@ description = "Library for heavily parallel Kafka message load-transform-publish
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "confluent-kafka >=2.12.2",
+    "confluent-kafka >=2.13.0",
     "sortedcontainers >=2.4.0",
     "pyrate-limiter >=3.9.0",
     "redis >=6.2.0"
