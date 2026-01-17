@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="INFO" dest="err">
+    <Appenders>
+        <Console name="Console" target="SYSTEM_OUT">
+            <PatternLayout
+                    pattern="[%d{ISO8601_OFFSET_DATE_TIME_HHMM}] [%level{WARN=WARNING}] [%logger{1}#%tid-%thread] %msg%n"/>
+        </Console>
+    </Appenders>
+    <Loggers>
+        <Logger name="org.apache.kafka" level="WARN"/>
+        <Logger name="io.confluent.parallelconsumer" level="WARN"/>
+        <Logger name="cz.vut.fit.domainradar" level="INFO"/>
+        <Root level="INFO">
+            <AppenderRef ref="Console"/>
+        </Root>
+    </Loggers>
+</Configuration>
