@@ -5,6 +5,7 @@ import cz.vut.fit.domainradar.Common;
 import cz.vut.fit.domainradar.standalone.collectors.GeoAsnCollector;
 import cz.vut.fit.domainradar.standalone.collectors.NERDCollector;
 import cz.vut.fit.domainradar.standalone.collectors.TLSCollector;
+import cz.vut.fit.domainradar.standalone.collectors.VertxHTTPCollector;
 import cz.vut.fit.domainradar.standalone.collectors.VertxQRadarCollector;
 import org.apache.commons.cli.*;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -104,6 +105,10 @@ public class StandaloneCollectorRunner {
                 components.add(new TLSCollector(mapper, appId, properties));
             }
 
+            if (useAll || cmd.hasOption("col-http")) {
+                components.add(new VertxHTTPCollector(mapper, appId, properties));
+            }
+
             if (useAll || cmd.hasOption("col-nerd")) {
                 components.add(new NERDCollector(mapper, appId, properties));
             }
@@ -166,6 +171,7 @@ public class StandaloneCollectorRunner {
         options.addOption("a", "all", false, "Use all collectors");
 
         options.addOption(null, "col-tls", false, "Use the TLS collector");
+        options.addOption(null, "col-http", false, "Use the HTTP collector");
         options.addOption(null, "col-nerd", false, "Use the NERD collector");
         options.addOption(null, "col-geo", false, "Use the GEO-ASN collector");
         options.addOption(null, "col-qradar", false, "Use the QRadar Offense collector");
