@@ -47,6 +47,8 @@ public class VertxHTTPCollector
     private final KafkaProducer<String, HTTPResult> _producer;
     private final int _timeoutMs;
     private final int _maxRedirects;
+    private final int _httpPort;
+    private final int _httpsPort;
     private final int _maxSizeBytes = 1024 * 1024; // 1 MB (TODO: Configuration property)
 
     private WebClient _client;
@@ -65,6 +67,10 @@ public class VertxHTTPCollector
                 CollectorConfig.HTTP_TIMEOUT_MS_DEFAULT));
         _maxRedirects = Integer.parseInt(properties.getProperty(CollectorConfig.HTTP_MAX_REDIRECTS_CONFIG,
                 CollectorConfig.HTTP_MAX_REDIRECTS_DEFAULT));
+        _httpPort = Integer.parseInt(properties.getProperty(CollectorConfig.HTTP_PORT_CONFIG,
+                CollectorConfig.HTTP_PORT_DEFAULT));
+        _httpsPort = Integer.parseInt(properties.getProperty(CollectorConfig.HTTPS_PORT_CONFIG,
+                CollectorConfig.HTTPS_PORT_DEFAULT));
 
         _producer = super.createProducer(new StringSerializer(),
                 JsonSerde.of(jsonMapper, HTTPResult.class).serializer());
@@ -241,8 +247,8 @@ public class VertxHTTPCollector
                 || statusCode == 307 || statusCode == 308;
     }
 
-    private static int schemeToPort(String scheme) {
-        return "https".equalsIgnoreCase(scheme) ? 443 : 80;
+    private int schemeToPort(String scheme) {
+        return "https".equalsIgnoreCase(scheme) ? _httpsPort : _httpPort;
     }
 
     private static HTTPResult successResult(FetchResult result) {

@@ -46,6 +46,12 @@ public class CollectorConfig {
     public static final String HTTP_MAX_REDIRECTS_CONFIG = "collectors.http.max.redirects";
     public static final String HTTP_MAX_REDIRECTS_DOC = "The maximum number of HTTP redirects to follow.";
     public static final String HTTP_MAX_REDIRECTS_DEFAULT = "2";
+    public static final String HTTP_PORT_CONFIG = "collectors.http.port";
+    public static final String HTTP_PORT_DOC = "The port to use for HTTP requests.";
+    public static final String HTTP_PORT_DEFAULT = "80";
+    public static final String HTTPS_PORT_CONFIG = "collectors.http.https.port";
+    public static final String HTTPS_PORT_DOC = "The port to use for HTTPS requests.";
+    public static final String HTTPS_PORT_DEFAULT = "443";
 
     /* --- QRadar collector --- */
     public static final String QRADAR_URL_CONFIG = "collectors.qradar.url";
