@@ -8,8 +8,8 @@ import cz.vut.fit.domainradar.models.ResultCodes;
 import cz.vut.fit.domainradar.models.results.TLSResult;
 import cz.vut.fit.domainradar.serialization.JsonSerde;
 import cz.vut.fit.domainradar.standalone.BaseStandaloneCollector;
-import cz.vut.fit.domainradar.standalone.https.HTTPSFetcherBase;
-import cz.vut.fit.domainradar.standalone.https.HTTPSFetcherImpl;
+import cz.vut.fit.domainradar.standalone.tls.TLSFetcherBase;
+import cz.vut.fit.domainradar.standalone.tls.TLSFetcherImpl;
 import io.confluent.parallelconsumer.ParallelStreamProcessor;
 import org.apache.commons.cli.CommandLine;
 import org.apache.kafka.clients.producer.KafkaProducer;
@@ -29,7 +29,7 @@ import java.util.concurrent.*;
  * A collector that processes TLS data for domain names.
  *
  * @author Ondřej Ondryáš
- * @see cz.vut.fit.domainradar.standalone.https.HTTPSFetcherBase
+ * @see TLSFetcherBase
  */
 public class TLSCollector
         extends BaseStandaloneCollector<String, String, ParallelStreamProcessor<String, String>> {
@@ -40,9 +40,8 @@ public class TLSCollector
 
     private final KafkaProducer<String, TLSResult> _producer;
     private final ExecutorService _executor;
-    private final int _timeout, _timeoutHTTPOnly;
-    private final boolean _tryHTTPOnly;
-    private final HTTPSFetcherBase _collector;
+    private final int _timeout;
+    private final TLSFetcherBase _collector;
 
     public TLSCollector(@NotNull ObjectMapper jsonMapper, @NotNull String appName, @NotNull Properties properties) {
         super(jsonMapper, appName, properties,
@@ -50,21 +49,8 @@ public class TLSCollector
 
         _timeout = Integer.parseInt(properties.getProperty(CollectorConfig.TLS_TIMEOUT_MS_CONFIG,
                 CollectorConfig.TLS_TIMEOUT_MS_DEFAULT));
-        _timeoutHTTPOnly = Integer.parseInt(properties.getProperty(CollectorConfig.TLS_HTTPONLY_TIMEOUT_MS_CONFIG,
-                CollectorConfig.TLS_HTTPONLY_TIMEOUT_MS_DEFAULT));
-
-        _tryHTTPOnly = Boolean.parseBoolean(properties.getProperty(CollectorConfig.TLS_HTTPONLY_ENABLED_CONFIG,
-                CollectorConfig.TLS_HTTPONLY_ENABLED_DEFAULT));
-
-        var maxRedirects = Integer.parseInt(properties.getProperty(CollectorConfig.TLS_MAX_REDIRECTS_CONFIG,
-                CollectorConfig.TLS_MAX_REDIRECTS_DEFAULT));
-        var maxRedirectsHTTPOnly = Integer.parseInt(
-                properties.getProperty(CollectorConfig.TLS_HTTPONLY_MAX_REDIRECTS_CONFIG,
-                        CollectorConfig.TLS_HTTPONLY_MAX_REDIRECTS_DEFAULT));
-
         _executor = Executors.newVirtualThreadPerTaskExecutor();
-        _collector = new HTTPSFetcherImpl(maxRedirects, _timeout, maxRedirectsHTTPOnly, _timeoutHTTPOnly,
-                _executor, Logger);
+        _collector = new TLSFetcherImpl(_timeout, Logger);
         _producer = super.createProducer(new StringSerializer(),
                 JsonSerde.of(jsonMapper, TLSResult.class).serializer());
 
@@ -86,7 +72,6 @@ public class TLSCollector
         // The timeout is used for connect and for the communication, so the absolute
         // processing bound must be slightly over its double
         final long futureTimeout = (long) (_timeout * 2.1);
-        final long httpFutureTimeout = (long) (_timeoutHTTPOnly * 1.1);
         buildProcessor(0, futureTimeout);
 
         _parallelProcessor.subscribe(UniLists.of(Topics.IN_TLS));
@@ -100,28 +85,16 @@ public class TLSCollector
 
             try {
                 var result = resultFuture.join();
-                if (_tryHTTPOnly && result.statusCode() != 0 && result.html() == null) {
-                    // Try HTTP to fetch the HTML
-                    var httpFuture = _collector.collectHTTPOnly(dn, ip);
-                    try {
-                        var html = httpFuture.orTimeout(httpFutureTimeout, TimeUnit.MILLISECONDS).join();
-                        result = new TLSResult(result.statusCode(), result.error(),
-                                result.lastAttempt(), result.tlsData(), html);
-                    } catch (CompletionException e) {
-                        // intentionally ignore
-                    }
-                }
-
                 _producer.send(resultRecord(Topics.OUT_TLS, dn, result));
             } catch (CompletionException e) {
                 if (e.getCause() instanceof TimeoutException) {
                     Logger.debug("Operation timed out: {}", dn);
                     _producer.send(resultRecord(Topics.OUT_TLS, dn,
-                            HTTPSFetcherBase.errorResult(ResultCodes.TIMEOUT, "Operation timed out (%d ms)".formatted(_timeout))));
+                            TLSFetcherBase.errorResult(ResultCodes.TIMEOUT, "Operation timed out (%d ms)".formatted(_timeout))));
                 } else {
                     Logger.warn("Unexpected error: {}", dn, e.getCause());
                     _producer.send(resultRecord(Topics.OUT_TLS, dn,
-                            HTTPSFetcherBase.errorResult(ResultCodes.INTERNAL_ERROR, e.getMessage())));
+                            TLSFetcherBase.errorResult(ResultCodes.INTERNAL_ERROR, e.getMessage())));
                 }
             }
         });

@@ -1,4 +1,4 @@
-package cz.vut.fit.domainradar.standalone.https;
+package cz.vut.fit.domainradar.standalone.tls;
 
 import javax.net.ssl.X509TrustManager;
 import java.security.cert.X509Certificate;
