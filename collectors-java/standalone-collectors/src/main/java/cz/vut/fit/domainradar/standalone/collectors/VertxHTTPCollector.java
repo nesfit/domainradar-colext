@@ -204,7 +204,7 @@ public class VertxHTTPCollector
 
             final var buffer = response.body();
             final var truncated = buffer.length() > _maxSizeBytes;
-            final var body = response.body().getBytes(0, _maxSizeBytes);
+            final var body = response.body().getBytes(0, Math.min(_maxSizeBytes, buffer.length()));
             return Future.succeededFuture(new FetchResult(status, url, body, truncated));
         });
     }
