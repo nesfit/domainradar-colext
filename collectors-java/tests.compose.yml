@@ -1,0 +1,67 @@
+services:
+  redpanda:
+    image: redpandadata/redpanda:latest
+    command:
+      - redpanda
+      - start
+      - --overprovisioned
+      - --smp
+      - "1"
+      - --memory
+      - "1G"
+      - --reserve-memory
+      - "0M"
+      - --node-id
+      - "0"
+      - --check=false
+      - --kafka-addr
+      - PLAINTEXT://0.0.0.0:9092,PLAINTEXT_HOST://0.0.0.0:29092
+      - --advertise-kafka-addr
+      - PLAINTEXT://redpanda:9092,PLAINTEXT_HOST://localhost:29092
+      - --set
+      - redpanda.auto_create_topics_enabled=true
+    ports:
+      - "29092:29092"
+    healthcheck:
+      test: [ "CMD", "rpk", "cluster", "info" ]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+
+  geoip-update:
+    image: ghcr.io/maxmind/geoipupdate:v7.1.1
+    volumes:
+      - geoip-data:/usr/share/GeoIP
+    environment:
+      GEOIPUPDATE_EDITION_IDS: "GeoLite2-City GeoLite2-ASN"
+      GEOIPUPDATE_ACCOUNT_ID: ${TEST_GEOIPUPDATE_ACCOUNT_ID}
+      GEOIPUPDATE_LICENSE_KEY: ${TEST_GEOIPUPDATE_LICENSE_KEY}
+
+  tests-collectors-java:
+    build:
+      context: .
+      dockerfile: tests.Dockerfile
+      args:
+        UID: "${UID:-1000}"
+        GID: "${GID:-1000}"
+    working_dir: /work
+    user: "${UID:-1000}:${GID:-1000}"
+    volumes:
+      - ./:/work
+      - geoip-data:/usr/share/GeoIP
+    environment:
+      KAFKA_BROKERS: redpanda:9092
+      TESTS_ALLOW_NETWORK: 1
+      GEOIP_DB_DIR: /usr/share/GeoIP
+      NERD_TOKEN: ${TEST_NERD_TOKEN}
+      QRADAR_URL: ${TEST_QRADAR_URL}
+      QRADAR_TOKEN: ${TEST_QRADAR_TOKEN}
+    depends_on:
+      redpanda:
+        condition: service_healthy
+      geoip-update:
+        condition: service_completed_successfully
+    # command: ["mvn", "-pl", "standalone-collectors", "-am", "-Dgroups=integration", "-Dsurefire.failIfNoSpecifiedTests=false", "test", "-X"]
+
+volumes:
+  geoip-data: {}
